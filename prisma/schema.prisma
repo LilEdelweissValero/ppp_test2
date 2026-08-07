@@ -1,0 +1,83 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Framework {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  color     String
+  sortOrder Int       @default(0) @map("sort_order")
+  programs  Program[]
+}
+
+model Program {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  frameworkId Int
+  framework   Framework @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
+  sortOrder   Int       @default(0) @map("sort_order")
+  projects    Project[]
+
+  @@index([frameworkId])
+}
+
+model Project {
+  id                    Int     @id @default(autoincrement())
+  name                  String
+  programId             Int
+  program               Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+  reference             String?
+  owner                 String?
+  sortOrder             Int     @default(0) @map("sort_order")
+  targetQuarter         String  @map("target_quarter")
+  adjustedTargetQuarter String  @map("adjusted_target_quarter")
+  actualCompletionDate  String? @map("actual_completion_date")
+  tasks                 Task[]
+
+  @@index([programId])
+}
+
+model Task {
+  id                    Int      @id @default(autoincrement())
+  taskCode              String   @map("task_code")
+  projectId             Int
+  project               Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name                  String
+  assignee              String?
+  priority              String
+  sortOrder             Int      @default(0) @map("sort_order")
+  description           String?
+  dependencies          String?
+  notes                 String?
+  status                String
+  targetQuarter         String   @map("target_quarter")
+  adjustedTargetQuarter String   @map("adjusted_target_quarter")
+  deliverable           String?
+  attachmentUrl         String?  @map("attachment_url")
+
+  @@index([projectId])
+}
+
+model EntityChangeLog {
+  id         Int    @id @default(autoincrement())
+  entityType String @map("entity_type")
+  entityId   Int    @map("entity_id")
+  changeType String @map("change_type")
+  oldValue   String? @map("old_value")
+  newValue   String? @map("new_value")
+  remarks    String?
+  createdAt  String @map("created_at")
+  seq        Int
+
+  @@index([entityType, entityId])
+}
+
+model SystemMetadata {
+  key   String @id
+  value String
+}
