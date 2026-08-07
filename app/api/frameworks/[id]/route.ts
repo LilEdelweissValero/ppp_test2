@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { touchLastModified } from "@/lib/system-metadata";
+import { logChange, diffFields } from "@/lib/audit-log";
 
 const PRESET_COLORS = [
   "#DBEAFE",
@@ -47,11 +48,24 @@ export async function PATCH(
     updateData.color = color;
   }
 
+  const oldFramework = await prisma.framework.findUnique({ where: { id: parseInt(id) } });
   const framework = await prisma.framework.update({
     where: { id: parseInt(id) },
     data: updateData,
   });
   await touchLastModified();
+  if (oldFramework) {
+    const details = diffFields(oldFramework as Record<string, unknown>, updateData, ["name", "color"]);
+    if (details) {
+      await logChange({
+        entityType: "Framework",
+        entityId: framework.id,
+        entityName: framework.name,
+        changeType: "update",
+        details,
+      });
+    }
+  }
   return NextResponse.json(framework);
 }
 
@@ -69,7 +83,17 @@ export async function DELETE(
       { status: 400 }
     );
   }
+  const framework = await prisma.framework.findUnique({ where: { id: parseInt(id) } });
   await prisma.framework.delete({ where: { id: parseInt(id) } });
   await touchLastModified();
+  if (framework) {
+    await logChange({
+      entityType: "Framework",
+      entityId: framework.id,
+      entityName: framework.name,
+      changeType: "delete",
+      oldValue: framework.name,
+    });
+  }
   return NextResponse.json({ ok: true });
 }

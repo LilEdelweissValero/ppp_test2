@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { getLastModifiedAt } from "@/lib/system-metadata";
 import DashboardView from "@/components/DashboardView";
+import { compareQuarters } from "@/lib/quarters";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,21 @@ export default async function DashboardPage() {
     },
     orderBy: { sortOrder: "asc" },
   });
+
+  // Collect distinct quarters from tasks and projects
+  const taskQuarters = await prisma.task.findMany({
+    select: { adjustedTargetQuarter: true },
+    distinct: ["adjustedTargetQuarter"],
+  });
+  const projectQuarters = await prisma.project.findMany({
+    select: { adjustedTargetQuarter: true },
+    distinct: ["adjustedTargetQuarter"],
+  });
+
+  const quarterSet = new Set<string>();
+  for (const q of taskQuarters) quarterSet.add(q.adjustedTargetQuarter);
+  for (const q of projectQuarters) quarterSet.add(q.adjustedTargetQuarter);
+  const existingQuarters = [...quarterSet].sort(compareQuarters);
 
   const lastModifiedAt = await getLastModifiedAt();
   let formattedDate = "Never";
@@ -108,7 +124,7 @@ export default async function DashboardPage() {
       <main
         style={{ maxWidth: 1600, margin: "0 auto", padding: "20px 24px 48px" }}
       >
-        <DashboardView frameworks={frameworks} />
+        <DashboardView frameworks={frameworks} existingQuarters={existingQuarters} />
       </main>
     </div>
   );

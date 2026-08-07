@@ -19,7 +19,7 @@ interface Props {
   onSave: () => void;
 }
 
-export default function ImportCsvModal({ open, onClose, onSave }: Props) {
+export default function ImportExcelModal({ open, onClose, onSave }: Props) {
   const [result, setResult] = useState<ImportResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -36,7 +36,7 @@ export default function ImportCsvModal({ open, onClose, onSave }: Props) {
   async function handleUpload() {
     const file = fileRef.current?.files?.[0];
     if (!file) {
-      setError("Please select a CSV file");
+      setError("Please select an Excel file");
       return;
     }
 
@@ -68,24 +68,49 @@ export default function ImportCsvModal({ open, onClose, onSave }: Props) {
     }
   }
 
+  async function handleDownloadTemplate() {
+    try {
+      const res = await fetch("/api/import");
+      if (!res.ok) throw new Error("Failed to download template");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "ppp_tracker_import_template.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      setError("Failed to download template");
+    }
+  }
+
   return (
-    <Modal open={open} onClose={onClose} title="Import CSV">
+    <Modal open={open} onClose={onClose} title="Import Excel">
       <div className="space-y-4">
         <p className="text-sm text-gray-600">
-          Upload a CSV file with the following columns in order:
+          Upload an Excel file (.xlsx) with the following columns:
         </p>
-        <pre className="bg-gray-50 border border-gray-200 rounded-md p-3 text-xs overflow-x-auto">
-          framework_name, program_name, project_name, project_reference,
-          project_owner, project_target_quarter, task_code, task_name,
-          task_assignee, task_priority, task_description, task_dependencies,
-          task_notes, task_status, task_target_quarter, task_deliverable,
-          task_attachment_url
+        <pre className="bg-gray-50 border border-gray-200 rounded-md p-3 text-xs overflow-x-auto max-h-32 overflow-y-auto">
+          {`framework_name, program_name, project_name, project_reference,
+project_owner, project_target_quarter, task_code, task_name,
+task_assignee, task_priority, task_description, task_dependencies,
+task_notes, task_status, task_target_quarter, task_deliverable,
+task_attachment_url`}
         </pre>
+
+        <button
+          onClick={handleDownloadTemplate}
+          className="text-sm text-blue-600 hover:text-blue-800 underline"
+        >
+          Download Excel Template
+        </button>
 
         <input
           ref={fileRef}
           type="file"
-          accept=".csv"
+          accept=".xlsx,.xls"
           className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
         />
 

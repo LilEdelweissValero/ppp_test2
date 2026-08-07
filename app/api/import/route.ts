@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { parse } from "csv-parse/sync";
+import * as XLSX from "xlsx";
 import { touchLastModified } from "@/lib/system-metadata";
+import { logChange } from "@/lib/audit-log";
 
-const CSV_COLUMNS = [
+const EXCEL_COLUMNS = [
   "framework_name",
   "program_name",
   "project_name",
@@ -37,6 +38,95 @@ function parseQuarter(q: string): boolean {
   return /^Q[1-4]\s+\d{4}$/.test(q.trim());
 }
 
+export async function GET() {
+  const sampleRows = [
+    [
+      "Infrastructure",
+      "Network Upgrade",
+      "Core Router Replacement",
+      "REF-001",
+      "John Doe",
+      "Q3 2026",
+      "T-001",
+      "Procure new routers",
+      "Jane Smith",
+      "High",
+      "Replace all core routers",
+      "None",
+      "Budget approved",
+      "In Progress, Partial",
+      "Q3 2026",
+      "Routers deployed",
+      "",
+    ],
+    [
+      "Infrastructure",
+      "Network Upgrade",
+      "Core Router Replacement",
+      "REF-001",
+      "John Doe",
+      "Q3 2026",
+      "T-002",
+      "Configure VLANs",
+      "Jane Smith",
+      "Moderate",
+      "Set up VLAN configuration",
+      "T-001",
+      "",
+      "Not Yet Started",
+      "Q4 2026",
+      "VLAN config complete",
+      "",
+    ],
+    [
+      "Security",
+      "Access Control",
+      "Badge System Upgrade",
+      "",
+      "Alice Lee",
+      "Q4 2026",
+      "T-003",
+      "Install badge readers",
+      "Bob Chen",
+      "High",
+      "Install readers at all entry points",
+      "None",
+      "Vendor confirmed delivery",
+      "In Progress, Planning or Initiated",
+      "Q4 2026",
+      "All readers installed",
+      "",
+    ],
+  ];
+
+  const headerRow = EXCEL_COLUMNS.map((c) =>
+    c
+      .split("_")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ")
+  );
+
+  const ws = XLSX.utils.aoa_to_sheet([headerRow, ...sampleRows]);
+
+  ws["!cols"] = EXCEL_COLUMNS.map((c) => ({
+    wch: Math.max(c.length + 2, 16),
+  }));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Import Template");
+
+  const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+  return new NextResponse(buffer, {
+    headers: {
+      "Content-Type":
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition":
+        'attachment; filename="ppp_tracker_import_template.xlsx"',
+    },
+  });
+}
+
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
@@ -44,28 +134,57 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
   }
 
-  const text = await file.text();
+  const arrayBuffer = await file.arrayBuffer();
   let records: Record<string, string>[];
   try {
-    records = parse(text, {
-      columns: true,
-      skip_empty_lines: true,
-      trim: true,
-      relax_column_count: true,
+    const workbook = XLSX.read(arrayBuffer, { type: "array" });
+    const sheetName = workbook.SheetNames[0];
+    if (!sheetName) {
+      return NextResponse.json(
+        { error: "Excel file contains no sheets" },
+        { status: 400 }
+      );
+    }
+    const sheet = workbook.Sheets[sheetName];
+    records = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, {
+      defval: "",
+      raw: false,
     });
   } catch {
-    return NextResponse.json({ error: "Failed to parse CSV" }, { status: 400 });
-  }
-
-  const headers = records.length > 0 ? Object.keys(records[0]) : [];
-  const actualSet = new Set(headers);
-  const missing = CSV_COLUMNS.filter((c) => !actualSet.has(c));
-  if (missing.length > 0) {
     return NextResponse.json(
-      { error: `Missing CSV columns: ${missing.join(", ")}` },
+      { error: "Failed to parse Excel file" },
       { status: 400 }
     );
   }
+
+  if (records.length === 0) {
+    return NextResponse.json(
+      { error: "Excel file contains no data rows" },
+      { status: 400 }
+    );
+  }
+
+  const headers = Object.keys(records[0]);
+  const actualSet = new Set(headers.map((h) => h.toLowerCase().trim()));
+  const missing = EXCEL_COLUMNS.filter(
+    (c) => !actualSet.has(c.toLowerCase())
+  );
+  if (missing.length > 0) {
+    return NextResponse.json(
+      { error: `Missing columns: ${missing.join(", ")}` },
+      { status: 400 }
+    );
+  }
+
+  // Normalize keys to snake_case for consistent access
+  const normalizedRecords = records.map((row) => {
+    const out: Record<string, string> = {};
+    for (const [key, val] of Object.entries(row)) {
+      const normalized = key.toLowerCase().trim().replace(/\s+/g, "_");
+      out[normalized] = String(val ?? "").trim();
+    }
+    return out;
+  });
 
   let frameworksCreated = 0;
   let programsCreated = 0;
@@ -75,18 +194,18 @@ export async function POST(request: NextRequest) {
   let rowsSkipped = 0;
   const errors: string[] = [];
 
-  for (let i = 0; i < records.length; i++) {
-    const row = records[i];
+  for (let i = 0; i < normalizedRecords.length; i++) {
+    const row = normalizedRecords[i];
     const rowNum = i + 2;
-    const frameworkName = row.framework_name?.trim() || "";
-    const programName = row.program_name?.trim() || "";
-    const projectName = row.project_name?.trim() || "";
-    const taskCode = row.task_code?.trim() || "";
-    const taskName = row.task_name?.trim() || "";
-    const taskStatus = row.task_status?.trim() || "";
-    const taskPriority = row.task_priority?.trim() || "";
-    const projectTargetQuarter = row.project_target_quarter?.trim() || "";
-    const taskTargetQuarter = row.task_target_quarter?.trim() || "";
+    const frameworkName = row.framework_name || "";
+    const programName = row.program_name || "";
+    const projectName = row.project_name || "";
+    const taskCode = row.task_code || "";
+    const taskName = row.task_name || "";
+    const taskStatus = row.task_status || "";
+    const taskPriority = row.task_priority || "";
+    const projectTargetQuarter = row.project_target_quarter || "";
+    const taskTargetQuarter = row.task_target_quarter || "";
 
     if (!frameworkName || !projectName || !taskCode || !taskName) {
       rowsSkipped++;
@@ -124,7 +243,6 @@ export async function POST(request: NextRequest) {
       continue;
     }
 
-    // Look up or create framework
     let framework = await prisma.framework.findFirst({
       where: { name: frameworkName },
     });
@@ -136,7 +254,6 @@ export async function POST(request: NextRequest) {
       frameworksCreated++;
     }
 
-    // Look up or create program
     let program = await prisma.program.findFirst({
       where: { name: programName },
     });
@@ -151,7 +268,6 @@ export async function POST(request: NextRequest) {
       programsCreated++;
     }
 
-    // Look up or create project within program
     let project = await prisma.project.findFirst({
       where: { name: projectName, programId: program.id },
     });
@@ -164,8 +280,8 @@ export async function POST(request: NextRequest) {
         data: {
           name: projectName,
           programId: program.id,
-          reference: row.project_reference?.trim() || null,
-          owner: row.project_owner?.trim() || null,
+          reference: row.project_reference || null,
+          owner: row.project_owner || null,
           targetQuarter: projectTargetQuarter || "Q1 2026",
           adjustedTargetQuarter: projectTargetQuarter || "Q1 2026",
           sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
@@ -174,7 +290,6 @@ export async function POST(request: NextRequest) {
       projectsCreated++;
     }
 
-    // Check for duplicate task_code
     const existingTask = await prisma.task.findFirst({
       where: { projectId: project.id, taskCode },
     });
@@ -189,17 +304,17 @@ export async function POST(request: NextRequest) {
         taskCode,
         projectId: project.id,
         name: taskName,
-        assignee: row.task_assignee?.trim() || null,
+        assignee: row.task_assignee || null,
         priority: taskPriority || "Low",
         sortOrder: (maxTaskOrder._max.sortOrder ?? -1) + 1,
-        description: row.task_description?.trim() || null,
-        dependencies: row.task_dependencies?.trim() || null,
-        notes: row.task_notes?.trim() || null,
+        description: row.task_description || null,
+        dependencies: row.task_dependencies || null,
+        notes: row.task_notes || null,
         status: taskStatus,
         targetQuarter: taskTargetQuarter || "Q1 2026",
         adjustedTargetQuarter: taskTargetQuarter || "Q1 2026",
-        deliverable: row.task_deliverable?.trim() || null,
-        attachmentUrl: row.task_attachment_url?.trim() || null,
+        deliverable: row.task_deliverable || null,
+        attachmentUrl: row.task_attachment_url || null,
       },
     });
     tasksCreated++;
@@ -207,6 +322,14 @@ export async function POST(request: NextRequest) {
 
   if (frameworksCreated > 0 || programsCreated > 0 || projectsCreated > 0 || tasksCreated > 0) {
     await touchLastModified();
+    await logChange({
+      entityType: "Import",
+      entityId: 0,
+      entityName: "Excel Import",
+      changeType: "import",
+      newValue: `${tasksCreated} tasks, ${projectsCreated} projects, ${programsCreated} programs, ${frameworksCreated} frameworks`,
+      details: `Tasks skipped: ${tasksSkipped}, Rows skipped: ${rowsSkipped}`,
+    });
   }
 
   return NextResponse.json({

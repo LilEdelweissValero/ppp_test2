@@ -43,7 +43,6 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { quarterRange } from "@/lib/quarters";
 import {
   computeProjectPercentComplete,
   computeProjectHealth,
@@ -54,7 +53,8 @@ import HealthBadge from "@/components/HealthBadge";
 import ProjectFormModal from "@/components/ProjectFormModal";
 import ManageFrameworksModal from "@/components/ManageFrameworksModal";
 import ManageProgramsModal from "@/components/ManageProgramsModal";
-import ImportCsvModal from "@/components/ImportCsvModal";
+import ImportExcelModal from "@/components/ImportExcelModal";
+import HistoryLogModal from "@/components/HistoryLogModal";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -62,7 +62,12 @@ interface Task {
   id: number;
   taskCode: string;
   name: string;
+  assignee: string | null;
+  priority: string;
   status: string;
+  description: string | null;
+  notes: string | null;
+  deliverable: string | null;
   adjustedTargetQuarter: string;
 }
 
@@ -96,6 +101,7 @@ interface Framework {
 
 interface Props {
   frameworks: Framework[];
+  existingQuarters: string[];
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -666,12 +672,14 @@ function ActionsMenu({
   onAddProject,
   onManageFrameworks,
   onManagePrograms,
-  onImportCsv,
+  onImportExcel,
+  onHistoryLog,
 }: {
   onAddProject: () => void;
   onManageFrameworks: () => void;
   onManagePrograms: () => void;
-  onImportCsv: () => void;
+  onImportExcel: () => void;
+  onHistoryLog: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -690,7 +698,8 @@ function ActionsMenu({
     { label: "Add Project", action: onAddProject, primary: true },
     { label: "Manage Frameworks", action: onManageFrameworks, primary: false },
     { label: "Manage Programs", action: onManagePrograms, primary: false },
-    { label: "Import CSV", action: onImportCsv, primary: false },
+    { label: "Import Excel", action: onImportExcel, primary: false },
+    { label: "History Log", action: onHistoryLog, primary: false },
   ];
 
   return (
@@ -773,7 +782,7 @@ function ActionsMenu({
 
 // ── Main component ─────────────────────────────────────────────────────────
 
-export default function DashboardView({ frameworks }: Props) {
+export default function DashboardView({ frameworks, existingQuarters }: Props) {
   const router = useRouter();
 
   const [selectedQuarter, setSelectedQuarter] = useState(ALL_TIME);
@@ -782,14 +791,15 @@ export default function DashboardView({ frameworks }: Props) {
   const [showAddProject, setShowAddProject] = useState(false);
   const [showManageFrameworks, setShowManageFrameworks] = useState(false);
   const [showManagePrograms, setShowManagePrograms] = useState(false);
-  const [showImportCsv, setShowImportCsv] = useState(false);
+  const [showImportExcel, setShowImportExcel] = useState(false);
+  const [showHistoryLog, setShowHistoryLog] = useState(false);
 
   // Local project ordering per framework (keyed by frameworkId)
   const [frameworkProjectsOverride, setFrameworkProjectsOverride] = useState<
     Record<number, Project[]>
   >({});
 
-  const quarters = [ALL_TIME, ...quarterRange(2, 2)];
+  const quarters = [ALL_TIME, ...existingQuarters];
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -816,18 +826,38 @@ export default function DashboardView({ frameworks }: Props) {
     }));
   }, [frameworks, frameworkProjectsOverride]);
 
-  // Filter by search
+  // Filter by search (universal: matches across all visible fields)
   const filteredFrameworks = useMemo(() => {
     const q = search.toLowerCase().trim();
     if (!q) return resolvedFrameworks;
+
+    function taskMatches(task: Task, query: string): boolean {
+      return (
+        task.taskCode.toLowerCase().includes(query) ||
+        task.name.toLowerCase().includes(query) ||
+        (task.assignee ?? "").toLowerCase().includes(query) ||
+        task.status.toLowerCase().includes(query) ||
+        task.priority.toLowerCase().includes(query) ||
+        (task.description ?? "").toLowerCase().includes(query) ||
+        (task.notes ?? "").toLowerCase().includes(query) ||
+        (task.deliverable ?? "").toLowerCase().includes(query)
+      );
+    }
+
     return resolvedFrameworks
       .map((fw) => ({
         ...fw,
         programs: fw.programs
           .map((prog) => ({
             ...prog,
-            projects: prog.projects.filter((p) =>
-              p.name.toLowerCase().includes(q)
+            projects: prog.projects.filter(
+              (p) =>
+                p.name.toLowerCase().includes(q) ||
+                (p.reference ?? "").toLowerCase().includes(q) ||
+                (p.owner ?? "").toLowerCase().includes(q) ||
+                prog.name.toLowerCase().includes(q) ||
+                fw.name.toLowerCase().includes(q) ||
+                p.tasks.some((t) => taskMatches(t, q))
             ),
           }))
           .filter((prog) => prog.projects.length > 0),
@@ -970,7 +1000,7 @@ export default function DashboardView({ frameworks }: Props) {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Filter by project name…"
+              placeholder="Search projects, tasks, assignees…"
               style={{
                 width: "100%",
                 border: "1px solid var(--rule-strong)",
@@ -993,7 +1023,8 @@ export default function DashboardView({ frameworks }: Props) {
             onAddProject={() => setShowAddProject(true)}
             onManageFrameworks={() => setShowManageFrameworks(true)}
             onManagePrograms={() => setShowManagePrograms(true)}
-            onImportCsv={() => setShowImportCsv(true)}
+            onImportExcel={() => setShowImportExcel(true)}
+            onHistoryLog={() => setShowHistoryLog(true)}
           />
         </div>
       </div>
@@ -1022,7 +1053,7 @@ export default function DashboardView({ frameworks }: Props) {
           </p>
           {!search && (
             <p style={{ fontSize: 12, color: "var(--ink-tertiary)" }}>
-              Use Actions → Add Project or Import CSV to get started.
+              Use Actions → Add Project or Import Excel to get started.
             </p>
           )}
         </div>
@@ -1301,10 +1332,14 @@ export default function DashboardView({ frameworks }: Props) {
         onClose={() => setShowManagePrograms(false)}
         onSave={handleRefresh}
       />
-      <ImportCsvModal
-        open={showImportCsv}
-        onClose={() => setShowImportCsv(false)}
+      <ImportExcelModal
+        open={showImportExcel}
+        onClose={() => setShowImportExcel(false)}
         onSave={handleRefresh}
+      />
+      <HistoryLogModal
+        open={showHistoryLog}
+        onClose={() => setShowHistoryLog(false)}
       />
     </div>
   );

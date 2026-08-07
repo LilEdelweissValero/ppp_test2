@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isQuarterValid } from "@/lib/quarters";
 import { touchLastModified } from "@/lib/system-metadata";
+import { logChange } from "@/lib/audit-log";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -79,5 +80,12 @@ export async function POST(request: NextRequest) {
     },
   });
   await touchLastModified();
+  await logChange({
+    entityType: "Task",
+    entityId: task.id,
+    entityName: `${task.taskCode}: ${task.name}`,
+    changeType: "create",
+    newValue: task.name,
+  });
   return NextResponse.json(task, { status: 201 });
 }

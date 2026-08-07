@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { touchLastModified } from "@/lib/system-metadata";
+import { logChange } from "@/lib/audit-log";
 
 export async function GET() {
   const programs = await prisma.program.findMany({
@@ -45,5 +46,12 @@ export async function POST(request: NextRequest) {
     },
   });
   await touchLastModified();
+  await logChange({
+    entityType: "Program",
+    entityId: program.id,
+    entityName: program.name,
+    changeType: "create",
+    newValue: program.name,
+  });
   return NextResponse.json(program, { status: 201 });
 }

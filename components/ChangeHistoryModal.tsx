@@ -6,8 +6,10 @@ import Modal from "./Modal";
 interface LogEntry {
   id: number;
   changeType: string;
+  entityName: string;
   oldValue: string | null;
   newValue: string | null;
+  details: string | null;
   remarks: string | null;
   createdAt: string;
 }
@@ -56,6 +58,14 @@ export default function ChangeHistoryModal({
     }
   }
 
+  const changeTypeLabel: Record<string, { bg: string; text: string; label: string }> = {
+    status: { bg: "bg-purple-100", text: "text-purple-700", label: "Status" },
+    quarter: { bg: "bg-amber-100", text: "text-amber-700", label: "Quarter" },
+    create: { bg: "bg-green-100", text: "text-green-700", label: "Created" },
+    update: { bg: "bg-blue-100", text: "text-blue-700", label: "Updated" },
+    delete: { bg: "bg-red-100", text: "text-red-700", label: "Deleted" },
+  };
+
   return (
     <Modal open={open} onClose={onClose} title="Change History">
       {loading ? (
@@ -64,35 +74,46 @@ export default function ChangeHistoryModal({
         <p className="text-sm text-gray-500">No changes recorded.</p>
       ) : (
         <div className="space-y-3">
-          {logs.map((log) => (
-            <div
-              key={log.id}
-              className="border border-gray-200 rounded-md p-3 text-sm"
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <span
-                  className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                    log.changeType === "status"
-                      ? "bg-purple-100 text-purple-700"
-                      : "bg-blue-100 text-blue-700"
-                  }`}
-                >
-                  {log.changeType === "status" ? "Status" : "Quarter"}
-                </span>
-                <span className="text-gray-400 text-xs">
-                  {formatDate(log.createdAt)}
-                </span>
+          {logs.map((log) => {
+            const ct = changeTypeLabel[log.changeType] || {
+              bg: "bg-gray-100",
+              text: "text-gray-700",
+              label: log.changeType,
+            };
+            return (
+              <div
+                key={log.id}
+                className="border border-gray-200 rounded-md p-3 text-sm"
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span
+                    className={`text-xs font-medium px-2 py-0.5 rounded-full ${ct.bg} ${ct.text}`}
+                  >
+                    {ct.label}
+                  </span>
+                  <span className="text-gray-400 text-xs">
+                    {formatDate(log.createdAt)}
+                  </span>
+                </div>
+                {log.oldValue && log.newValue && (
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{log.oldValue}</span>
+                    <span className="text-gray-400">&rarr;</span>
+                    <span className="font-medium">{log.newValue}</span>
+                  </div>
+                )}
+                {!log.oldValue && log.newValue && (
+                  <div className="font-medium">{log.newValue}</div>
+                )}
+                {log.details && (
+                  <p className="mt-1 text-gray-600 text-xs">{log.details}</p>
+                )}
+                {log.remarks && (
+                  <p className="mt-1 text-gray-500 text-xs italic">{log.remarks}</p>
+                )}
               </div>
-              <div className="flex items-center gap-2">
-                <span className="font-medium">{log.oldValue}</span>
-                <span className="text-gray-400">&rarr;</span>
-                <span className="font-medium">{log.newValue}</span>
-              </div>
-              {log.remarks && (
-                <p className="mt-1 text-gray-600">{log.remarks}</p>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </Modal>

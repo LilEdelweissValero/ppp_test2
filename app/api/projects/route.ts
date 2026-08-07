@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isQuarterValid } from "@/lib/quarters";
 import { touchLastModified } from "@/lib/system-metadata";
+import { logChange } from "@/lib/audit-log";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -39,5 +40,12 @@ export async function POST(request: NextRequest) {
     },
   });
   await touchLastModified();
+  await logChange({
+    entityType: "Project",
+    entityId: project.id,
+    entityName: project.name,
+    changeType: "create",
+    newValue: project.name,
+  });
   return NextResponse.json(project, { status: 201 });
 }

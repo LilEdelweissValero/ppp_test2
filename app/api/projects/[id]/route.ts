@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { touchLastModified } from "@/lib/system-metadata";
+import { logChange, diffFields } from "@/lib/audit-log";
 
 export async function GET(
   _request: NextRequest,
@@ -34,10 +35,27 @@ export async function PATCH(
   if (actualCompletionDate !== undefined) updateData.actualCompletionDate = actualCompletionDate || null;
   if (programId !== undefined) updateData.programId = parseInt(programId);
 
+  const oldProject = await prisma.project.findUnique({ where: { id: parseInt(id) } });
   const project = await prisma.project.update({
     where: { id: parseInt(id) },
     data: updateData,
   });
   await touchLastModified();
+  if (oldProject) {
+    const details = diffFields(
+      oldProject as Record<string, unknown>,
+      updateData,
+      ["name", "reference", "owner", "targetQuarter", "adjustedTargetQuarter", "actualCompletionDate", "programId"]
+    );
+    if (details) {
+      await logChange({
+        entityType: "Project",
+        entityId: project.id,
+        entityName: project.name,
+        changeType: "update",
+        details,
+      });
+    }
+  }
   return NextResponse.json(project);
 }

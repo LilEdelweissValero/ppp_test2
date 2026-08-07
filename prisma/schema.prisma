@@ -4,7 +4,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 model Framework {
@@ -67,13 +67,14 @@ model EntityChangeLog {
   id         Int    @id @default(autoincrement())
   entityType String @map("entity_type")
   entityId   Int    @map("entity_id")
+  entityName String @default("") @map("entity_name")
   changeType String @map("change_type")
   oldValue   String? @map("old_value")
   newValue   String? @map("new_value")
+  details    String?
   remarks    String?
   createdAt  String @map("created_at")
   seq        Int
-
   @@index([entityType, entityId])
 }
 

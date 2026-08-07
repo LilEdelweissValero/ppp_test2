@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { touchLastModified } from "@/lib/system-metadata";
+import { logChange, diffFields } from "@/lib/audit-log";
 
 export async function GET(
   _request: NextRequest,
@@ -54,36 +55,24 @@ export async function PATCH(
   if (deliverable !== undefined) updateData.deliverable = deliverable || null;
   if (attachmentUrl !== undefined) updateData.attachmentUrl = attachmentUrl || null;
 
-  const logEntries = [];
-  if (status !== undefined && status !== existingTask.status) {
-    const lastLog = await prisma.entityChangeLog.findFirst({
-      where: { entityType: "Task", entityId: parseInt(id) },
-      orderBy: { seq: "desc" },
-    });
-    const nextSeq = lastLog ? lastLog.seq + 1 : 1;
-    logEntries.push(
-      prisma.entityChangeLog.create({
-        data: {
-          entityType: "Task",
-          entityId: parseInt(id),
-          changeType: "status",
-          oldValue: existingTask.status,
-          newValue: status,
-          remarks: null,
-          createdAt: new Date().toISOString(),
-          seq: nextSeq,
-        },
-      })
-    );
-  }
-
   const task = await prisma.task.update({
     where: { id: parseInt(id) },
     data: updateData,
   });
 
-  if (logEntries.length > 0) {
-    await prisma.$transaction(logEntries);
+  const details = diffFields(
+    existingTask as Record<string, unknown>,
+    updateData,
+    ["taskCode", "name", "assignee", "priority", "status", "description", "dependencies", "notes", "deliverable", "attachmentUrl", "targetQuarter", "adjustedTargetQuarter"]
+  );
+  if (details) {
+    await logChange({
+      entityType: "Task",
+      entityId: task.id,
+      entityName: `${task.taskCode}: ${task.name}`,
+      changeType: "update",
+      details,
+    });
   }
 
   await touchLastModified();
