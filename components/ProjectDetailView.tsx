@@ -95,22 +95,24 @@ function SortableTaskRow({
     <tr
       ref={setNodeRef}
       style={style}
-      className="border-b border-gray-100 hover:bg-gray-50"
+      className="detail-task-row"
     >
-      <td className="px-4 py-2">
+      <td>
         <button
-          className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
+          className="detail-task-action"
+          style={{ cursor: "grab", color: "var(--ink-tertiary)", textDecoration: "none" }}
           {...attributes}
           {...listeners}
+          aria-label="Drag to reorder task"
         >
-          &#9776;
+          <span aria-hidden="true">⠿</span>
         </button>
       </td>
-      <td className="px-4 py-2 font-mono text-xs">{task.taskCode}</td>
-      <td className="px-4 py-2">{task.name}</td>
-      <td className="px-4 py-2 text-gray-600">{task.assignee || "-"}</td>
+      <td className="detail-task-code">{task.taskCode}</td>
+      <td>{task.name}</td>
+      <td className="detail-muted">{task.assignee || "—"}</td>
       <td
-        className="px-4 py-2 text-gray-600 cursor-pointer hover:bg-blue-50"
+        className="detail-inline-cell detail-muted"
         onClick={() => setEditingCell({ taskId: task.id, field: "priority" })}
       >
         {editingCell?.taskId === task.id && editingCell.field === "priority" ? (
@@ -123,7 +125,7 @@ function SortableTaskRow({
               if (e.key === "Escape") setEditingCell(null);
               if (e.key === "Enter") (e.target as HTMLSelectElement).blur();
             }}
-            className="w-full border border-blue-400 rounded px-1 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="detail-inline-select"
           >
             {PRIORITY_LABELS.map((p) => (
               <option key={p} value={p}>
@@ -136,7 +138,7 @@ function SortableTaskRow({
         )}
       </td>
       <td
-        className="px-4 py-2 cursor-pointer hover:bg-blue-50"
+        className="detail-inline-cell"
         onClick={() => setEditingCell({ taskId: task.id, field: "status" })}
       >
         {editingCell?.taskId === task.id && editingCell.field === "status" ? (
@@ -149,7 +151,7 @@ function SortableTaskRow({
               if (e.key === "Escape") setEditingCell(null);
               if (e.key === "Enter") (e.target as HTMLSelectElement).blur();
             }}
-            className="w-full border border-blue-400 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="detail-inline-select"
           >
             {STATUS_LABELS.map((s) => (
               <option key={s} value={s}>
@@ -158,49 +160,49 @@ function SortableTaskRow({
             ))}
           </select>
         ) : (
-          <span className="text-xs text-gray-700">{task.status}</span>
+          <span>{task.status}</span>
         )}
       </td>
-      <td className="px-4 py-2 text-gray-600">{task.targetQuarter}</td>
-      <td className="px-4 py-2 text-gray-600">{task.adjustedTargetQuarter}</td>
-      <td className="px-4 py-2 text-gray-600">{task.deliverable || "-"}</td>
-      <td className="px-4 py-2">
+      <td className="detail-muted">{task.targetQuarter}</td>
+      <td className="detail-muted">{task.adjustedTargetQuarter}</td>
+      <td className="detail-muted">{task.deliverable || "—"}</td>
+      <td>
         {task.attachmentUrl ? (
           <a
             href={task.attachmentUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-blue-600 hover:text-blue-800 text-xs"
+            className="detail-task-action"
           >
             Link
           </a>
         ) : (
-          "-"
+          "—"
         )}
       </td>
-      <td className="px-4 py-2 text-gray-600 max-w-[150px] truncate">
-        {task.dependencies || "-"}
+      <td className="detail-truncate">
+        {task.dependencies || "—"}
       </td>
-      <td className="px-4 py-2 text-gray-600 max-w-[150px] truncate">
-        {task.notes || "-"}
+      <td className="detail-truncate">
+        {task.notes || "—"}
       </td>
-      <td className="px-4 py-2">
-        <div className="flex gap-1">
+      <td>
+        <div className="detail-task-actions">
           <button
             onClick={onEdit}
-            className="text-xs text-blue-600 hover:text-blue-800"
+            className="detail-task-action"
           >
             Edit
           </button>
           <button
             onClick={onChangeQuarter}
-            className="text-xs text-blue-600 hover:text-blue-800"
+            className="detail-task-action"
           >
             Qtr
           </button>
           <button
             onClick={onViewHistory}
-            className="text-xs text-blue-600 hover:text-blue-800"
+            className="detail-task-action"
           >
             History
           </button>
@@ -280,75 +282,70 @@ export default function ProjectDetailView({ project }: Props) {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="mb-4">
+    <main className="detail-shell">
+      <div className="detail-container">
+        <div>
           <button
             onClick={() => router.push("/")}
-            className="text-sm text-blue-600 hover:text-blue-800"
+            className="detail-back"
           >
-            &larr; Back to Dashboard
+            <span aria-hidden="true">←</span> Back to Dashboard
           </button>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
-          <div className="flex items-start justify-between mb-4">
+        <section className="detail-hero" aria-labelledby="project-title">
+          <div className="detail-title-row">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
+              <p className="detail-kicker">Project detail</p>
+              <h1 id="project-title" className="detail-title">
                 {project.name}
               </h1>
-              <p className="text-sm text-gray-500">
-                {project.program.name}
-              </p>
+              <p className="detail-program">{project.program.name}</p>
             </div>
             <HealthBadge health={health} />
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
-            <div>
-              <span className="text-gray-500">Reference</span>
-              <p className="font-medium">{project.reference || "-"}</p>
+          <div className="detail-meta-grid">
+            <div className="detail-meta-item">
+              <span className="detail-meta-label">Reference</span>
+              <p className="detail-meta-value">{project.reference || "—"}</p>
             </div>
-            <div>
-              <span className="text-gray-500">Owner</span>
-              <p className="font-medium">{project.owner || "-"}</p>
+            <div className="detail-meta-item">
+              <span className="detail-meta-label">Owner</span>
+              <p className="detail-meta-value">{project.owner || "—"}</p>
             </div>
-            <div>
-              <span className="text-gray-500">Initial Quarter Due</span>
-              <p className="font-medium">
+            <div className="detail-meta-item">
+              <span className="detail-meta-label">Initial quarter due</span>
+              <p className="detail-meta-value">
                 {project.targetQuarter === project.adjustedTargetQuarter
                   ? "\u2014"
                   : project.targetQuarter}
               </p>
             </div>
-            <div>
-              <span className="text-gray-500">Quarter Due</span>
-              <p className="font-medium">
-                {project.adjustedTargetQuarter}
-              </p>
+            <div className="detail-meta-item">
+              <span className="detail-meta-label">Quarter due</span>
+              <p className="detail-meta-value">{project.adjustedTargetQuarter}</p>
             </div>
-            <div>
-              <span className="text-gray-500">Actual Completion Date</span>
-              <p className="font-medium">
-                {project.actualCompletionDate || "-"}
-              </p>
+            <div className="detail-meta-item">
+              <span className="detail-meta-label">Actual completion</span>
+              <p className="detail-meta-value">{project.actualCompletionDate || "—"}</p>
             </div>
-            <div>
-              <span className="text-gray-500">Percent Complete</span>
-              <p className="font-medium">{Math.round(pct * 100)}%</p>
+            <div className="detail-meta-item">
+              <span className="detail-meta-label">Percent complete</span>
+              <p className="detail-meta-value">{Math.round(pct * 100)}%</p>
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="detail-actions">
             <button
               onClick={() => setShowEditProject(true)}
-              className="px-3 py-1.5 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+              className="detail-button detail-button-primary"
             >
               Edit
             </button>
             <button
               onClick={() => setChangeProjectQuarter(true)}
-              className="px-3 py-1.5 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+              className="detail-button"
             >
               Change Due Quarter
             </button>
@@ -356,46 +353,52 @@ export default function ProjectDetailView({ project }: Props) {
               onClick={() =>
                 setViewHistory({ type: "Project", id: project.id })
               }
-              className="px-3 py-1.5 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+              className="detail-button"
             >
               View History
             </button>
           </div>
-        </div>
+        </section>
 
-        <div className="bg-white border border-gray-200 rounded-lg">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-            <h2 className="font-semibold text-gray-900">Tasks</h2>
+        <section className="detail-task-panel" aria-labelledby="tasks-title">
+          <div className="detail-task-header">
+            <div>
+              <h2 id="tasks-title" className="detail-task-heading">Tasks</h2>
+              <p className="detail-task-subtitle">
+                {tasks.length} task{tasks.length === 1 ? "" : "s"} · Click priority or status to edit inline
+              </p>
+            </div>
             <button
               onClick={() => setShowAddTask(true)}
-              className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md"
+              className="detail-button detail-button-primary"
             >
               Add Task
             </button>
           </div>
 
           {tasks.length === 0 ? (
-            <p className="px-4 py-6 text-gray-500 text-sm text-center">
-              No tasks yet. Click &quot;Add Task&quot; to create one.
-            </p>
+            <div className="detail-empty">
+              <p>No tasks yet.</p>
+              <p>Use Add Task to create the first delivery item for this project.</p>
+            </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="detail-task-table">
                 <thead>
-                  <tr className="border-b border-gray-200 text-left text-gray-500">
-                    <th className="px-4 py-2 font-medium w-[40px]"></th>
-                    <th className="px-4 py-2 font-medium">Code</th>
-                    <th className="px-4 py-2 font-medium">Name</th>
-                    <th className="px-4 py-2 font-medium">Assignee</th>
-                    <th className="px-4 py-2 font-medium">Priority</th>
-                    <th className="px-4 py-2 font-medium">Status</th>
-                    <th className="px-4 py-2 font-medium">Initial Qtr</th>
-                    <th className="px-4 py-2 font-medium">Quarter Due</th>
-                    <th className="px-4 py-2 font-medium">Deliverable</th>
-                    <th className="px-4 py-2 font-medium">Link</th>
-                    <th className="px-4 py-2 font-medium">Dependencies</th>
-                    <th className="px-4 py-2 font-medium">Notes</th>
-                    <th className="px-4 py-2 font-medium">Actions</th>
+                  <tr>
+                    <th aria-label="Reorder" />
+                    <th>Code</th>
+                    <th>Name</th>
+                    <th>Assignee</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Initial Qtr</th>
+                    <th>Quarter Due</th>
+                    <th>Deliverable</th>
+                    <th>Link</th>
+                    <th>Dependencies</th>
+                    <th>Notes</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -429,7 +432,7 @@ export default function ProjectDetailView({ project }: Props) {
               </table>
             </div>
           )}
-        </div>
+        </section>
 
         <ProjectFormModal
           open={showEditProject}
