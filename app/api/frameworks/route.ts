@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { touchLastModified } from "@/lib/system-metadata";
+import { logChange } from "@/lib/audit-log";
 
 const PRESET_COLORS = [
   "#DBEAFE",
@@ -57,5 +58,12 @@ export async function POST(request: NextRequest) {
     data: { name: name.trim(), color, sortOrder: (maxOrder._max.sortOrder ?? -1) + 1 },
   });
   await touchLastModified();
+  await logChange({
+    entityType: "Framework",
+    entityId: framework.id,
+    entityName: framework.name,
+    changeType: "create",
+    newValue: framework.name,
+  });
   return NextResponse.json(framework, { status: 201 });
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { touchLastModified } from "@/lib/system-metadata";
+import { logChange, diffFields } from "@/lib/audit-log";
 
 export async function PATCH(
   request: NextRequest,
@@ -22,11 +23,24 @@ export async function PATCH(
   if (frameworkId) {
     updateData.frameworkId = parseInt(frameworkId);
   }
+  const oldProgram = await prisma.program.findUnique({ where: { id: parseInt(id) } });
   const program = await prisma.program.update({
     where: { id: parseInt(id) },
     data: updateData,
   });
   await touchLastModified();
+  if (oldProgram) {
+    const details = diffFields(oldProgram as Record<string, unknown>, { name: name.trim(), frameworkId: updateData.frameworkId }, ["name", "frameworkId"]);
+    if (details) {
+      await logChange({
+        entityType: "Program",
+        entityId: program.id,
+        entityName: program.name,
+        changeType: "update",
+        details,
+      });
+    }
+  }
   return NextResponse.json(program);
 }
 
@@ -44,7 +58,17 @@ export async function DELETE(
       { status: 400 }
     );
   }
+  const program = await prisma.program.findUnique({ where: { id: parseInt(id) } });
   await prisma.program.delete({ where: { id: parseInt(id) } });
   await touchLastModified();
+  if (program) {
+    await logChange({
+      entityType: "Program",
+      entityId: program.id,
+      entityName: program.name,
+      changeType: "delete",
+      oldValue: program.name,
+    });
+  }
   return NextResponse.json({ ok: true });
 }
