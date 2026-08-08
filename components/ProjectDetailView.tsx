@@ -72,6 +72,7 @@ function SortableTaskRow({
   editingCell,
   setEditingCell,
   selectRef,
+  taskCount,
 }: {
   task: Task;
   onEdit: () => void;
@@ -81,6 +82,7 @@ function SortableTaskRow({
   editingCell: { taskId: number; field: "status" | "priority" } | null;
   setEditingCell: (cell: { taskId: number; field: "status" | "priority" } | null) => void;
   selectRef: React.RefObject<HTMLSelectElement | null>;
+  taskCount: number;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: task.id });
@@ -90,6 +92,9 @@ function SortableTaskRow({
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
+
+  const completedStatuses = ["Complete or Verified"];
+  const isCompleted = completedStatuses.includes(task.status);
 
   return (
     <tr
@@ -163,28 +168,15 @@ function SortableTaskRow({
           <span>{task.status}</span>
         )}
       </td>
-      <td className="detail-muted">{task.targetQuarter}</td>
       <td className="detail-muted">{task.adjustedTargetQuarter}</td>
-      <td className="detail-muted">{task.deliverable || "—"}</td>
-      <td>
-        {task.attachmentUrl ? (
-          <a
-            href={task.attachmentUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="detail-task-action"
-          >
-            Link
-          </a>
-        ) : (
-          "—"
-        )}
-      </td>
-      <td className="detail-truncate">
-        {task.dependencies || "—"}
-      </td>
-      <td className="detail-truncate">
-        {task.notes || "—"}
+      <td style={{ textAlign: "center" }}>
+        <span style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: isCompleted ? "var(--health-completed-ink)" : "var(--ink-primary)",
+        }}>
+          {isCompleted ? "✓" : "—"}
+        </span>
       </td>
       <td>
         <div className="detail-task-actions">
@@ -392,12 +384,8 @@ export default function ProjectDetailView({ project }: Props) {
                     <th>Assignee</th>
                     <th>Priority</th>
                     <th>Status</th>
-                    <th>Initial Qtr</th>
                     <th>Quarter Due</th>
-                    <th>Deliverable</th>
-                    <th>Link</th>
-                    <th>Dependencies</th>
-                    <th>Notes</th>
+                    <th>Done</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -424,6 +412,7 @@ export default function ProjectDetailView({ project }: Props) {
                           editingCell={editingCell}
                           setEditingCell={setEditingCell}
                           selectRef={selectRef}
+                          taskCount={tasks.length}
                         />
                       ))}
                     </SortableContext>

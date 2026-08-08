@@ -669,13 +669,11 @@ function SortableProjectRow({
 // ── Actions dropdown ───────────────────────────────────────────────────────
 
 function ActionsMenu({
-  onAddProject,
   onManageFrameworks,
   onManagePrograms,
   onImportExcel,
   onHistoryLog,
 }: {
-  onAddProject: () => void;
   onManageFrameworks: () => void;
   onManagePrograms: () => void;
   onImportExcel: () => void;
@@ -695,11 +693,10 @@ function ActionsMenu({
   }, []);
 
   const items = [
-    { label: "Add Project", action: onAddProject, primary: true },
-    { label: "Manage Frameworks", action: onManageFrameworks, primary: false },
-    { label: "Manage Programs", action: onManagePrograms, primary: false },
-    { label: "Import Excel", action: onImportExcel, primary: false },
-    { label: "History Log", action: onHistoryLog, primary: false },
+    { label: "Manage Frameworks", action: onManageFrameworks },
+    { label: "Manage Programs", action: onManagePrograms },
+    { label: "Import Excel", action: onImportExcel },
+    { label: "History Log", action: onHistoryLog },
   ];
 
   return (
@@ -724,7 +721,7 @@ function ActionsMenu({
         aria-haspopup="true"
         aria-expanded={open}
       >
-        Actions
+        Manage
         <svg
           width="10"
           height="6"
@@ -764,8 +761,8 @@ function ActionsMenu({
               style={{
                 padding: "9px 14px",
                 fontSize: 12,
-                fontWeight: item.primary ? 600 : 400,
-                color: item.primary ? "var(--accent)" : "var(--ink-primary)",
+                fontWeight: 400,
+                color: "var(--ink-primary)",
                 borderTop: i > 0 ? "1px solid var(--rule)" : "none",
                 letterSpacing: "0.01em",
               }}
@@ -1017,10 +1014,34 @@ export default function DashboardView({ frameworks, existingQuarters }: Props) {
         {/* Spacer */}
         <div style={{ flex: 1 }} />
 
-        {/* Actions menu */}
+        {/* Add Project button */}
+        <button
+          onClick={() => setShowAddProject(true)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "7px 14px",
+            background: "var(--accent)",
+            color: "#FFFFFF",
+            border: "none",
+            borderRadius: 3,
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: "pointer",
+            letterSpacing: "0.01em",
+            transition: "background 0.12s",
+          }}
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          Add Project
+        </button>
+
+        {/* Manage menu */}
         <div style={{ display: "flex", alignItems: "flex-end" }}>
           <ActionsMenu
-            onAddProject={() => setShowAddProject(true)}
             onManageFrameworks={() => setShowManageFrameworks(true)}
             onManagePrograms={() => setShowManagePrograms(true)}
             onImportExcel={() => setShowImportExcel(true)}
@@ -1053,7 +1074,7 @@ export default function DashboardView({ frameworks, existingQuarters }: Props) {
           </p>
           {!search && (
             <p style={{ fontSize: 12, color: "var(--ink-tertiary)" }}>
-              Use Actions → Add Project or Import Excel to get started.
+              Click "Add Project" or use Manage → Import Excel to get started.
             </p>
           )}
         </div>
@@ -1101,7 +1122,6 @@ export default function DashboardView({ frameworks, existingQuarters }: Props) {
             <div
               key={fw.id}
               style={{
-              borderRadius: 4,
               border: "1px solid var(--rule)",
               overflow: "hidden",
               boxShadow: "0 1px 4px rgba(15,17,23,0.07), 0 0 0 1px rgba(15,17,23,0.02)",

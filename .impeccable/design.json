@@ -1,0 +1,292 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-08T00:00:00.000Z",
+  "title": "Design System: ITSD Project Tracker",
+  "extensions": {
+    "colorMeta": {
+      "ground": {
+        "role": "neutral",
+        "displayName": "Matte Paper",
+        "canonical": "#F7F8FA",
+        "tonalRamp": ["#1a1b1e", "#2d2f33", "#44474d", "#5c5f66", "#787c84", "#a8acb4", "#d4d7dc", "#F7F8FA"]
+      },
+      "ground-metric": {
+        "role": "neutral",
+        "displayName": "Metric Ground",
+        "canonical": "#F0F2F6",
+        "tonalRamp": ["#181a1d", "#2a2c30", "#3f4247", "#56595f", "#70747b", "#a2a6ae", "#ced1d7", "#F0F2F6"]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface",
+        "canonical": "#FFFFFF",
+        "tonalRamp": ["#0d0d0e", "#1f1f21", "#333336", "#4a4a4e", "#66666a", "#99999c", "#ccccce", "#FFFFFF"]
+      },
+      "ink-primary": {
+        "role": "neutral",
+        "displayName": "Technical Ink",
+        "canonical": "#0F1117",
+        "tonalRamp": ["#0F1117", "#1a1c22", "#282b33", "#3a3d47", "#525660", "#767a85", "#b0b3ba", "#e8eaed"]
+      },
+      "ink-secondary": {
+        "role": "neutral",
+        "displayName": "Secondary Ink",
+        "canonical": "#4A5568",
+        "tonalRamp": ["#1a1d24", "#2a2d35", "#3a3e48", "#4A5568", "#636a7a", "#8a90a0", "#b4b8c2", "#dde0e5"]
+      },
+      "ink-tertiary": {
+        "role": "neutral",
+        "displayName": "Tertiary Ink",
+        "canonical": "#8896A8",
+        "tonalRamp": ["#2a2e36", "#3d424c", "#555b68", "#6e7584", "#8896A8", "#a8b0bc", "#c8cdd5", "#eff1f4"]
+      },
+      "ink-on-dark": {
+        "role": "neutral",
+        "displayName": "Ink On Dark",
+        "canonical": "#F7F8FA",
+        "tonalRamp": ["#1a1b1e", "#2d2f33", "#44474d", "#5c5f66", "#787c84", "#a8acb4", "#d4d7dc", "#F7F8FA"]
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Rule",
+        "canonical": "#DDE2EA",
+        "tonalRamp": ["#1c1e23", "#2e3137", "#454951", "#5e626c", "#7c818e", "#adb1ba", "#cdd0d7", "#DDE2EA"]
+      },
+      "rule-strong": {
+        "role": "neutral",
+        "displayName": "Strong Rule",
+        "canonical": "#C4CCD8",
+        "tonalRamp": ["#1a1d23", "#2c2f37", "#42464f", "#5a5e69", "#777c88", "#a8adb8", "#c4CCD8", "#eaecf0"]
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Institutional Blue",
+        "canonical": "#1A56DB",
+        "tonalRamp": ["#0a1a3d", "#0f2657", "#153578", "#1A56DB", "#4a7ae8", "#7da0f2", "#b0c4f8", "#e0eafc"]
+      },
+      "accent-hover": {
+        "role": "primary",
+        "displayName": "Accent Hover",
+        "canonical": "#1447C0",
+        "tonalRamp": ["#081530", "#0c1f48", "#112d64", "#1447C0", "#3d6adb", "#6f96ea", "#a4bdf4", "#dbe5fc"]
+      },
+      "accent-bg": {
+        "role": "primary",
+        "displayName": "Accent Background",
+        "canonical": "#EBF2FF",
+        "tonalRamp": ["#0d1524", "#142038", "#1e2e50", "#2d4270", "#4a6498", "#7a96c8", "#b4c8e8", "#EBF2FF"]
+      },
+      "status-planning-ink": {
+        "role": "status",
+        "displayName": "Planning Ink",
+        "canonical": "#1D4BAA",
+        "tonalRamp": ["#0a1530", "#0f1f48", "#152d68", "#1D4BAA", "#4670d0", "#769be5", "#a8c0f2", "#dce8fc"]
+      },
+      "status-partial-ink": {
+        "role": "status",
+        "displayName": "Partial Progress Ink",
+        "canonical": "#8B5200",
+        "tonalRamp": ["#2a1900", "#402500", "#5c3700", "#8B5200", "#b07020", "#d0964a", "#e8be80", "#f8e4c0"]
+      },
+      "status-mostly-ink": {
+        "role": "status",
+        "displayName": "Mostly Done Ink",
+        "canonical": "#0A5FA8",
+        "tonalRamp": ["#051c30", "#082a48", "#0c3c68", "#0A5FA8", "#2a80c8", "#5aa4e0", "#8cc4f2", "#c4e4fc"]
+      },
+      "status-complete-ink": {
+        "role": "status",
+        "displayName": "Complete Ink",
+        "canonical": "#1A6B3C",
+        "tonalRamp": ["#0a2012", "#10321c", "#184828", "#1A6B3C", "#308a54", "#58b078", "#88d4a4", "#c0f0d4"]
+      },
+      "status-nys-ink": {
+        "role": "status",
+        "displayName": "Not Yet Started Ink",
+        "canonical": "#5A6478",
+        "tonalRamp": ["#1c1f26", "#2c3038", "#404550", "#5A6478", "#768090", "#9aa4b4", "#bcc4d0", "#e4e8ee"]
+      },
+      "health-atrisk-ink": {
+        "role": "health",
+        "displayName": "At Risk Ink",
+        "canonical": "#B91C1C",
+        "tonalRamp": ["#380a0a", "#541010", "#781818", "#B91C1C", "#d84040", "#e87070", "#f4a8a8", "#fcd8d8"]
+      }
+    },
+    "typographyMeta": {
+      "body": {
+        "displayName": "Body",
+        "purpose": "Default text for all content. 14px base, 1.5 line-height."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Column headers, section labels, kicker text. 10px caps with 0.08em letter-spacing."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Reference codes, task codes, tabular data requiring alignment."
+      }
+    },
+    "shadows": [
+      {
+        "name": "detail-hero",
+        "value": "0 1px 4px rgba(15,17,23,0.07), 0 0 0 1px rgba(15,17,23,0.02)",
+        "purpose": "Project detail header panel. The only card-like element with a shadow."
+      },
+      {
+        "name": "dropdown",
+        "value": "0 4px 16px rgba(15,17,23,0.12), 0 1px 4px rgba(15,17,23,0.08)",
+        "purpose": "Actions menu and floating panels. Ephemeral overlay state."
+      },
+      {
+        "name": "task-panel",
+        "value": "0 1px 4px rgba(15,17,23,0.05)",
+        "purpose": "Minimal lift for task tables in detail view."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-standard",
+        "value": "cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Default easing for state transitions."
+      },
+      {
+        "name": "duration-fast",
+        "value": "120ms",
+        "purpose": "Fast transitions for hover, focus, and small state changes."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "720px"
+      },
+      {
+        "name": "md",
+        "value": "1280px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primary interactive button with Institutional Blue background.",
+      "html": "<button class=\"ds-btn-primary\">SAVE CHANGES</button>",
+      "css": ".ds-btn-primary { background: #1A56DB; color: #FFFFFF; padding: 7px 12px; border-radius: 3px; font-size: 12px; font-weight: 600; border: none; cursor: pointer; transition: background 120ms ease-standard; } .ds-btn-primary:hover { background: #1447C0; } .ds-btn-primary:focus-visible { outline: 2px solid #1A56DB; outline-offset: 2px; }"
+    },
+    {
+      "name": "Health Badge",
+      "kind": "chip",
+      "refersTo": "health-badge",
+      "description": "Status indicator with colored dot and label.",
+      "html": "<span class=\"ds-health-badge\"><span class=\"ds-health-dot\"></span>On Time</span>",
+      "css": ".ds-health-badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 7px; background: #E6F4EE; color: #1A6B3C; font-size: 11px; font-weight: 600; letter-spacing: 0.03em; border-radius: 2px; white-space: nowrap; } .ds-health-dot { width: 6px; height: 6px; border-radius: 50%; background: #1A6B3C; display: inline-block; flex-shrink: 0; } .ds-health-badge--atrisk { background: #FFF0EE; color: #B91C1C; } .ds-health-badge--atrisk .ds-health-dot { background: #B91C1C; } .ds-health-badge--delayed { background: #EAF1FE; color: #1D4BAA; } .ds-health-badge--delayed .ds-health-dot { background: #1D4BAA; }"
+    },
+    {
+      "name": "Modal Backdrop",
+      "kind": "custom",
+      "refersTo": "modal",
+      "description": "Centered modal dialog with semi-transparent backdrop.",
+      "html": "<div class=\"ds-modal-backdrop\"><div class=\"ds-modal-panel\"><div class=\"ds-modal-header\"><h2>Modal Title</h2><button class=\"ds-modal-close\">&times;</button></div><div class=\"ds-modal-body\">Content here</div></div></div>",
+      "css": ".ds-modal-backdrop { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); } .ds-modal-panel { background: #FFFFFF; border-radius: 4px; box-shadow: 0 4px 16px rgba(15,17,23,0.12), 0 1px 4px rgba(15,17,23,0.08); width: 100%; max-width: 32rem; max-height: 90vh; display: flex; flex-direction: column; } .ds-modal-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #DDE2EA; padding: 16px 24px; } .ds-modal-header h2 { font-size: 18px; font-weight: 600; margin: 0; } .ds-modal-close { background: none; border: none; font-size: 20px; color: #8896A8; cursor: pointer; } .ds-modal-close:hover { color: #4A5568; } .ds-modal-body { padding: 24px; overflow-y: auto; }"
+    },
+    {
+      "name": "Table Header",
+      "kind": "custom",
+      "refersTo": "table-header",
+      "description": "Dual-zone header with identity and metric sections.",
+      "html": "<thead class=\"ds-table-header\"><tr><th class=\"ds-th--identity\">Project</th><th class=\"ds-th--identity\">Program</th><th class=\"ds-th--metric\">#</th><th class=\"ds-th--metric\">Status</th></tr></thead>",
+      "css": ".ds-table-header th { padding: 7px 10px; font-size: 10px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; text-align: left; white-space: nowrap; } .ds-th--identity { background: #0F1117; color: #F7F8FA; border-bottom: 1px solid rgba(255,255,255,0.10); } .ds-th--metric { background: #F0F2F6; color: #4A5568; border-bottom: 1px solid #C4CCD8; text-align: center; }"
+    },
+    {
+      "name": "Sortable Row",
+      "kind": "custom",
+      "refersTo": "sortable-row",
+      "description": "Table row with drag handle, hover state, and accent background.",
+      "html": "<tr class=\"ds-sortable-row\"><td class=\"ds-sortable-grip\"><svg width=\"10\" height=\"14\" viewBox=\"0 0 10 14\"><circle cx=\"2\" cy=\"3\" r=\"1.2\" fill=\"currentColor\"/><circle cx=\"7\" cy=\"3\" r=\"1.2\" fill=\"currentColor\"/><circle cx=\"2\" cy=\"7\" r=\"1.2\" fill=\"currentColor\"/><circle cx=\"7\" cy=\"7\" r=\"1.2\" fill=\"currentColor\"/><circle cx=\"2\" cy=\"11\" r=\"1.2\" fill=\"currentColor\"/><circle cx=\"7\" cy=\"11\" r=\"1.2\" fill=\"currentColor\"/></svg></td><td>Project Name</td><td>Program</td></tr>",
+      "css": ".ds-sortable-row { transition: background 100ms ease-standard; } .ds-sortable-row:hover { background: #EBF2FF; } .ds-sortable-row td { padding: 8px 10px; border-bottom: 1px solid #DDE2EA; font-size: 12px; color: #0F1117; } .ds-sortable-grip { width: 32px; text-align: center; color: #8896A8; cursor: grab; } .ds-sortable-grip:hover { color: #4A5568; }"
+    },
+    {
+      "name": "Actions Menu",
+      "kind": "nav",
+      "refersTo": "actions-menu",
+      "description": "Dropdown menu trigger with chevron icon and shadow panel.",
+      "html": "<div class=\"ds-actions\"><button class=\"ds-actions-trigger\">Actions <svg width=\"10\" height=\"6\" viewBox=\"0 0 10 6\"><path d=\"M1 1l4 4 4-4\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" fill=\"none\"/></svg></button><div class=\"ds-actions-dropdown\"><button class=\"ds-actions-item ds-actions-item--primary\">Add Project</button><button class=\"ds-actions-item\">Manage Frameworks</button><button class=\"ds-actions-item\">Import Excel</button></div></div>",
+      "css": ".ds-actions { position: relative; } .ds-actions-trigger { display: flex; align-items: center; gap: 6px; padding: 7px 14px; background: #FFFFFF; color: #0F1117; border: 1px solid #C4CCD8; border-radius: 3px; font-size: 12px; font-weight: 500; cursor: pointer; transition: background 120ms, color 120ms; } .ds-actions-trigger:hover { background: #0F1117; color: #F7F8FA; } .ds-actions-dropdown { position: absolute; top: calc(100% + 4px); right: 0; background: #FFFFFF; border: 1px solid #C4CCD8; border-radius: 4px; box-shadow: 0 4px 16px rgba(15,17,23,0.12), 0 1px 4px rgba(15,17,23,0.08); min-width: 180px; z-index: 50; overflow: hidden; } .ds-actions-item { display: block; width: 100%; text-align: left; background: none; border: none; padding: 9px 14px; font-size: 12px; cursor: pointer; transition: background 100ms; } .ds-actions-item:hover { background: #F7F8FA; } .ds-actions-item--primary { font-weight: 600; color: #1A56DB; }"
+    },
+    {
+      "name": "Status Mini Bar",
+      "kind": "custom",
+      "refersTo": "status-mini-bar",
+      "description": "Horizontal segmented bar showing task status distribution.",
+      "html": "<div class=\"ds-status-mini-bar\"><div class=\"ds-status-segment\" style=\"width: 24px; background: #5A6478;\"></div><div class=\"ds-status-segment\" style=\"width: 16px; background: #1D4BAA;\"></div><div class=\"ds-status-segment\" style=\"width: 40px; background: #1A6B3C;\"></div></div>",
+      "css": ".ds-status-mini-bar { display: flex; gap: 1px; align-items: center; height: 8px; } .ds-status-segment { height: 8px; min-width: 3px; opacity: 0.75; border-radius: 1px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Audit Ledger",
+    "overview": "The ITSD Project Tracker embodies the authority of a well-maintained ledger — dense, trustworthy, and unambiguous. Every element earns its place through function, not decoration. The system presents portfolio delivery data with the precision of architectural drafting: framework color spines anchor vertical rhythm, metric zones differentiate from identity zones through tonal contrast, and status communication happens through color-coded badges that read at a glance.\n\nThe aesthetic is document-forward: near-white drafting-paper ground, near-black technical ink hierarchy, and a restrained institutional blue reserved for interactive state. Density is a feature — the dashboard fits an entire portfolio in one view without losing scannability. The visual language says: this is the system of record.",
+    "keyCharacteristics": [
+      "Architectural drafting aesthetic with framework color spines",
+      "Dense data tables with metric zone / identity zone differentiation",
+      "Tonal layering over shadows for depth hierarchy",
+      "Restrained accent blue for interactive state only",
+      "Status communication through semantic color badges"
+    ],
+    "rules": [
+      {
+        "name": "The Accent Restraint Rule",
+        "body": "Institutional Blue appears on ≤15% of any given viewport. It marks interactive state only — links, focus rings, selected filters, primary buttons.",
+        "section": "colors"
+      },
+      {
+        "name": "The Status Pairing Rule",
+        "body": "Status and health colors always appear as bg+ink pairs. Never use the ink color alone without its background tint.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Nums Rule",
+        "body": "All numeric columns in data tables use font-variant-numeric: tabular-nums for vertical alignment.",
+        "section": "typography"
+      },
+      {
+        "name": "The Label Caps Rule",
+        "body": "Column headers and section labels use: 10px, 600 weight, 0.08em letter-spacing, uppercase.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-By-Default Rule",
+        "body": "Surfaces are flat at rest. Tonal differentiation does the depth work. Shadows appear only as response to state.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Tonal Layering Rule",
+        "body": "Depth is communicated through background value, not shadow. ground → ground-metric → surface progression implies lift.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Spine Rule",
+        "body": "Every framework section begins with its 6px color spine. The spine is the primary visual anchor.",
+        "section": "layout"
+      }
+    ],
+    "dos": [
+      "Do use the framework color spine on every framework section",
+      "Do use tabular-nums for all numeric columns in data tables",
+      "Do use label-caps style for column headers and section labels",
+      "Do use status bg+ink pairs together — never separate them",
+      "Do use ground-metric to differentiate metric zones from identity zones",
+      "Do keep accent blue to interactive elements only (links, focus, selected state)"
+    ],
+    "donts": [
+      "Don't use accent blue for decorative purposes or section backgrounds",
+      "Don't add shadows to cards or panels at rest — keep them flat",
+      "Don't use body text style for headers — always use label-caps",
+      "Don't round framework sections or tables — keep them sharp",
+      "Don't use status colors for non-semantic purposes (decoration, emphasis)",
+      "Don't add breathing room beyond the spacing scale — density is a feature"
+    ]
+  }
+}

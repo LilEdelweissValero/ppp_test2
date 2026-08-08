@@ -69,21 +69,41 @@ function SortableProgram({
   return (
     <div
       ref={setNodeRef}
-      style={style}
-      className="flex items-center justify-between border border-gray-200 rounded-md px-3 py-2"
+      style={{
+        ...style,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        border: "1px solid var(--rule)",
+        borderRadius: 3,
+        padding: "8px 12px",
+      }}
     >
       {editId === program.id ? (
-        <div className="flex gap-2 flex-1">
+        <div style={{ display: "flex", gap: 8, flex: 1 }}>
           <input
             type="text"
             value={editName}
             onChange={(e) => setEditName(e.target.value)}
-            className="flex-1 border border-gray-300 rounded-md px-2 py-1 text-sm"
+            style={{
+              flex: 1,
+              border: "1px solid var(--rule-strong)",
+              borderRadius: 3,
+              padding: "4px 8px",
+              fontSize: 12,
+            }}
           />
           <button
             onClick={() => handleRename(program.id)}
             disabled={loading}
-            className="px-3 py-1 text-sm text-white bg-green-600 hover:bg-green-700 rounded-md disabled:opacity-50"
+            style={{
+              padding: "8px 12px",
+              fontSize: 12,
+              color: "#FFFFFF",
+              background: "#1A6B3C",
+              borderRadius: 3,
+              opacity: loading ? 0.5 : 1,
+            }}
           >
             Save
           </button>
@@ -92,39 +112,49 @@ function SortableProgram({
               setEditId(null);
               setEditName("");
             }}
-            className="px-3 py-1 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+            style={{
+              padding: "8px 12px",
+              fontSize: 12,
+              color: "var(--ink-primary)",
+              background: "var(--ground)",
+              borderRadius: 3,
+            }}
           >
             Cancel
           </button>
         </div>
       ) : (
         <>
-          <div className="flex items-center gap-2">
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <button
-              className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 px-1"
+              style={{
+                cursor: "grab",
+                color: "var(--ink-tertiary)",
+                padding: "0 4px",
+              }}
               {...attributes}
               {...listeners}
             >
               &#9776;
             </button>
-            <span className="text-sm font-medium">{program.name}</span>
-            <span className="text-xs text-gray-400">
+            <span style={{ fontSize: 12, fontWeight: 500 }}>{program.name}</span>
+            <span style={{ fontSize: 10, color: "var(--ink-tertiary)" }}>
               {program.framework?.name}
             </span>
           </div>
-          <div className="flex gap-2">
+          <div style={{ display: "flex", gap: 8 }}>
             <button
               onClick={() => {
                 setEditId(program.id);
                 setEditName(program.name);
               }}
-              className="text-sm text-blue-600 hover:text-blue-800"
+              style={{ fontSize: 12, color: "var(--accent)" }}
             >
               Rename
             </button>
             <button
               onClick={() => handleDelete(program.id)}
-              className="text-sm text-red-600 hover:text-red-800"
+              style={{ fontSize: 12, color: "#B91C1C" }}
             >
               Delete
             </button>
@@ -259,13 +289,18 @@ export default function ManageProgramsModal({ open, onClose, onSave }: Props) {
 
   return (
     <Modal open={open} onClose={onClose} title="Manage Programs">
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <div className="flex gap-2">
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8 }}>
             <select
               value={newFrameworkId}
               onChange={(e) => setNewFrameworkId(parseInt(e.target.value))}
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={{
+                border: "1px solid var(--rule-strong)",
+                borderRadius: 3,
+                padding: "8px 12px",
+                fontSize: 12,
+              }}
             >
               <option value={0}>Select framework</option>
               {frameworks.map((f) => (
@@ -279,19 +314,34 @@ export default function ManageProgramsModal({ open, onClose, onSave }: Props) {
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="New program name"
-              className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={{
+                flex: 1,
+                border: "1px solid var(--rule-strong)",
+                borderRadius: 3,
+                padding: "8px 12px",
+                fontSize: 12,
+              }}
             />
             <button
               onClick={handleAdd}
               disabled={loading || !newName.trim() || !newFrameworkId}
-              className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
+              style={{
+                padding: "8px 16px",
+                fontSize: 12,
+                color: "#FFFFFF",
+                background: "var(--accent)",
+                borderRadius: 3,
+                opacity: loading || !newName.trim() || !newFrameworkId ? 0.5 : 1,
+              }}
             >
               Add
             </button>
           </div>
         </div>
 
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+        {error && (
+          <p style={{ color: "#B91C1C", fontSize: 12 }}>{error}</p>
+        )}
 
         <DndContext
           sensors={sensors}
@@ -302,7 +352,7 @@ export default function ManageProgramsModal({ open, onClose, onSave }: Props) {
             items={programs.map((p) => p.id)}
             strategy={verticalListSortingStrategy}
           >
-            <div className="space-y-2">
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {programs.map((program) => (
                 <SortableProgram
                   key={program.id}

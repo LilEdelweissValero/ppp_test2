@@ -142,11 +142,24 @@ export default function ProjectFormModal({
     }
   }
 
-  function inputClass(invalid: boolean) {
-    const base = "w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 ";
-    if (invalid) return base + "border-red-500 focus:ring-red-500";
-    return base + "border-gray-300 focus:ring-blue-500";
-  }
+  const inputStyle = (invalid: boolean): React.CSSProperties => ({
+    width: "100%",
+    border: `1px solid ${invalid ? "#B91C1C" : "var(--rule-strong)"}`,
+    borderRadius: 3,
+    padding: "6px 10px",
+    fontSize: 12,
+    color: "var(--ink-primary)",
+    background: "var(--surface)",
+    outline: "none",
+  });
+
+  const labelStyle: React.CSSProperties = {
+    display: "block",
+    fontSize: 12,
+    fontWeight: 500,
+    color: "var(--ink-secondary)",
+    marginBottom: 4,
+  };
 
   return (
     <Modal
@@ -154,28 +167,24 @@ export default function ProjectFormModal({
       onClose={onClose}
       title={isEdit ? "Edit Project" : "Add Project"}
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Name *
-          </label>
+      <form onSubmit={handleSubmit}>
+        <div style={{ marginBottom: 16 }}>
+          <label style={labelStyle}>Name *</label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className={inputClass(nameInvalid)}
+            style={inputStyle(nameInvalid)}
           />
         </div>
 
         {!frameworkId && !isEdit && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Framework *
-            </label>
+          <div style={{ marginBottom: 16 }}>
+            <label style={labelStyle}>Framework *</label>
             <select
               value={selectedFrameworkId}
               onChange={(e) => setSelectedFrameworkId(parseInt(e.target.value))}
-              className={inputClass(frameworkInvalid)}
+              style={inputStyle(frameworkInvalid)}
             >
               <option value={0}>Select framework</option>
               {frameworks.map((f) => (
@@ -188,14 +197,12 @@ export default function ProjectFormModal({
         )}
 
         {!frameworkId && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Program *
-            </label>
+          <div style={{ marginBottom: 16 }}>
+            <label style={labelStyle}>Program *</label>
             <select
               value={selectedProgramId}
               onChange={(e) => setSelectedProgramId(parseInt(e.target.value))}
-              className={inputClass(programInvalid)}
+              style={inputStyle(programInvalid)}
               disabled={selectedFrameworkId === 0}
             >
               <option value={0}>Select program</option>
@@ -208,64 +215,89 @@ export default function ProjectFormModal({
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-4">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Reference
-            </label>
+            <label style={labelStyle}>Reference</label>
             <input
               type="text"
               value={reference}
               onChange={(e) => setReference(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={inputStyle(false)}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Owner
-            </label>
+            <label style={labelStyle}>Owner</label>
             <input
               type="text"
               value={owner}
               onChange={(e) => setOwner(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={inputStyle(false)}
             />
           </div>
         </div>
 
-        <QuarterSelect
-          label="Target Quarter *"
-          value={targetQuarter}
-          onChange={setTargetQuarter}
-          invalid={quarterInvalid}
-        />
+        <div style={{ marginBottom: 16 }}>
+          <QuarterSelect
+            label="Target Quarter *"
+            value={targetQuarter}
+            onChange={setTargetQuarter}
+            invalid={quarterInvalid}
+          />
+        </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Actual Completion Date
-          </label>
+        <div style={{ marginBottom: 16 }}>
+          <label style={labelStyle}>Actual Completion Date</label>
           <input
             type="date"
             value={actualCompletionDate}
             onChange={(e) => setActualCompletionDate(e.target.value)}
-            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            style={inputStyle(false)}
           />
         </div>
 
-        {serverError && <p className="text-red-600 text-sm">{serverError}</p>}
+        {serverError && (
+          <p style={{ fontSize: 12, color: "#B91C1C", marginBottom: 12 }}>
+            {serverError}
+          </p>
+        )}
 
-        <div className="flex justify-end gap-2 pt-2">
+        <div style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: 8,
+          paddingTop: 12,
+          borderTop: "1px solid var(--rule)",
+        }}>
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+            style={{
+              padding: "7px 12px",
+              fontSize: 12,
+              fontWeight: 500,
+              color: "var(--ink-primary)",
+              background: "var(--ground)",
+              border: "1px solid var(--rule-strong)",
+              borderRadius: 3,
+              cursor: "pointer",
+            }}
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
+            style={{
+              padding: "7px 12px",
+              fontSize: 12,
+              fontWeight: 600,
+              color: "#FFFFFF",
+              background: "var(--accent)",
+              border: "none",
+              borderRadius: 3,
+              cursor: "pointer",
+              opacity: loading ? 0.5 : 1,
+            }}
           >
             {loading ? "Saving..." : "Save"}
           </button>

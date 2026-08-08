@@ -21,13 +21,13 @@ interface Props {
   onClose: () => void;
 }
 
-const CHANGE_TYPE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  create: { bg: "bg-green-100", text: "text-green-700", label: "ADD" },
-  update: { bg: "bg-blue-100", text: "text-blue-700", label: "MODIFY" },
-  delete: { bg: "bg-red-100", text: "text-red-700", label: "DELETE" },
-  import: { bg: "bg-purple-100", text: "text-purple-700", label: "IMPORT" },
-  quarter: { bg: "bg-amber-100", text: "text-amber-700", label: "QUARTER" },
-  status: { bg: "bg-indigo-100", text: "text-indigo-700", label: "STATUS" },
+const CHANGE_TYPE_STYLES: Record<string, { bg: string; ink: string; label: string }> = {
+  create: { bg: "#E6F4EE", ink: "#1A6B3C", label: "ADD" },
+  update: { bg: "var(--accent-bg)", ink: "var(--accent)", label: "MODIFY" },
+  delete: { bg: "#FFF0EE", ink: "#B91C1C", label: "DELETE" },
+  import: { bg: "#F3E8FF", ink: "#7C3AED", label: "IMPORT" },
+  quarter: { bg: "#FFF3E0", ink: "#8B5200", label: "QUARTER" },
+  status: { bg: "#EAF1FE", ink: "#1D4BAA", label: "STATUS" },
 };
 
 export default function HistoryLogModal({ open, onClose }: Props) {
@@ -81,25 +81,61 @@ export default function HistoryLogModal({ open, onClose }: Props) {
   function getStyle(changeType: string) {
     return (
       CHANGE_TYPE_STYLES[changeType] || {
-        bg: "bg-gray-100",
-        text: "text-gray-700",
+        bg: "var(--ground)",
+        ink: "var(--ink-primary)",
         label: changeType.toUpperCase(),
       }
     );
   }
 
+  const filterSelectStyle: React.CSSProperties = {
+    border: "1px solid var(--rule)",
+    borderRadius: 3,
+    padding: "5px 8px",
+    fontSize: 12,
+    color: "var(--ink-primary)",
+    background: "var(--surface)",
+  };
+
+  const badgeStyle = (bg: string, ink: string): React.CSSProperties => ({
+    display: "inline-block",
+    fontSize: 11,
+    fontWeight: 600,
+    padding: "2px 8px",
+    borderRadius: 3,
+    background: bg,
+    color: ink,
+  });
+
+  const cardStyle: React.CSSProperties = {
+    border: "1px solid var(--rule)",
+    borderRadius: 3,
+    padding: 12,
+    fontSize: 12,
+  };
+
+  const paginationBtnStyle: React.CSSProperties = {
+    padding: "4px 12px",
+    fontSize: 11,
+    border: "1px solid var(--rule)",
+    borderRadius: 3,
+    background: "var(--surface)",
+    color: "var(--ink-primary)",
+    cursor: "pointer",
+  };
+
   return (
     <Modal open={open} onClose={onClose} title="History Log">
-      <div className="space-y-4">
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Filters */}
-        <div className="flex gap-3 text-sm">
+        <div style={{ display: "flex", gap: 12, fontSize: 12 }}>
           <select
             value={entityFilter}
             onChange={(e) => {
               setEntityFilter(e.target.value);
               setPage(1);
             }}
-            className="border border-gray-200 rounded-md px-2 py-1 text-sm"
+            style={filterSelectStyle}
           >
             <option value="">All Entity Types</option>
             <option value="Framework">Framework</option>
@@ -114,7 +150,7 @@ export default function HistoryLogModal({ open, onClose }: Props) {
               setChangeFilter(e.target.value);
               setPage(1);
             }}
-            className="border border-gray-200 rounded-md px-2 py-1 text-sm"
+            style={filterSelectStyle}
           >
             <option value="">All Actions</option>
             <option value="create">Add</option>
@@ -127,52 +163,47 @@ export default function HistoryLogModal({ open, onClose }: Props) {
         </div>
 
         {loading ? (
-          <p className="text-sm text-gray-500">Loading...</p>
+          <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>Loading...</p>
         ) : logs.length === 0 ? (
-          <p className="text-sm text-gray-500">No history records found.</p>
+          <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>No history records found.</p>
         ) : (
           <>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 384, overflowY: "auto" }}>
               {logs.map((log) => {
                 const style = getStyle(log.changeType);
                 return (
-                  <div
-                    key={log.id}
-                    className="border border-gray-200 rounded-md p-3 text-sm"
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span
-                        className={`text-xs font-semibold px-2 py-0.5 rounded ${style.bg} ${style.text}`}
-                      >
+                  <div key={log.id} style={cardStyle}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <span style={badgeStyle(style.bg, style.ink)}>
                         {style.label}
                       </span>
-                      <span className="text-xs font-medium text-gray-600">
+                      <span style={{ fontSize: 11, fontWeight: 500, color: "var(--ink-secondary)" }}>
                         {log.entityType}
                       </span>
-                      <span className="text-gray-400 text-xs">
+                      <span style={{ fontSize: 11, color: "var(--ink-tertiary)" }}>
                         {formatDate(log.createdAt)}
                       </span>
                     </div>
-                    <div className="text-gray-800 font-medium">
+                    <div style={{ fontWeight: 500, color: "var(--ink-primary)" }}>
                       {log.entityName || `${log.entityType} #${log.entityId}`}
                     </div>
                     {log.oldValue && log.newValue && (
-                      <div className="text-xs text-gray-500 mt-1">
+                      <div style={{ fontSize: 11, color: "var(--ink-secondary)", marginTop: 4 }}>
                         {log.oldValue} &rarr; {log.newValue}
                       </div>
                     )}
                     {!log.oldValue && log.newValue && (
-                      <div className="text-xs text-gray-500 mt-1">
+                      <div style={{ fontSize: 11, color: "var(--ink-secondary)", marginTop: 4 }}>
                         {log.newValue}
                       </div>
                     )}
                     {log.details && (
-                      <div className="text-xs text-gray-500 mt-1">
+                      <div style={{ fontSize: 11, color: "var(--ink-secondary)", marginTop: 4 }}>
                         {log.details}
                       </div>
                     )}
                     {log.remarks && (
-                      <p className="mt-1 text-xs text-gray-500 italic">
+                      <p style={{ marginTop: 4, fontSize: 11, color: "var(--ink-secondary)", fontStyle: "italic" }}>
                         {log.remarks}
                       </p>
                     )}
@@ -183,21 +214,21 @@ export default function HistoryLogModal({ open, onClose }: Props) {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between text-sm pt-2">
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12, paddingTop: 8 }}>
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="px-3 py-1 text-xs border border-gray-200 rounded-md disabled:opacity-40 hover:bg-gray-50"
+                  style={{ ...paginationBtnStyle, opacity: page === 1 ? 0.4 : 1 }}
                 >
                   Previous
                 </button>
-                <span className="text-gray-500 text-xs">
+                <span style={{ fontSize: 11, color: "var(--ink-secondary)" }}>
                   Page {page} of {totalPages}
                 </span>
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="px-3 py-1 text-xs border border-gray-200 rounded-md disabled:opacity-40 hover:bg-gray-50"
+                  style={{ ...paginationBtnStyle, opacity: page === totalPages ? 0.4 : 1 }}
                 >
                   Next
                 </button>

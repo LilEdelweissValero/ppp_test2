@@ -78,22 +78,42 @@ function SortableFramework({
   return (
     <div
       ref={setNodeRef}
-      style={style}
-      className="flex items-center justify-between border border-gray-200 rounded-md px-3 py-2"
+      style={{
+        ...style,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        border: "1px solid var(--rule)",
+        borderRadius: 3,
+        padding: "8px 12px",
+      }}
     >
       {editId === fw.id ? (
-        <div className="flex gap-2 flex-1 items-center">
+        <div style={{ display: "flex", gap: 8, flex: 1, alignItems: "center" }}>
           <input
             type="text"
             value={editName}
             onChange={(e) => setEditName(e.target.value)}
-            className="flex-1 border border-gray-300 rounded-md px-2 py-1 text-sm"
+            style={{
+              flex: 1,
+              border: "1px solid var(--rule-strong)",
+              borderRadius: 3,
+              padding: "4px 8px",
+              fontSize: 12,
+            }}
           />
           <ColorPicker value={editColor} onChange={setEditColor} />
           <button
             onClick={() => handleRename(fw.id)}
             disabled={loading}
-            className="px-3 py-1 text-sm text-white bg-green-600 hover:bg-green-700 rounded-md disabled:opacity-50"
+            style={{
+              padding: "4px 12px",
+              fontSize: 12,
+              color: "#FFFFFF",
+              background: "#1A6B3C",
+              borderRadius: 3,
+              opacity: loading ? 0.5 : 1,
+            }}
           >
             Save
           </button>
@@ -103,41 +123,52 @@ function SortableFramework({
               setEditName("");
               setEditColor("");
             }}
-            className="px-3 py-1 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+            style={{
+              padding: "4px 12px",
+              fontSize: 12,
+              color: "var(--ink-primary)",
+              background: "var(--ground)",
+              borderRadius: 3,
+            }}
           >
             Cancel
           </button>
         </div>
       ) : (
         <>
-          <div className="flex items-center gap-2">
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <button
-              className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 px-1"
+              style={{ cursor: "grab", color: "var(--ink-tertiary)", padding: 4 }}
               {...attributes}
               {...listeners}
             >
               &#9776;
             </button>
             <span
-              className="w-4 h-4 rounded-full inline-block"
-              style={{ backgroundColor: fw.color }}
+              style={{
+                width: 16,
+                height: 16,
+                borderRadius: "50%",
+                display: "inline-block",
+                backgroundColor: fw.color,
+              }}
             />
-            <span className="text-sm font-medium">{fw.name}</span>
+            <span style={{ fontSize: 12, fontWeight: 500 }}>{fw.name}</span>
           </div>
-          <div className="flex gap-2">
+          <div style={{ display: "flex", gap: 8 }}>
             <button
               onClick={() => {
                 setEditId(fw.id);
                 setEditName(fw.name);
                 setEditColor(fw.color);
               }}
-              className="text-sm text-blue-600 hover:text-blue-800"
+              style={{ fontSize: 12, color: "var(--accent)" }}
             >
               Rename
             </button>
             <button
               onClick={() => handleDelete(fw.id)}
-              className="text-sm text-red-600 hover:text-red-800"
+              style={{ fontSize: 12, color: "#B91C1C" }}
             >
               Delete
             </button>
@@ -156,16 +187,19 @@ function ColorPicker({
   onChange: (c: string) => void;
 }) {
   return (
-    <div className="flex gap-1">
+    <div style={{ display: "flex", gap: 4 }}>
       {PRESET_COLORS.map((c) => (
         <button
           key={c.value}
           type="button"
           onClick={() => onChange(c.value)}
-          className={`w-6 h-6 rounded-full border-2 ${
-            value === c.value ? "border-gray-800" : "border-gray-300"
-          }`}
-          style={{ backgroundColor: c.value }}
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: "50%",
+            border: value === c.value ? "2px solid #1F2937" : "2px solid var(--rule-strong)",
+            backgroundColor: c.value,
+          }}
           title={c.label}
         />
       ))}
@@ -290,26 +324,46 @@ export default function ManageFrameworksModal({ open, onClose, onSave }: Props) 
 
   return (
     <Modal open={open} onClose={onClose} title="Manage Frameworks">
-      <div className="space-y-4">
-        <div className="space-y-2">
+      <div>
+        <div style={{ marginBottom: 16 }}>
           <input
             type="text"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="New framework name"
-            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            style={{
+              width: "100%",
+              border: "1px solid var(--rule-strong)",
+              borderRadius: 3,
+              padding: "8px 12px",
+              fontSize: 12,
+              outline: "none",
+              boxSizing: "border-box",
+            }}
           />
-          <ColorPicker value={newColor} onChange={setNewColor} />
+          <div style={{ marginTop: 8 }}>
+            <ColorPicker value={newColor} onChange={setNewColor} />
+          </div>
           <button
             onClick={handleAdd}
             disabled={loading || !newName.trim()}
-            className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
+            style={{
+              marginTop: 8,
+              padding: "8px 16px",
+              fontSize: 12,
+              color: "#FFFFFF",
+              background: "var(--accent)",
+              borderRadius: 3,
+              opacity: loading || !newName.trim() ? 0.5 : 1,
+            }}
           >
             Add
           </button>
         </div>
 
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+        {error && (
+          <p style={{ color: "#B91C1C", fontSize: 12, marginBottom: 16 }}>{error}</p>
+        )}
 
         <DndContext
           sensors={sensors}
@@ -320,7 +374,7 @@ export default function ManageFrameworksModal({ open, onClose, onSave }: Props) 
             items={frameworks.map((f) => f.id)}
             strategy={verticalListSortingStrategy}
           >
-            <div className="space-y-2">
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {frameworks.map((fw) => (
                 <SortableFramework
                   key={fw.id}

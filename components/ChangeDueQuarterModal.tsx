@@ -68,18 +68,62 @@ export default function ChangeDueQuarterModal({
     }
   }
 
+  const labelStyle: React.CSSProperties = {
+    display: "block",
+    fontSize: 12,
+    fontWeight: 500,
+    color: "var(--ink-secondary)",
+    marginBottom: 4,
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    border: "1px solid var(--rule-strong)",
+    borderRadius: 3,
+    padding: "7px 12px",
+    fontSize: 12,
+    color: "var(--ink-primary)",
+    background: "var(--surface)",
+  };
+
+  const disabledInputStyle: React.CSSProperties = {
+    ...inputStyle,
+    background: "var(--ground)",
+    color: "var(--ink-secondary)",
+    cursor: "not-allowed",
+  };
+
+  const cancelBtnStyle: React.CSSProperties = {
+    padding: "7px 16px",
+    fontSize: 12,
+    color: "var(--ink-primary)",
+    background: "var(--ground)",
+    border: "1px solid var(--rule-strong)",
+    borderRadius: 3,
+    cursor: "pointer",
+  };
+
+  const saveBtnStyle: React.CSSProperties = {
+    padding: "7px 16px",
+    fontSize: 12,
+    fontWeight: 600,
+    color: "#FFFFFF",
+    background: "var(--accent)",
+    border: "none",
+    borderRadius: 3,
+    cursor: "pointer",
+  };
+
   return (
     <Modal open={open} onClose={onClose} title="Change Due Quarter">
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Current Quarter Due
-          </label>
+          <label style={labelStyle}>Current Quarter Due</label>
           <input
             type="text"
             value={currentQuarter}
             disabled
-            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-gray-50"
+            style={disabledInputStyle}
           />
         </div>
 
@@ -91,31 +135,29 @@ export default function ChangeDueQuarterModal({
         />
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Remarks
-          </label>
+          <label style={labelStyle}>Remarks</label>
           <textarea
             value={remarks}
             onChange={(e) => setRemarks(e.target.value)}
             rows={3}
-            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            style={{ ...inputStyle, resize: "vertical" }}
           />
         </div>
 
-        {serverError && <p className="text-red-600 text-sm">{serverError}</p>}
+        {serverError && <p style={{ fontSize: 12, color: "#B91C1C" }}>{serverError}</p>}
 
-        <div className="flex justify-end gap-2 pt-2">
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, paddingTop: 8 }}>
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+            style={cancelBtnStyle}
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
+            style={{ ...saveBtnStyle, opacity: loading ? 0.5 : 1 }}
           >
             {loading ? "Saving..." : "Save"}
           </button>

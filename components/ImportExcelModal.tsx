@@ -88,11 +88,23 @@ export default function ImportExcelModal({ open, onClose, onSave }: Props) {
 
   return (
     <Modal open={open} onClose={onClose} title="Import Excel">
-      <div className="space-y-4">
-        <p className="text-sm text-gray-600">
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <p style={{ fontSize: 12, color: "var(--ink-secondary)", margin: 0 }}>
           Upload an Excel file (.xlsx) with the following columns:
         </p>
-        <pre className="bg-gray-50 border border-gray-200 rounded-md p-3 text-xs overflow-x-auto max-h-32 overflow-y-auto">
+        <pre
+          style={{
+            background: "var(--ground)",
+            border: "1px solid var(--rule)",
+            borderRadius: 3,
+            padding: 12,
+            fontSize: 11,
+            overflowX: "auto",
+            maxHeight: 128,
+            overflowY: "auto",
+            margin: 0,
+          }}
+        >
           {`framework_name, program_name, project_name, project_reference,
 project_owner, project_target_quarter, task_code, task_name,
 task_assignee, task_priority, task_description, task_dependencies,
@@ -102,7 +114,16 @@ task_attachment_url`}
 
         <button
           onClick={handleDownloadTemplate}
-          className="text-sm text-blue-600 hover:text-blue-800 underline"
+          style={{
+            fontSize: 12,
+            color: "var(--accent)",
+            textDecoration: "underline",
+            background: "none",
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
+            textAlign: "left",
+          }}
         >
           Download Excel Template
         </button>
@@ -111,24 +132,55 @@ task_attachment_url`}
           ref={fileRef}
           type="file"
           accept=".xlsx,.xls"
-          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+          style={{
+            fontSize: 12,
+            color: "var(--ink-tertiary)",
+            width: "100%",
+          }}
         />
 
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+        {error && (
+          <p style={{ fontSize: 12, color: "#B91C1C", margin: 0 }}>{error}</p>
+        )}
 
         {result && (
-          <div className="bg-green-50 border border-green-200 rounded-md p-4 text-sm space-y-1">
-            <p className="font-medium text-green-800">Import Complete</p>
-            <p>Frameworks created: {result.frameworksCreated}</p>
-            <p>Programs created: {result.programsCreated}</p>
-            <p>Projects created: {result.projectsCreated}</p>
-            <p>Tasks created: {result.tasksCreated}</p>
-            <p>Tasks skipped (duplicates): {result.tasksSkipped}</p>
-            <p>Rows skipped (errors): {result.rowsSkipped}</p>
+          <div
+            style={{
+              background: "#E6F4EE",
+              border: "1px solid #1A6B3C",
+              borderRadius: 3,
+              padding: 16,
+              fontSize: 12,
+              display: "flex",
+              flexDirection: "column",
+              gap: 4,
+            }}
+          >
+            <p style={{ fontWeight: 500, color: "#1A6B3C", margin: 0 }}>
+              Import Complete
+            </p>
+            <p style={{ margin: 0 }}>Frameworks created: {result.frameworksCreated}</p>
+            <p style={{ margin: 0 }}>Programs created: {result.programsCreated}</p>
+            <p style={{ margin: 0 }}>Projects created: {result.projectsCreated}</p>
+            <p style={{ margin: 0 }}>Tasks created: {result.tasksCreated}</p>
+            <p style={{ margin: 0 }}>Tasks skipped (duplicates): {result.tasksSkipped}</p>
+            <p style={{ margin: 0 }}>Rows skipped (errors): {result.rowsSkipped}</p>
             {result.errors.length > 0 && (
-              <div className="mt-2">
-                <p className="font-medium text-red-700">Errors:</p>
-                <ul className="list-disc list-inside text-red-600 text-xs max-h-40 overflow-y-auto">
+              <div style={{ marginTop: 8 }}>
+                <p style={{ fontWeight: 500, color: "#B91C1C", margin: 0 }}>
+                  Errors:
+                </p>
+                <ul
+                  style={{
+                    listStyleType: "disc",
+                    paddingLeft: 20,
+                    color: "#B91C1C",
+                    fontSize: 11,
+                    maxHeight: 160,
+                    overflowY: "auto",
+                    margin: 0,
+                  }}
+                >
                   {result.errors.map((err, i) => (
                     <li key={i}>{err}</li>
                   ))}
@@ -138,11 +190,26 @@ task_attachment_url`}
           </div>
         )}
 
-        <div className="flex justify-end gap-2 pt-2">
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 8,
+            paddingTop: 8,
+          }}
+        >
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+            style={{
+              padding: "7px 12px",
+              fontSize: 12,
+              color: "var(--ink-primary)",
+              background: "var(--ground)",
+              border: "1px solid var(--rule-strong)",
+              borderRadius: 3,
+              cursor: "pointer",
+            }}
           >
             {result ? "Close" : "Cancel"}
           </button>
@@ -150,7 +217,17 @@ task_attachment_url`}
             <button
               onClick={handleUpload}
               disabled={loading}
-              className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
+              style={{
+                padding: "7px 12px",
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#FFFFFF",
+                background: "var(--accent)",
+                border: "none",
+                borderRadius: 3,
+                cursor: loading ? "not-allowed" : "pointer",
+                opacity: loading ? 0.5 : 1,
+              }}
             >
               {loading ? "Importing..." : "Import"}
             </button>

@@ -30,21 +30,77 @@ export default function Modal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 50,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "rgba(15, 17, 23, 0.5)",
+      }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+    >
       <div
         ref={ref}
-        className={`bg-white rounded-lg shadow-xl ${wide ? "w-full max-w-3xl" : "w-full max-w-lg"} max-h-[90vh] flex flex-col`}
+        style={{
+          background: "var(--surface)",
+          borderRadius: 4,
+          boxShadow: "0 4px 16px rgba(15,17,23,0.12), 0 1px 4px rgba(15,17,23,0.08)",
+          width: "100%",
+          maxWidth: wide ? "48rem" : "32rem",
+          maxHeight: "90vh",
+          display: "flex",
+          flexDirection: "column",
+        }}
       >
-        <div className="flex items-center justify-between border-b px-6 py-4">
-          <h2 className="text-lg font-semibold">{title}</h2>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderBottom: "1px solid var(--rule)",
+            padding: "16px 24px",
+          }}
+        >
+          <h2
+            id="modal-title"
+            style={{
+              margin: 0,
+              fontSize: 18,
+              fontWeight: 600,
+              color: "var(--ink-primary)",
+            }}
+          >
+            {title}
+          </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+            style={{
+              background: "none",
+              border: "none",
+              fontSize: 20,
+              color: "var(--ink-tertiary)",
+              cursor: "pointer",
+              padding: 0,
+              lineHeight: 1,
+            }}
+            aria-label="Close"
           >
             &times;
           </button>
         </div>
-        <div className="overflow-y-auto px-6 py-4">{children}</div>
+        <div
+          style={{
+            padding: 24,
+            overflowY: "auto",
+          }}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );
