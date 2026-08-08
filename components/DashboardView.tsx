@@ -1136,17 +1136,12 @@ export default function DashboardView({ frameworks, existingQuarters }: Props) {
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     {hasProjects && (
-                      <button
-                        onClick={() => toggleCollapse(fw.id)}
-                        aria-label={isCollapsed ? "Expand framework" : "Collapse framework"}
+                      <span
+                        aria-hidden="true"
                         style={{
-                          background: "none",
-                          border: "none",
-                          cursor: "pointer",
-                          padding: 0,
-                          color: "var(--ink-tertiary)",
                           display: "flex",
                           alignItems: "center",
+                          color: "var(--ink-tertiary)",
                         }}
                       >
                         <svg
@@ -1168,7 +1163,7 @@ export default function DashboardView({ frameworks, existingQuarters }: Props) {
                             strokeLinejoin="round"
                           />
                         </svg>
-                      </button>
+                      </span>
                     )}
 
                     {/* Color pip */}
