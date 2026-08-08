@@ -1121,6 +1121,7 @@ export default function DashboardView({ frameworks, existingQuarters }: Props) {
 
                 {/* Framework name row */}
                 <div
+                  onClick={() => hasProjects && toggleCollapse(fw.id)}
                   style={{
                     flex: 1,
                     background: "var(--surface)",
@@ -1129,6 +1130,8 @@ export default function DashboardView({ frameworks, existingQuarters }: Props) {
                     alignItems: "center",
                     justifyContent: "space-between",
                     padding: "10px 14px",
+                    cursor: hasProjects ? "pointer" : "default",
+                    userSelect: "none",
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
