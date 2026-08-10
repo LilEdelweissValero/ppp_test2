@@ -344,6 +344,7 @@ export default function ManageProgramsModal({ open, onClose, onSave }: Props) {
         )}
 
         <DndContext
+          id="program-sort"
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragEnd={handleDragEnd}

@@ -1255,6 +1255,7 @@ export default function DashboardView({ frameworks, existingQuarters }: Props) {
 
                   <div style={{ flex: 1, overflowX: "auto" }}>
                     <DndContext
+                      id={`project-sort-${fw.id}`}
                       sensors={sensors}
                       collisionDetection={closestCenter}
                       onDragEnd={(event) => handleProjectDragEnd(fw.id, event)}

@@ -366,6 +366,7 @@ export default function ManageFrameworksModal({ open, onClose, onSave }: Props) 
         )}
 
         <DndContext
+          id="framework-sort"
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragEnd={handleDragEnd}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   DndContext,
@@ -222,6 +222,10 @@ export default function ProjectDetailView({ project }: Props) {
   const selectRef = useRef<HTMLSelectElement>(null);
   const [tasks, setTasks] = useState<Task[]>(project.tasks);
 
+  useEffect(() => {
+    setTasks(project.tasks);
+  }, [project.tasks]);
+
   const pct = computeProjectPercentComplete(tasks);
   const health =
     tasks.length > 0
@@ -374,31 +378,32 @@ export default function ProjectDetailView({ project }: Props) {
               <p>Use Add Task to create the first delivery item for this project.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="detail-task-table">
-                <thead>
-                  <tr>
-                    <th aria-label="Reorder" />
-                    <th>Code</th>
-                    <th>Name</th>
-                    <th>Assignee</th>
-                    <th>Priority</th>
-                    <th>Status</th>
-                    <th>Quarter Due</th>
-                    <th>Done</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleDragEnd}
-                  >
-                    <SortableContext
-                      items={tasks.map((t) => t.id)}
-                      strategy={verticalListSortingStrategy}
-                    >
+            <DndContext
+              id="task-sort"
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={tasks.map((t) => t.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="overflow-x-auto">
+                  <table className="detail-task-table">
+                    <thead>
+                      <tr>
+                        <th aria-label="Reorder" />
+                        <th>Code</th>
+                        <th>Name</th>
+                        <th>Assignee</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Quarter Due</th>
+                        <th>Done</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
                       {tasks.map((task) => (
                         <SortableTaskRow
                           key={task.id}
@@ -415,11 +420,11 @@ export default function ProjectDetailView({ project }: Props) {
                           taskCount={tasks.length}
                         />
                       ))}
-                    </SortableContext>
-                  </DndContext>
-                </tbody>
-              </table>
-            </div>
+                    </tbody>
+                  </table>
+                </div>
+              </SortableContext>
+            </DndContext>
           )}
         </section>
 
