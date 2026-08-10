@@ -22,6 +22,7 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   computeProjectPercentComplete,
   computeProjectHealth,
+  computeTaskPercentDone,
 } from "@/lib/health";
 import { STATUS_LABELS, PRIORITY_LABELS } from "@/lib/status";
 import HealthBadge from "@/components/HealthBadge";
@@ -93,8 +94,7 @@ function SortableTaskRow({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const completedStatuses = ["Complete or Verified"];
-  const isCompleted = completedStatuses.includes(task.status);
+  const pct = computeTaskPercentDone(task.status);
 
   return (
     <tr
@@ -173,9 +173,9 @@ function SortableTaskRow({
         <span style={{
           fontSize: 11,
           fontWeight: 600,
-          color: isCompleted ? "var(--health-completed-ink)" : "var(--ink-primary)",
+          color: pct === 1 ? "var(--health-completed-ink)" : "var(--ink-primary)",
         }}>
-          {isCompleted ? "✓" : "—"}
+          {Math.round(pct * 100)}%
         </span>
       </td>
       <td>
@@ -399,7 +399,7 @@ export default function ProjectDetailView({ project }: Props) {
                         <th>Priority</th>
                         <th>Status</th>
                         <th>Quarter Due</th>
-                        <th>Done</th>
+                        <th>%</th>
                         <th>Actions</th>
                       </tr>
                     </thead>
