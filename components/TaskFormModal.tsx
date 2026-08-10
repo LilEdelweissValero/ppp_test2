@@ -322,7 +322,7 @@ export default function TaskFormModal({
               </select>
             </div>
             <QuarterSelect
-              label="Target Quarter *"
+              label="Planned Quarter *"
               value={targetQuarter}
               onChange={setTargetQuarter}
               invalid={quarterInvalid}
