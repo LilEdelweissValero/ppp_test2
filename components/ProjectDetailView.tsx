@@ -249,12 +249,14 @@ export default function ProjectDetailView({ project }: Props) {
     value: string
   ) {
     setEditingCell(null);
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, [field]: value } : t))
+    );
     await fetch(`/api/tasks/${taskId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ [field]: value }),
     });
-    handleRefresh();
   }
 
   async function handleDragEnd(event: DragEndEvent) {
@@ -274,7 +276,6 @@ export default function ProjectDetailView({ project }: Props) {
         orderedIds: reordered.map((t) => t.id),
       }),
     });
-    handleRefresh();
   }
 
   return (
@@ -446,7 +447,9 @@ export default function ProjectDetailView({ project }: Props) {
         <TaskFormModal
           open={showAddTask}
           onClose={() => setShowAddTask(false)}
-          onSave={handleRefresh}
+          onSave={(newTask) => {
+            setTasks((prev) => [...prev, newTask]);
+          }}
           projectId={project.id}
         />
 

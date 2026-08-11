@@ -7,7 +7,7 @@ import QuarterSelect from "./QuarterSelect";
 interface Props {
   open: boolean;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (data: { entityType: "Project" | "Task"; entityId: number; newQuarter: string }) => void;
   entityType: "Project" | "Task";
   entityId: number;
   currentQuarter: string;
@@ -60,7 +60,7 @@ export default function ChangeDueQuarterModal({
 
     setLoading(false);
     if (res.ok) {
-      onSave();
+      onSave({ entityType, entityId, newQuarter });
       onClose();
     } else {
       const data = await res.json();

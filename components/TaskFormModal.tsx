@@ -8,7 +8,7 @@ import { STATUS_LABELS, PRIORITY_LABELS } from "@/lib/status";
 interface Props {
   open: boolean;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (task: { id: number; taskCode: string; name: string; assignee: string | null; priority: string; status: string; description: string | null; dependencies: string | null; notes: string | null; targetQuarter: string; adjustedTargetQuarter: string; deliverable: string | null; attachmentUrl: string | null; projectId: number; sortOrder: number }) => void;
   projectId: number;
   initialData?: {
     id: number;
@@ -131,7 +131,8 @@ export default function TaskFormModal({
 
     setLoading(false);
     if (res.ok) {
-      onSave();
+      const task = await res.json();
+      onSave(task);
       onClose();
     } else {
       const data = await res.json();

@@ -14,7 +14,7 @@ interface Framework {
 interface Props {
   open: boolean;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (project: { id: number; name: string; programId: number; reference: string | null; owner: string | null; targetQuarter: string; adjustedTargetQuarter: string; actualCompletionDate: string | null; sortOrder: number; program?: { id: number; name: string } }) => void;
   frameworkId?: number | null;
   initialData?: {
     id: number;
@@ -134,7 +134,8 @@ export default function ProjectFormModal({
 
     setLoading(false);
     if (res.ok) {
-      onSave();
+      const project = await res.json();
+      onSave(project);
       onClose();
     } else {
       const data = await res.json();
