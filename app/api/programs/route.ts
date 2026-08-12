@@ -3,15 +3,19 @@ import { prisma } from "@/lib/db";
 import { touchLastModified } from "@/lib/system-metadata";
 import { logChange } from "@/lib/audit-log";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const simple = request.nextUrl.searchParams.get("simple") === "true";
+
   const programs = await prisma.program.findMany({
-    include: {
-      projects: {
-        include: { tasks: true },
-        orderBy: { sortOrder: "asc" },
-      },
-      framework: { select: { name: true } },
-    },
+    include: simple
+      ? { framework: { select: { name: true } } }
+      : {
+          projects: {
+            include: { tasks: true },
+            orderBy: { sortOrder: "asc" },
+          },
+          framework: { select: { name: true } },
+        },
     orderBy: { sortOrder: "asc" },
   });
   return NextResponse.json(programs);

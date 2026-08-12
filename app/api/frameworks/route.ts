@@ -14,19 +14,25 @@ const PRESET_COLORS = [
   "#E5E7EB",
 ];
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const simple = request.nextUrl.searchParams.get("simple") === "true";
+
   const frameworks = await prisma.framework.findMany({
-    include: {
-      programs: {
-        include: {
-          projects: {
-            include: { tasks: true },
-            orderBy: { sortOrder: "asc" },
+    ...(simple
+      ? {}
+      : {
+          include: {
+            programs: {
+              include: {
+                projects: {
+                  include: { tasks: true },
+                  orderBy: { sortOrder: "asc" },
+                },
+              },
+              orderBy: { sortOrder: "asc" },
+            },
           },
-        },
-        orderBy: { sortOrder: "asc" },
-      },
-    },
+        }),
     orderBy: { sortOrder: "asc" },
   });
   return NextResponse.json(frameworks);

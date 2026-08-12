@@ -174,6 +174,7 @@ export default function ManageProgramsModal({ open, onClose, onSave }: Props) {
   const [editName, setEditName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingInitial, setLoadingInitial] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -183,7 +184,7 @@ export default function ManageProgramsModal({ open, onClose, onSave }: Props) {
   );
 
   async function loadPrograms() {
-    const res = await fetch("/api/programs");
+    const res = await fetch("/api/programs?simple=true");
     if (res.ok) {
       const data = await res.json();
       setPrograms(data);
@@ -191,7 +192,7 @@ export default function ManageProgramsModal({ open, onClose, onSave }: Props) {
   }
 
   async function loadFrameworks() {
-    const res = await fetch("/api/frameworks");
+    const res = await fetch("/api/frameworks?simple=true");
     if (res.ok) {
       const data = await res.json();
       setFrameworks(data);
@@ -200,8 +201,10 @@ export default function ManageProgramsModal({ open, onClose, onSave }: Props) {
 
   useEffect(() => {
     if (open) {
-      loadPrograms();
-      loadFrameworks();
+      setLoadingInitial(true);
+      Promise.all([loadPrograms(), loadFrameworks()]).finally(() =>
+        setLoadingInitial(false)
+      );
       setNewName("");
       setNewFrameworkId(0);
       setEditId(null);
@@ -343,6 +346,9 @@ export default function ManageProgramsModal({ open, onClose, onSave }: Props) {
           <p style={{ color: "#B91C1C", fontSize: 12 }}>{error}</p>
         )}
 
+        {loadingInitial ? (
+          <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>Loading programs...</p>
+        ) : (
         <DndContext
           id="program-sort"
           sensors={sensors}
@@ -370,6 +376,7 @@ export default function ManageProgramsModal({ open, onClose, onSave }: Props) {
             </div>
           </SortableContext>
         </DndContext>
+        )}
       </div>
     </Modal>
   );

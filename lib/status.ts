@@ -20,8 +20,6 @@ export const PRIORITY_LABELS = ["Low", "Moderate", "High"] as const;
 
 export type PriorityLabel = (typeof PRIORITY_LABELS)[number];
 
-export const ENTITY_TYPES = ["Project", "Task"] as const;
-
 export type StatusCounts = Record<StatusLabel, number>;
 
 export function countTasksByStatus(

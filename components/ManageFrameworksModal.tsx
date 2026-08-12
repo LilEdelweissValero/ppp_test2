@@ -216,6 +216,7 @@ export default function ManageFrameworksModal({ open, onClose, onSave }: Props) 
   const [editColor, setEditColor] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingInitial, setLoadingInitial] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -225,7 +226,7 @@ export default function ManageFrameworksModal({ open, onClose, onSave }: Props) 
   );
 
   async function loadFrameworks() {
-    const res = await fetch("/api/frameworks");
+    const res = await fetch("/api/frameworks?simple=true");
     if (res.ok) {
       const data = await res.json();
       setFrameworks(data);
@@ -234,7 +235,8 @@ export default function ManageFrameworksModal({ open, onClose, onSave }: Props) 
 
   useEffect(() => {
     if (open) {
-      loadFrameworks();
+      setLoadingInitial(true);
+      loadFrameworks().finally(() => setLoadingInitial(false));
       setNewName("");
       setNewColor(PRESET_COLORS[0].value);
       setEditId(null);
@@ -365,6 +367,9 @@ export default function ManageFrameworksModal({ open, onClose, onSave }: Props) 
           <p style={{ color: "#B91C1C", fontSize: 12, marginBottom: 16 }}>{error}</p>
         )}
 
+        {loadingInitial ? (
+          <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>Loading frameworks...</p>
+        ) : (
         <DndContext
           id="framework-sort"
           sensors={sensors}
@@ -394,6 +399,7 @@ export default function ManageFrameworksModal({ open, onClose, onSave }: Props) 
             </div>
           </SortableContext>
         </DndContext>
+        )}
       </div>
     </Modal>
   );

@@ -42,21 +42,6 @@ export function computeProjectPercentComplete(
   return total / tasks.length;
 }
 
-export function computeQuarterSpecificPercent(
-  tasks: { status: string; adjustedTargetQuarter: string }[],
-  selectedQuarter: string
-): number | null {
-  const filtered = tasks.filter(
-    (t) => t.adjustedTargetQuarter === selectedQuarter
-  );
-  if (filtered.length === 0) return null;
-  const total = filtered.reduce(
-    (sum, t) => sum + computeTaskPercentDone(t.status),
-    0
-  );
-  return total / filtered.length;
-}
-
 export function computeProjectDerivedStatus(
   tasks: { status: string }[]
 ): "In Progress" | "Completed" {
