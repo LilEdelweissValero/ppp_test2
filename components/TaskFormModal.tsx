@@ -107,36 +107,41 @@ export default function TaskFormModal({
 
     setLoading(true);
 
-    const url = isEdit ? `/api/tasks/${initialData?.id}` : "/api/tasks";
-    const method = isEdit ? "PATCH" : "POST";
+    try {
+      const url = isEdit ? `/api/tasks/${initialData?.id}` : "/api/tasks";
+      const method = isEdit ? "PATCH" : "POST";
 
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        projectId,
-        taskCode,
-        name,
-        assignee,
-        priority,
-        description,
-        dependencies,
-        notes,
-        status,
-        targetQuarter,
-        deliverable,
-        attachmentUrl: attachmentUrl || null,
-      }),
-    });
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          taskCode,
+          name,
+          assignee,
+          priority,
+          description,
+          dependencies,
+          notes,
+          status,
+          targetQuarter,
+          deliverable,
+          attachmentUrl: attachmentUrl || null,
+        }),
+      });
 
-    setLoading(false);
-    if (res.ok) {
-      const task = await res.json();
-      onSave(task);
-      onClose();
-    } else {
-      const data = await res.json();
-      setServerError(data.error || "Failed to save task");
+      if (res.ok) {
+        const task = await res.json();
+        onSave(task);
+        onClose();
+      } else {
+        const data = await res.json();
+        setServerError(data.error || "Failed to save task");
+      }
+    } catch {
+      setServerError("Failed to save task");
+    } finally {
+      setLoading(false);
     }
   }
 

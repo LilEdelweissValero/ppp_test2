@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   DndContext,
   closestCenter,
@@ -73,7 +74,6 @@ function SortableTaskRow({
   editingCell,
   setEditingCell,
   selectRef,
-  taskCount,
 }: {
   task: Task;
   onEdit: () => void;
@@ -83,7 +83,6 @@ function SortableTaskRow({
   editingCell: { taskId: number; field: "status" | "priority" } | null;
   setEditingCell: (cell: { taskId: number; field: "status" | "priority" } | null) => void;
   selectRef: React.RefObject<HTMLSelectElement | null>;
-  taskCount: number;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: task.id });
@@ -248,15 +247,22 @@ export default function ProjectDetailView({ project }: Props) {
     field: "status" | "priority",
     value: string
   ) {
+    const previousTasks = tasks;
     setEditingCell(null);
     setTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, [field]: value } : t))
     );
-    await fetch(`/api/tasks/${taskId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ [field]: value }),
-    });
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: value }),
+      });
+      if (!response.ok) throw new Error("Update failed");
+      router.refresh();
+    } catch {
+      setTasks(previousTasks);
+    }
   }
 
   async function handleDragEnd(event: DragEndEvent) {
@@ -265,29 +271,34 @@ export default function ProjectDetailView({ project }: Props) {
 
     const oldIndex = tasks.findIndex((t) => t.id === active.id);
     const newIndex = tasks.findIndex((t) => t.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const previousTasks = tasks;
     const reordered = arrayMove(tasks, oldIndex, newIndex);
     setTasks(reordered);
 
-    await fetch("/api/reorder", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        entityType: "task",
-        orderedIds: reordered.map((t) => t.id),
-      }),
-    });
+    try {
+      const response = await fetch("/api/reorder", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entityType: "task",
+          orderedIds: reordered.map((t) => t.id),
+        }),
+      });
+      if (!response.ok) throw new Error("Reorder failed");
+      router.refresh();
+    } catch {
+      setTasks(previousTasks);
+    }
   }
 
   return (
     <main className="detail-shell">
       <div className="detail-container">
         <div>
-          <button
-            onClick={() => router.push("/")}
-            className="detail-back"
-          >
+          <Link href="/" className="detail-back">
             <span aria-hidden="true">←</span> Back to Dashboard
-          </button>
+          </Link>
         </div>
 
         <section className="detail-hero" aria-labelledby="project-title">
@@ -418,8 +429,7 @@ export default function ProjectDetailView({ project }: Props) {
                           editingCell={editingCell}
                           setEditingCell={setEditingCell}
                           selectRef={selectRef}
-                          taskCount={tasks.length}
-                        />
+                          />
                       ))}
                     </tbody>
                   </table>
@@ -449,6 +459,7 @@ export default function ProjectDetailView({ project }: Props) {
           onClose={() => setShowAddTask(false)}
           onSave={(newTask) => {
             setTasks((prev) => [...prev, newTask]);
+            router.refresh();
           }}
           projectId={project.id}
         />

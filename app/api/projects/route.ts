@@ -18,19 +18,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Valid target quarter is required (Q# YYYY)" }, { status: 400 });
   }
 
-  const program = await prisma.program.findUnique({ where: { id: parseInt(programId) } });
+  const parsedProgramId = parseInt(programId);
+  const [program, maxOrder] = await Promise.all([
+    prisma.program.findUnique({
+      where: { id: parsedProgramId },
+      select: { id: true },
+    }),
+    prisma.project.aggregate({
+      _max: { sortOrder: true },
+      where: { programId: parsedProgramId },
+    }),
+  ]);
   if (!program) {
     return NextResponse.json({ error: "Program not found" }, { status: 404 });
   }
 
-  const maxOrder = await prisma.project.aggregate({
-    _max: { sortOrder: true },
-    where: { programId: parseInt(programId) },
-  });
   const project = await prisma.project.create({
     data: {
       name: name.trim(),
-      programId: parseInt(programId),
+      programId: parsedProgramId,
       reference: reference || null,
       owner: owner || null,
       targetQuarter,
@@ -39,13 +45,15 @@ export async function POST(request: NextRequest) {
       sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
     },
   });
-  await touchLastModified();
-  await logChange({
-    entityType: "Project",
-    entityId: project.id,
-    entityName: project.name,
-    changeType: "create",
-    newValue: project.name,
-  });
+  await Promise.all([
+    touchLastModified(),
+    logChange({
+      entityType: "Project",
+      entityId: project.id,
+      entityName: project.name,
+      changeType: "create",
+      newValue: project.name,
+    }),
+  ]);
   return NextResponse.json(project, { status: 201 });
 }

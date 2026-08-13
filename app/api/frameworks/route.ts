@@ -16,9 +16,22 @@ const PRESET_COLORS = [
 
 export async function GET(request: NextRequest) {
   const simple = request.nextUrl.searchParams.get("simple") === "true";
+  const options = request.nextUrl.searchParams.get("options") === "true";
 
   const frameworks = await prisma.framework.findMany({
-    ...(simple
+    ...(options
+      ? {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+            programs: {
+              select: { id: true, name: true },
+              orderBy: { sortOrder: "asc" as const },
+            },
+          },
+        }
+      : simple
       ? {}
       : {
           include: {
@@ -50,26 +63,31 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
-  const existing = await prisma.framework.findFirst({
-    where: { name: name.trim() },
-  });
+  const [existing, maxOrder] = await Promise.all([
+    prisma.framework.findFirst({
+      where: { name: name.trim() },
+      select: { id: true },
+    }),
+    prisma.framework.aggregate({ _max: { sortOrder: true } }),
+  ]);
   if (existing) {
     return NextResponse.json(
       { error: "Framework name already exists" },
       { status: 409 }
     );
   }
-  const maxOrder = await prisma.framework.aggregate({ _max: { sortOrder: true } });
   const framework = await prisma.framework.create({
     data: { name: name.trim(), color, sortOrder: (maxOrder._max.sortOrder ?? -1) + 1 },
   });
-  await touchLastModified();
-  await logChange({
-    entityType: "Framework",
-    entityId: framework.id,
-    entityName: framework.name,
-    changeType: "create",
-    newValue: framework.name,
-  });
+  await Promise.all([
+    touchLastModified(),
+    logChange({
+      entityType: "Framework",
+      entityId: framework.id,
+      entityName: framework.name,
+      changeType: "create",
+      newValue: framework.name,
+    }),
+  ]);
   return NextResponse.json(framework, { status: 201 });
 }

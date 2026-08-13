@@ -1,42 +1,25 @@
-import { prisma } from "@/lib/db";
-import { getLastModifiedAt } from "@/lib/system-metadata";
 import DashboardView from "@/components/DashboardView";
 import { compareQuarters } from "@/lib/quarters";
+import { getDashboardData } from "@/lib/portfolio-data";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const frameworks = await prisma.framework.findMany({
-    include: {
-      programs: {
-        include: {
-          projects: {
-            include: { tasks: true },
-            orderBy: { sortOrder: "asc" },
-          },
-        },
-        orderBy: { sortOrder: "asc" },
-      },
-    },
-    orderBy: { sortOrder: "asc" },
-  });
-
-  // Collect distinct quarters from tasks and projects
-  const taskQuarters = await prisma.task.findMany({
-    select: { adjustedTargetQuarter: true },
-    distinct: ["adjustedTargetQuarter"],
-  });
-  const projectQuarters = await prisma.project.findMany({
-    select: { adjustedTargetQuarter: true },
-    distinct: ["adjustedTargetQuarter"],
-  });
+  const { frameworks, lastModifiedAt } = await getDashboardData();
 
   const quarterSet = new Set<string>();
-  for (const q of taskQuarters) quarterSet.add(q.adjustedTargetQuarter);
-  for (const q of projectQuarters) quarterSet.add(q.adjustedTargetQuarter);
+  for (const framework of frameworks) {
+    for (const program of framework.programs) {
+      for (const project of program.projects) {
+        quarterSet.add(project.adjustedTargetQuarter);
+        for (const task of project.tasks) {
+          quarterSet.add(task.adjustedTargetQuarter);
+        }
+      }
+    }
+  }
   const existingQuarters = [...quarterSet].sort(compareQuarters);
 
-  const lastModifiedAt = await getLastModifiedAt();
   let formattedDate = "Never";
   if (lastModifiedAt) {
     const date = new Date(lastModifiedAt);

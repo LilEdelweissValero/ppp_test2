@@ -3,8 +3,12 @@ import { prisma } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const page = parseInt(searchParams.get("page") || "1");
-  const limit = parseInt(searchParams.get("limit") || "50");
+  const parsedPage = parseInt(searchParams.get("page") || "1");
+  const parsedLimit = parseInt(searchParams.get("limit") || "50");
+  const page = Number.isFinite(parsedPage) ? Math.max(1, parsedPage) : 1;
+  const limit = Number.isFinite(parsedLimit)
+    ? Math.min(100, Math.max(1, parsedLimit))
+    : 50;
   const entityType = searchParams.get("entityType");
   const changeType = searchParams.get("changeType");
 
@@ -15,7 +19,7 @@ export async function GET(request: NextRequest) {
   const [logs, total] = await Promise.all([
     prisma.entityChangeLog.findMany({
       where,
-      orderBy: { seq: "desc" },
+      orderBy: { id: "desc" },
       skip: (page - 1) * limit,
       take: limit,
     }),

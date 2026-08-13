@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       entityType,
       entityId: parseInt(entityId),
     },
-    orderBy: { seq: "desc" },
+    orderBy: { id: "desc" },
   });
 
   return NextResponse.json(logs);

@@ -24,8 +24,10 @@
 
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useDeferredValue } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import dynamic from "next/dynamic";
 import {
   DndContext,
   closestCenter,
@@ -51,10 +53,15 @@ import {
 import { countTasksByStatus, countTasksByStatusForQuarter } from "@/lib/status";
 import HealthBadge from "@/components/HealthBadge";
 import ProjectFormModal from "@/components/ProjectFormModal";
-import ManageFrameworksModal from "@/components/ManageFrameworksModal";
-import ManageProgramsModal from "@/components/ManageProgramsModal";
-import ImportExcelModal from "@/components/ImportExcelModal";
-import HistoryLogModal from "@/components/HistoryLogModal";
+
+const preloadManageFrameworks = () => import("@/components/ManageFrameworksModal");
+const preloadManagePrograms = () => import("@/components/ManageProgramsModal");
+const preloadImportExcel = () => import("@/components/ImportExcelModal");
+const preloadHistoryLog = () => import("@/components/HistoryLogModal");
+const ManageFrameworksModal = dynamic(() => import("@/components/ManageFrameworksModal"));
+const ManageProgramsModal = dynamic(() => import("@/components/ManageProgramsModal"));
+const ImportExcelModal = dynamic(() => import("@/components/ImportExcelModal"));
+const HistoryLogModal = dynamic(() => import("@/components/HistoryLogModal"));
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -395,17 +402,16 @@ function FrameworkSummaryRow({
 
 function SortableProjectRow({
   project,
-  onClick,
   selectedQuarter,
   isEven,
   programName,
 }: {
   project: Project;
-  onClick: () => void;
   selectedQuarter: string;
   isEven: boolean;
   programName: string;
 }) {
+  const [shouldPrefetch, setShouldPrefetch] = useState(false);
   const {
     attributes,
     listeners,
@@ -493,22 +499,23 @@ function SortableProjectRow({
 
       {/* project name */}
       <td style={{ ...tdBase, width: 220 }}>
-        <button
-          onClick={onClick}
+        <Link
+          href={`/projects/${project.id}`}
+          prefetch={shouldPrefetch ? true : false}
+          onPointerEnter={() => setShouldPrefetch(true)}
+          onFocus={() => setShouldPrefetch(true)}
           style={{
-            background: "none",
-            border: "none",
-            padding: 0,
             fontWeight: 600,
             fontSize: 12,
             color: "var(--accent)",
             cursor: "pointer",
             textAlign: "left",
             lineHeight: 1.35,
+            textDecoration: "none",
           }}
         >
           {project.name}
-        </button>
+        </Link>
       </td>
 
       {/* program */}
@@ -703,6 +710,18 @@ function ActionsMenu({
     <div ref={ref} style={{ position: "relative" }}>
       <button
         onClick={() => setOpen((v) => !v)}
+        onPointerEnter={() => {
+          preloadManageFrameworks();
+          preloadManagePrograms();
+          preloadImportExcel();
+          preloadHistoryLog();
+        }}
+        onFocus={() => {
+          preloadManageFrameworks();
+          preloadManagePrograms();
+          preloadImportExcel();
+          preloadHistoryLog();
+        }}
         style={{
           display: "flex",
           alignItems: "center",
@@ -790,6 +809,7 @@ export default function DashboardView({ frameworks, existingQuarters }: Props) {
   const [showManagePrograms, setShowManagePrograms] = useState(false);
   const [showImportExcel, setShowImportExcel] = useState(false);
   const [showHistoryLog, setShowHistoryLog] = useState(false);
+  const deferredSearch = useDeferredValue(search);
 
   // Local project ordering per framework (keyed by frameworkId)
   const [frameworkProjectsOverride, setFrameworkProjectsOverride] = useState<
@@ -825,7 +845,7 @@ export default function DashboardView({ frameworks, existingQuarters }: Props) {
 
   // Filter by search (universal: matches across all visible fields)
   const filteredFrameworks = useMemo(() => {
-    const q = search.toLowerCase().trim();
+    const q = deferredSearch.toLowerCase().trim();
     if (!q) return resolvedFrameworks;
 
     function taskMatches(task: Task, query: string): boolean {
@@ -860,7 +880,7 @@ export default function DashboardView({ frameworks, existingQuarters }: Props) {
           .filter((prog) => prog.projects.length > 0),
       }))
       .filter((fw) => fw.programs.length > 0);
-  }, [resolvedFrameworks, search]);
+  }, [resolvedFrameworks, deferredSearch]);
 
   function toggleCollapse(id: number) {
     setCollapsed((prev) => {
@@ -898,15 +918,24 @@ export default function DashboardView({ frameworks, existingQuarters }: Props) {
 
     setFrameworkProjectsOverride((prev) => ({ ...prev, [fwId]: reordered }));
 
-    await fetch("/api/reorder", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        entityType: "project",
-        orderedIds: reordered.map((p) => p.id),
-      }),
-    });
-    handleRefresh();
+    try {
+      const response = await fetch("/api/reorder", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entityType: "project",
+          orderedIds: reordered.map((p) => p.id),
+        }),
+      });
+      if (!response.ok) throw new Error("Reorder failed");
+      router.refresh();
+    } catch {
+      setFrameworkProjectsOverride((prev) => {
+        const next = { ...prev };
+        delete next[fwId];
+        return next;
+      });
+    }
   }
 
   const allCollapsed =
@@ -1074,7 +1103,7 @@ export default function DashboardView({ frameworks, existingQuarters }: Props) {
           </p>
           {!search && (
             <p style={{ fontSize: 12, color: "var(--ink-tertiary)" }}>
-              Click "Add Project" or use Manage → Import Excel to get started.
+              Click &quot;Add Project&quot; or use Manage → Import Excel to get started.
             </p>
           )}
         </div>
@@ -1298,9 +1327,6 @@ export default function DashboardView({ frameworks, existingQuarters }: Props) {
                                     selectedQuarter={selectedQuarter}
                                     isEven={rowIdx % 2 === 0}
                                     programName={prog.name}
-                                    onClick={() =>
-                                      router.push(`/projects/${project.id}`)
-                                    }
                                   />
                                 ))}
                               </SortableContext>
@@ -1340,26 +1366,35 @@ export default function DashboardView({ frameworks, existingQuarters }: Props) {
         open={showAddProject}
         onClose={() => setShowAddProject(false)}
         onSave={handleRefresh}
+        frameworkOptions={frameworks}
       />
-      <ManageFrameworksModal
-        open={showManageFrameworks}
-        onClose={() => setShowManageFrameworks(false)}
-        onSave={handleRefresh}
-      />
-      <ManageProgramsModal
-        open={showManagePrograms}
-        onClose={() => setShowManagePrograms(false)}
-        onSave={handleRefresh}
-      />
-      <ImportExcelModal
-        open={showImportExcel}
-        onClose={() => setShowImportExcel(false)}
-        onSave={handleRefresh}
-      />
-      <HistoryLogModal
-        open={showHistoryLog}
-        onClose={() => setShowHistoryLog(false)}
-      />
+      {showManageFrameworks && (
+        <ManageFrameworksModal
+          open
+          onClose={() => setShowManageFrameworks(false)}
+          onSave={handleRefresh}
+        />
+      )}
+      {showManagePrograms && (
+        <ManageProgramsModal
+          open
+          onClose={() => setShowManagePrograms(false)}
+          onSave={handleRefresh}
+        />
+      )}
+      {showImportExcel && (
+        <ImportExcelModal
+          open
+          onClose={() => setShowImportExcel(false)}
+          onSave={handleRefresh}
+        />
+      )}
+      {showHistoryLog && (
+        <HistoryLogModal
+          open
+          onClose={() => setShowHistoryLog(false)}
+        />
+      )}
     </div>
   );
 }

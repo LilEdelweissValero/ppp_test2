@@ -30,32 +30,43 @@ export async function POST(request: NextRequest) {
   if (!frameworkId) {
     return NextResponse.json({ error: "Framework is required" }, { status: 400 });
   }
-  const existing = await prisma.program.findFirst({ where: { name: name.trim() } });
+  const parsedFrameworkId = parseInt(frameworkId);
+  const [existing, framework, maxOrder] = await Promise.all([
+    prisma.program.findFirst({
+      where: { name: name.trim() },
+      select: { id: true },
+    }),
+    prisma.framework.findUnique({
+      where: { id: parsedFrameworkId },
+      select: { id: true },
+    }),
+    prisma.program.aggregate({
+      _max: { sortOrder: true },
+      where: { frameworkId: parsedFrameworkId },
+    }),
+  ]);
   if (existing) {
     return NextResponse.json({ error: "Program name already exists" }, { status: 409 });
   }
-  const framework = await prisma.framework.findUnique({ where: { id: parseInt(frameworkId) } });
   if (!framework) {
     return NextResponse.json({ error: "Framework not found" }, { status: 404 });
   }
-  const maxOrder = await prisma.program.aggregate({
-    _max: { sortOrder: true },
-    where: { frameworkId: parseInt(frameworkId) },
-  });
   const program = await prisma.program.create({
     data: {
       name: name.trim(),
-      frameworkId: parseInt(frameworkId),
+      frameworkId: parsedFrameworkId,
       sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
     },
   });
-  await touchLastModified();
-  await logChange({
-    entityType: "Program",
-    entityId: program.id,
-    entityName: program.name,
-    changeType: "create",
-    newValue: program.name,
-  });
+  await Promise.all([
+    touchLastModified(),
+    logChange({
+      entityType: "Program",
+      entityId: program.id,
+      entityName: program.name,
+      changeType: "create",
+      newValue: program.name,
+    }),
+  ]);
   return NextResponse.json(program, { status: 201 });
 }

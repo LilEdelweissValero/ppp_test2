@@ -47,24 +47,29 @@ export default function ChangeDueQuarterModal({
 
     setLoading(true);
 
-    const url =
-      entityType === "Project"
-        ? `/api/projects/${entityId}/change-quarter`
-        : `/api/tasks/${entityId}/change-quarter`;
+    try {
+      const url =
+        entityType === "Project"
+          ? `/api/projects/${entityId}/change-quarter`
+          : `/api/tasks/${entityId}/change-quarter`;
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ newQuarter, remarks }),
-    });
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newQuarter, remarks }),
+      });
 
-    setLoading(false);
-    if (res.ok) {
-      onSave({ entityType, entityId, newQuarter });
-      onClose();
-    } else {
-      const data = await res.json();
-      setServerError(data.error || "Failed to change quarter");
+      if (res.ok) {
+        onSave({ entityType, entityId, newQuarter });
+        onClose();
+      } else {
+        const data = await res.json();
+        setServerError(data.error || "Failed to change quarter");
+      }
+    } catch {
+      setServerError("Failed to change quarter");
+    } finally {
+      setLoading(false);
     }
   }
 

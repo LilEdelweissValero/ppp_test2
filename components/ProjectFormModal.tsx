@@ -16,6 +16,7 @@ interface Props {
   onClose: () => void;
   onSave: (project: { id: number; name: string; programId: number; reference: string | null; owner: string | null; targetQuarter: string; adjustedTargetQuarter: string; actualCompletionDate: string | null; sortOrder: number; program?: { id: number; name: string } }) => void;
   frameworkId?: number | null;
+  frameworkOptions?: Framework[];
   initialData?: {
     id: number;
     name: string;
@@ -32,6 +33,7 @@ export default function ProjectFormModal({
   onClose,
   onSave,
   frameworkId,
+  frameworkOptions,
   initialData,
 }: Props) {
   const isEdit = !!initialData;
@@ -50,7 +52,7 @@ export default function ProjectFormModal({
   const [actualCompletionDate, setActualCompletionDate] = useState(
     initialData?.actualCompletionDate || ""
   );
-  const [frameworks, setFrameworks] = useState<Framework[]>([]);
+  const [frameworks, setFrameworks] = useState<Framework[]>(frameworkOptions || []);
   const [serverError, setServerError] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -61,16 +63,19 @@ export default function ProjectFormModal({
       : frameworks.flatMap((f) => f.programs);
 
   async function loadFrameworks() {
-    const res = await fetch("/api/frameworks");
-    if (res.ok) {
-      const data = await res.json();
-      setFrameworks(data);
+    try {
+      const res = await fetch("/api/frameworks?options=true");
+      if (res.ok) {
+        const data = await res.json();
+        setFrameworks(data);
+      }
+    } catch {
+      setServerError("Failed to load project options");
     }
   }
 
   useEffect(() => {
     if (open) {
-      loadFrameworks();
       if (!isEdit) {
         setName("");
         setSelectedFrameworkId(frameworkId || 0);
@@ -85,6 +90,12 @@ export default function ProjectFormModal({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (frameworkOptions) setFrameworks(frameworkOptions);
+    loadFrameworks();
+  }, [open, frameworkOptions]);
 
   useEffect(() => {
     if (selectedFrameworkId > 0 && !isEdit) {
@@ -114,32 +125,37 @@ export default function ProjectFormModal({
 
     setLoading(true);
 
-    const url = isEdit
-      ? `/api/projects/${initialData?.id}`
-      : "/api/projects";
-    const method = isEdit ? "PATCH" : "POST";
+    try {
+      const url = isEdit
+        ? `/api/projects/${initialData?.id}`
+        : "/api/projects";
+      const method = isEdit ? "PATCH" : "POST";
 
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name,
-        programId: selectedProgramId,
-        reference,
-        owner,
-        targetQuarter,
-        actualCompletionDate: actualCompletionDate || null,
-      }),
-    });
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          programId: selectedProgramId,
+          reference,
+          owner,
+          targetQuarter,
+          actualCompletionDate: actualCompletionDate || null,
+        }),
+      });
 
-    setLoading(false);
-    if (res.ok) {
-      const project = await res.json();
-      onSave(project);
-      onClose();
-    } else {
-      const data = await res.json();
-      setServerError(data.error || "Failed to save project");
+      if (res.ok) {
+        const project = await res.json();
+        onSave(project);
+        onClose();
+      } else {
+        const data = await res.json();
+        setServerError(data.error || "Failed to save project");
+      }
+    } catch {
+      setServerError("Failed to save project");
+    } finally {
+      setLoading(false);
     }
   }
 

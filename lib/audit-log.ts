@@ -23,12 +23,6 @@ export async function logChange(params: LogChangeParams): Promise<void> {
     remarks = null,
   } = params;
 
-  const lastLog = await prisma.entityChangeLog.findFirst({
-    orderBy: { seq: "desc" },
-    select: { seq: true },
-  });
-  const nextSeq = (lastLog?.seq ?? 0) + 1;
-
   await prisma.entityChangeLog.create({
     data: {
       entityType,
@@ -40,7 +34,9 @@ export async function logChange(params: LogChangeParams): Promise<void> {
       details,
       remarks,
       createdAt: new Date().toISOString(),
-      seq: nextSeq,
+      // History is ordered by the autoincrementing primary key. Keep this
+      // legacy field populated without scanning the entire log on every save.
+      seq: 0,
     },
   });
 }

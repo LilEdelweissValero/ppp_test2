@@ -37,19 +37,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Valid target quarter is required" }, { status: 400 });
   }
 
-  const project = await prisma.project.findUnique({
-    where: { id: parseInt(projectId) },
-  });
+  const parsedProjectId = parseInt(projectId);
+  const [project, existing, maxOrder] = await Promise.all([
+    prisma.project.findUnique({
+      where: { id: parsedProjectId },
+      select: { id: true },
+    }),
+    prisma.task.findFirst({
+      where: {
+        projectId: parsedProjectId,
+        taskCode: taskCode.trim(),
+      },
+      select: { id: true },
+    }),
+    prisma.task.aggregate({
+      _max: { sortOrder: true },
+      where: { projectId: parsedProjectId },
+    }),
+  ]);
   if (!project) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
-  const existing = await prisma.task.findFirst({
-    where: {
-      projectId: parseInt(projectId),
-      taskCode: taskCode.trim(),
-    },
-  });
   if (existing) {
     return NextResponse.json(
       { error: "A task with this code already exists in this project" },
@@ -57,14 +66,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const maxOrder = await prisma.task.aggregate({
-    _max: { sortOrder: true },
-    where: { projectId: parseInt(projectId) },
-  });
   const task = await prisma.task.create({
     data: {
       taskCode: taskCode.trim(),
-      projectId: parseInt(projectId),
+      projectId: parsedProjectId,
       name: name.trim(),
       assignee: assignee || null,
       priority: priority || "Low",
@@ -79,13 +84,15 @@ export async function POST(request: NextRequest) {
       attachmentUrl: attachmentUrl || null,
     },
   });
-  await touchLastModified();
-  await logChange({
-    entityType: "Task",
-    entityId: task.id,
-    entityName: `${task.taskCode}: ${task.name}`,
-    changeType: "create",
-    newValue: task.name,
-  });
+  await Promise.all([
+    touchLastModified(),
+    logChange({
+      entityType: "Task",
+      entityId: task.id,
+      entityName: `${task.taskCode}: ${task.name}`,
+      changeType: "create",
+      newValue: task.name,
+    }),
+  ]);
   return NextResponse.json(task, { status: 201 });
 }
