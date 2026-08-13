@@ -27,7 +27,6 @@
 import { useState, useMemo, useRef, useEffect, useDeferredValue } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import {
   DndContext,
   closestCenter,
@@ -53,15 +52,10 @@ import {
 import { countTasksByStatus, countTasksByStatusForQuarter } from "@/lib/status";
 import HealthBadge from "@/components/HealthBadge";
 import ProjectFormModal from "@/components/ProjectFormModal";
-
-const preloadManageFrameworks = () => import("@/components/ManageFrameworksModal");
-const preloadManagePrograms = () => import("@/components/ManageProgramsModal");
-const preloadImportExcel = () => import("@/components/ImportExcelModal");
-const preloadHistoryLog = () => import("@/components/HistoryLogModal");
-const ManageFrameworksModal = dynamic(() => import("@/components/ManageFrameworksModal"));
-const ManageProgramsModal = dynamic(() => import("@/components/ManageProgramsModal"));
-const ImportExcelModal = dynamic(() => import("@/components/ImportExcelModal"));
-const HistoryLogModal = dynamic(() => import("@/components/HistoryLogModal"));
+import ManageFrameworksModal from "@/components/ManageFrameworksModal";
+import ManageProgramsModal from "@/components/ManageProgramsModal";
+import ImportExcelModal from "@/components/ImportExcelModal";
+import HistoryLogModal from "@/components/HistoryLogModal";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -402,16 +396,17 @@ function FrameworkSummaryRow({
 
 function SortableProjectRow({
   project,
+  onPrefetch,
   selectedQuarter,
   isEven,
   programName,
 }: {
   project: Project;
+  onPrefetch: () => void;
   selectedQuarter: string;
   isEven: boolean;
   programName: string;
 }) {
-  const [shouldPrefetch, setShouldPrefetch] = useState(false);
   const {
     attributes,
     listeners,
@@ -473,7 +468,11 @@ function SortableProjectRow({
     <tr
       ref={setNodeRef}
       style={style}
-      onMouseEnter={() => setHovered(true)}
+      onMouseEnter={() => {
+        setHovered(true);
+        onPrefetch();
+      }}
+      onFocus={onPrefetch}
       onMouseLeave={() => setHovered(false)}
     >
       {/* drag handle */}
@@ -501,9 +500,9 @@ function SortableProjectRow({
       <td style={{ ...tdBase, width: 220 }}>
         <Link
           href={`/projects/${project.id}`}
-          prefetch={shouldPrefetch ? true : false}
-          onPointerEnter={() => setShouldPrefetch(true)}
-          onFocus={() => setShouldPrefetch(true)}
+          prefetch={false}
+          onPointerEnter={onPrefetch}
+          onFocus={onPrefetch}
           style={{
             fontWeight: 600,
             fontSize: 12,
@@ -710,18 +709,6 @@ function ActionsMenu({
     <div ref={ref} style={{ position: "relative" }}>
       <button
         onClick={() => setOpen((v) => !v)}
-        onPointerEnter={() => {
-          preloadManageFrameworks();
-          preloadManagePrograms();
-          preloadImportExcel();
-          preloadHistoryLog();
-        }}
-        onFocus={() => {
-          preloadManageFrameworks();
-          preloadManagePrograms();
-          preloadImportExcel();
-          preloadHistoryLog();
-        }}
         style={{
           display: "flex",
           alignItems: "center",
@@ -800,6 +787,7 @@ function ActionsMenu({
 
 export default function DashboardView({ frameworks, existingQuarters }: Props) {
   const router = useRouter();
+  const [portfolio, setPortfolio] = useState(frameworks);
 
   const [selectedQuarter, setSelectedQuarter] = useState(ALL_TIME);
   const [search, setSearch] = useState("");
@@ -810,6 +798,10 @@ export default function DashboardView({ frameworks, existingQuarters }: Props) {
   const [showImportExcel, setShowImportExcel] = useState(false);
   const [showHistoryLog, setShowHistoryLog] = useState(false);
   const deferredSearch = useDeferredValue(search);
+
+  useEffect(() => {
+    setPortfolio(frameworks);
+  }, [frameworks]);
 
   // Local project ordering per framework (keyed by frameworkId)
   const [frameworkProjectsOverride, setFrameworkProjectsOverride] = useState<
@@ -827,7 +819,7 @@ export default function DashboardView({ frameworks, existingQuarters }: Props) {
 
   // Merge local overrides back into the framework+program tree
   const resolvedFrameworks = useMemo(() => {
-    return frameworks.map((fw) => ({
+    return portfolio.map((fw) => ({
       ...fw,
       programs: fw.programs.map((prog) => {
         // Apply any reorder overrides at program level
@@ -841,7 +833,51 @@ export default function DashboardView({ frameworks, existingQuarters }: Props) {
         return prog;
       }),
     }));
-  }, [frameworks, frameworkProjectsOverride]);
+  }, [portfolio, frameworkProjectsOverride]);
+
+  const programOptions = useMemo(
+    () =>
+      portfolio.flatMap((framework) =>
+        framework.programs.map((program) => ({
+          id: program.id,
+          name: program.name,
+          frameworkId: framework.id,
+          framework: { name: framework.name },
+        }))
+      ),
+    [portfolio]
+  );
+
+  function handleFrameworksChange(nextFrameworks: { id: number; name: string; color: string }[]) {
+    setPortfolio((current) =>
+      nextFrameworks.map((framework) => ({
+        ...framework,
+        programs:
+          current.find((item) => item.id === framework.id)?.programs || [],
+      }))
+    );
+  }
+
+  function handleProgramsChange(
+    nextPrograms: { id: number; name: string; frameworkId: number }[]
+  ) {
+    setPortfolio((current) =>
+      current.map((framework) => ({
+        ...framework,
+        programs: nextPrograms
+          .filter((program) => program.frameworkId === framework.id)
+          .map((program) => ({
+            id: program.id,
+            name: program.name,
+            frameworkId: program.frameworkId,
+            projects:
+              current
+                .flatMap((item) => item.programs)
+                .find((item) => item.id === program.id)?.projects || [],
+          })),
+      }))
+    );
+  }
 
   // Filter by search (universal: matches across all visible fields)
   const filteredFrameworks = useMemo(() => {
@@ -1327,6 +1363,7 @@ export default function DashboardView({ frameworks, existingQuarters }: Props) {
                                     selectedQuarter={selectedQuarter}
                                     isEven={rowIdx % 2 === 0}
                                     programName={prog.name}
+                                    onPrefetch={() => router.prefetch(`/projects/${project.id}`)}
                                   />
                                 ))}
                               </SortableContext>
@@ -1366,20 +1403,23 @@ export default function DashboardView({ frameworks, existingQuarters }: Props) {
         open={showAddProject}
         onClose={() => setShowAddProject(false)}
         onSave={handleRefresh}
-        frameworkOptions={frameworks}
+        frameworkOptions={portfolio}
       />
       {showManageFrameworks && (
         <ManageFrameworksModal
           open
           onClose={() => setShowManageFrameworks(false)}
-          onSave={handleRefresh}
+          frameworks={portfolio}
+          onChange={handleFrameworksChange}
         />
       )}
       {showManagePrograms && (
         <ManageProgramsModal
           open
           onClose={() => setShowManagePrograms(false)}
-          onSave={handleRefresh}
+          frameworks={portfolio}
+          programs={programOptions}
+          onChange={handleProgramsChange}
         />
       )}
       {showImportExcel && (

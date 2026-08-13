@@ -35,7 +35,9 @@ interface Program {
 interface Props {
   open: boolean;
   onClose: () => void;
-  onSave: () => void;
+  frameworks: Framework[];
+  programs: Program[];
+  onChange: (programs: Program[]) => void;
 }
 
 function SortableProgram({
@@ -165,16 +167,20 @@ function SortableProgram({
   );
 }
 
-export default function ManageProgramsModal({ open, onClose, onSave }: Props) {
-  const [programs, setPrograms] = useState<Program[]>([]);
-  const [frameworks, setFrameworks] = useState<Framework[]>([]);
+export default function ManageProgramsModal({
+  open,
+  onClose,
+  frameworks,
+  programs: initialPrograms,
+  onChange,
+}: Props) {
+  const [programs, setPrograms] = useState<Program[]>(initialPrograms);
   const [newName, setNewName] = useState("");
   const [newFrameworkId, setNewFrameworkId] = useState<number>(0);
   const [editId, setEditId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [loadingInitial, setLoadingInitial] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -183,35 +189,16 @@ export default function ManageProgramsModal({ open, onClose, onSave }: Props) {
     })
   );
 
-  async function loadPrograms() {
-    const res = await fetch("/api/programs?simple=true");
-    if (res.ok) {
-      const data = await res.json();
-      setPrograms(data);
-    }
-  }
-
-  async function loadFrameworks() {
-    const res = await fetch("/api/frameworks?simple=true");
-    if (res.ok) {
-      const data = await res.json();
-      setFrameworks(data);
-    }
-  }
-
   useEffect(() => {
     if (open) {
-      setLoadingInitial(true);
-      Promise.all([loadPrograms(), loadFrameworks()]).finally(() =>
-        setLoadingInitial(false)
-      );
+      setPrograms(initialPrograms);
       setNewName("");
       setNewFrameworkId(0);
       setEditId(null);
       setEditName("");
       setError("");
     }
-  }, [open]);
+  }, [open, initialPrograms]);
 
   async function handleAdd() {
     if (!newName.trim() || !newFrameworkId) return;
@@ -224,10 +211,16 @@ export default function ManageProgramsModal({ open, onClose, onSave }: Props) {
     });
     setLoading(false);
     if (res.ok) {
+      const program = await res.json();
+      const framework = frameworks.find((item) => item.id === program.frameworkId);
+      const next = [
+        ...programs,
+        { ...program, framework: { name: framework?.name || "" } },
+      ];
+      setPrograms(next);
+      onChange(next);
       setNewName("");
       setNewFrameworkId(0);
-      loadPrograms();
-      onSave();
     } else {
       const data = await res.json();
       setError(data.error || "Failed to create program");
@@ -245,10 +238,14 @@ export default function ManageProgramsModal({ open, onClose, onSave }: Props) {
     });
     setLoading(false);
     if (res.ok) {
+      const program = await res.json();
+      const next = programs.map((item) =>
+        item.id === id ? { ...item, ...program } : item
+      );
+      setPrograms(next);
+      onChange(next);
       setEditId(null);
       setEditName("");
-      loadPrograms();
-      onSave();
     } else {
       const data = await res.json();
       setError(data.error || "Failed to rename program");
@@ -262,8 +259,9 @@ export default function ManageProgramsModal({ open, onClose, onSave }: Props) {
     const res = await fetch(`/api/programs/${id}`, { method: "DELETE" });
     setLoading(false);
     if (res.ok) {
-      loadPrograms();
-      onSave();
+      const next = programs.filter((program) => program.id !== id);
+      setPrograms(next);
+      onChange(next);
     } else {
       const data = await res.json();
       setError(data.error || "Failed to delete program");
@@ -279,15 +277,20 @@ export default function ManageProgramsModal({ open, onClose, onSave }: Props) {
     const reordered = arrayMove(programs, oldIndex, newIndex);
     setPrograms(reordered);
 
-    await fetch("/api/reorder", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        entityType: "program",
-        orderedIds: reordered.map((p) => p.id),
-      }),
-    });
-    onSave();
+    try {
+      const response = await fetch("/api/reorder", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entityType: "program",
+          orderedIds: reordered.map((p) => p.id),
+        }),
+      });
+      if (!response.ok) throw new Error("Reorder failed");
+      onChange(reordered);
+    } catch {
+      setPrograms(initialPrograms);
+    }
   }
 
   return (
@@ -346,9 +349,6 @@ export default function ManageProgramsModal({ open, onClose, onSave }: Props) {
           <p style={{ color: "#B91C1C", fontSize: 12 }}>{error}</p>
         )}
 
-        {loadingInitial ? (
-          <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>Loading programs...</p>
-        ) : (
         <DndContext
           id="program-sort"
           sensors={sensors}
@@ -376,7 +376,6 @@ export default function ManageProgramsModal({ open, onClose, onSave }: Props) {
             </div>
           </SortableContext>
         </DndContext>
-        )}
       </div>
     </Modal>
   );

@@ -40,7 +40,8 @@ interface Framework {
 interface Props {
   open: boolean;
   onClose: () => void;
-  onSave: () => void;
+  frameworks: Framework[];
+  onChange: (frameworks: Framework[]) => void;
 }
 
 function SortableFramework({
@@ -207,8 +208,13 @@ function ColorPicker({
   );
 }
 
-export default function ManageFrameworksModal({ open, onClose, onSave }: Props) {
-  const [frameworks, setFrameworks] = useState<Framework[]>([]);
+export default function ManageFrameworksModal({
+  open,
+  onClose,
+  frameworks: initialFrameworks,
+  onChange,
+}: Props) {
+  const [frameworks, setFrameworks] = useState<Framework[]>(initialFrameworks);
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState(PRESET_COLORS[0].value);
   const [editId, setEditId] = useState<number | null>(null);
@@ -216,7 +222,6 @@ export default function ManageFrameworksModal({ open, onClose, onSave }: Props) 
   const [editColor, setEditColor] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [loadingInitial, setLoadingInitial] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -225,18 +230,9 @@ export default function ManageFrameworksModal({ open, onClose, onSave }: Props) 
     })
   );
 
-  async function loadFrameworks() {
-    const res = await fetch("/api/frameworks?simple=true");
-    if (res.ok) {
-      const data = await res.json();
-      setFrameworks(data);
-    }
-  }
-
   useEffect(() => {
     if (open) {
-      setLoadingInitial(true);
-      loadFrameworks().finally(() => setLoadingInitial(false));
+      setFrameworks(initialFrameworks);
       setNewName("");
       setNewColor(PRESET_COLORS[0].value);
       setEditId(null);
@@ -244,7 +240,7 @@ export default function ManageFrameworksModal({ open, onClose, onSave }: Props) 
       setEditColor("");
       setError("");
     }
-  }, [open]);
+  }, [open, initialFrameworks]);
 
   async function handleAdd() {
     if (!newName.trim()) return;
@@ -257,10 +253,12 @@ export default function ManageFrameworksModal({ open, onClose, onSave }: Props) 
     });
     setLoading(false);
     if (res.ok) {
+      const framework = await res.json();
+      const next = [...frameworks, framework];
+      setFrameworks(next);
+      onChange(next);
       setNewName("");
       setNewColor(PRESET_COLORS[0].value);
-      loadFrameworks();
-      onSave();
     } else {
       const data = await res.json();
       setError(data.error || "Failed to create framework");
@@ -278,11 +276,15 @@ export default function ManageFrameworksModal({ open, onClose, onSave }: Props) 
     });
     setLoading(false);
     if (res.ok) {
+      const framework = await res.json();
+      const next = frameworks.map((item) =>
+        item.id === id ? framework : item
+      );
+      setFrameworks(next);
+      onChange(next);
       setEditId(null);
       setEditName("");
       setEditColor("");
-      loadFrameworks();
-      onSave();
     } else {
       const data = await res.json();
       setError(data.error || "Failed to rename framework");
@@ -296,8 +298,9 @@ export default function ManageFrameworksModal({ open, onClose, onSave }: Props) 
     const res = await fetch(`/api/frameworks/${id}`, { method: "DELETE" });
     setLoading(false);
     if (res.ok) {
-      loadFrameworks();
-      onSave();
+      const next = frameworks.filter((framework) => framework.id !== id);
+      setFrameworks(next);
+      onChange(next);
     } else {
       const data = await res.json();
       setError(data.error || "Failed to delete framework");
@@ -313,15 +316,20 @@ export default function ManageFrameworksModal({ open, onClose, onSave }: Props) 
     const reordered = arrayMove(frameworks, oldIndex, newIndex);
     setFrameworks(reordered);
 
-    await fetch("/api/reorder", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        entityType: "framework",
-        orderedIds: reordered.map((f) => f.id),
-      }),
-    });
-    onSave();
+    try {
+      const response = await fetch("/api/reorder", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entityType: "framework",
+          orderedIds: reordered.map((f) => f.id),
+        }),
+      });
+      if (!response.ok) throw new Error("Reorder failed");
+      onChange(reordered);
+    } catch {
+      setFrameworks(initialFrameworks);
+    }
   }
 
   return (
@@ -367,9 +375,6 @@ export default function ManageFrameworksModal({ open, onClose, onSave }: Props) 
           <p style={{ color: "#B91C1C", fontSize: 12, marginBottom: 16 }}>{error}</p>
         )}
 
-        {loadingInitial ? (
-          <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>Loading frameworks...</p>
-        ) : (
         <DndContext
           id="framework-sort"
           sensors={sensors}
@@ -399,7 +404,6 @@ export default function ManageFrameworksModal({ open, onClose, onSave }: Props) 
             </div>
           </SortableContext>
         </DndContext>
-        )}
       </div>
     </Modal>
   );

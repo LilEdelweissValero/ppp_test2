@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   DndContext,
   closestCenter,
@@ -242,6 +241,19 @@ export default function ProjectDetailView({ project }: Props) {
     router.refresh();
   }
 
+  function handleBackToDashboard() {
+    try {
+      const referrer = document.referrer ? new URL(document.referrer) : null;
+      if (referrer?.origin === window.location.origin && referrer.pathname === "/") {
+        router.back();
+        return;
+      }
+    } catch {
+      // Fall through to a normal dashboard navigation.
+    }
+    router.push("/");
+  }
+
   async function handleInlineSave(
     taskId: number,
     field: "status" | "priority",
@@ -296,9 +308,9 @@ export default function ProjectDetailView({ project }: Props) {
     <main className="detail-shell">
       <div className="detail-container">
         <div>
-          <Link href="/" className="detail-back">
+          <button type="button" onClick={handleBackToDashboard} className="detail-back">
             <span aria-hidden="true">←</span> Back to Dashboard
-          </Link>
+          </button>
         </div>
 
         <section className="detail-hero" aria-labelledby="project-title">

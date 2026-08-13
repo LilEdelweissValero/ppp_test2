@@ -94,7 +94,7 @@ export default function ProjectFormModal({
   useEffect(() => {
     if (!open) return;
     if (frameworkOptions) setFrameworks(frameworkOptions);
-    loadFrameworks();
+    else loadFrameworks();
   }, [open, frameworkOptions]);
 
   useEffect(() => {
