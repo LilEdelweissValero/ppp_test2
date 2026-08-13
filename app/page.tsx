@@ -107,7 +107,11 @@ export default async function DashboardPage() {
       <main
         style={{ maxWidth: 1600, margin: "0 auto", padding: "20px 24px 48px" }}
       >
-        <DashboardView frameworks={frameworks} existingQuarters={existingQuarters} />
+        <DashboardView
+          frameworks={frameworks}
+          existingQuarters={existingQuarters}
+          sourceVersion={lastModifiedAt}
+        />
       </main>
     </div>
   );

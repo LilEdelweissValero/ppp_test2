@@ -56,6 +56,7 @@ import ManageFrameworksModal from "@/components/ManageFrameworksModal";
 import ManageProgramsModal from "@/components/ManageProgramsModal";
 import ImportExcelModal from "@/components/ImportExcelModal";
 import HistoryLogModal from "@/components/HistoryLogModal";
+import { usePortfolioCache } from "@/components/PortfolioCacheProvider";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -67,8 +68,11 @@ interface Task {
   priority: string;
   status: string;
   description: string | null;
+  targetQuarter: string;
   notes: string | null;
   deliverable: string | null;
+  attachmentUrl: string | null;
+  dependencies: string | null;
   adjustedTargetQuarter: string;
 }
 
@@ -103,6 +107,7 @@ interface Framework {
 interface Props {
   frameworks: Framework[];
   existingQuarters: string[];
+  sourceVersion: string | null;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -397,16 +402,19 @@ function FrameworkSummaryRow({
 function SortableProjectRow({
   project,
   onPrefetch,
+  onNavigate,
   selectedQuarter,
   isEven,
   programName,
 }: {
   project: Project;
   onPrefetch: () => void;
+  onNavigate: () => void;
   selectedQuarter: string;
   isEven: boolean;
   programName: string;
 }) {
+  const [shouldPrefetch, setShouldPrefetch] = useState(false);
   const {
     attributes,
     listeners,
@@ -470,6 +478,7 @@ function SortableProjectRow({
       style={style}
       onMouseEnter={() => {
         setHovered(true);
+        setShouldPrefetch(true);
         onPrefetch();
       }}
       onFocus={onPrefetch}
@@ -499,10 +508,12 @@ function SortableProjectRow({
       {/* project name */}
       <td style={{ ...tdBase, width: 220 }}>
         <Link
-          href={`/projects/${project.id}`}
-          prefetch={false}
+          href={`/projects/${project.id}?cached=1`}
+          prefetch={shouldPrefetch ? true : false}
           onPointerEnter={onPrefetch}
           onFocus={onPrefetch}
+          onTouchStart={onPrefetch}
+          onNavigate={onNavigate}
           style={{
             fontWeight: 600,
             fontSize: 12,
@@ -785,8 +796,19 @@ function ActionsMenu({
 
 // ── Main component ─────────────────────────────────────────────────────────
 
-export default function DashboardView({ frameworks, existingQuarters }: Props) {
+export default function DashboardView({
+  frameworks,
+  existingQuarters,
+  sourceVersion,
+}: Props) {
   const router = useRouter();
+  const {
+    getProject,
+    setProject,
+    seedPortfolio,
+    markDashboardNavigation,
+    version,
+  } = usePortfolioCache();
   const [portfolio, setPortfolio] = useState(frameworks);
 
   const [selectedQuarter, setSelectedQuarter] = useState(ALL_TIME);
@@ -802,6 +824,10 @@ export default function DashboardView({ frameworks, existingQuarters }: Props) {
   useEffect(() => {
     setPortfolio(frameworks);
   }, [frameworks]);
+
+  useEffect(() => {
+    seedPortfolio(frameworks, sourceVersion);
+  }, [frameworks, seedPortfolio, sourceVersion]);
 
   // Local project ordering per framework (keyed by frameworkId)
   const [frameworkProjectsOverride, setFrameworkProjectsOverride] = useState<
@@ -819,21 +845,40 @@ export default function DashboardView({ frameworks, existingQuarters }: Props) {
 
   // Merge local overrides back into the framework+program tree
   const resolvedFrameworks = useMemo(() => {
+    void version;
+    const allProjects = portfolio.flatMap((framework) =>
+      framework.programs.flatMap((program) =>
+        program.projects.map((project) => {
+          const cached = getProject(project.id);
+          return cached ? { ...project, ...cached } : project;
+        })
+      )
+    );
     return portfolio.map((fw) => ({
       ...fw,
       programs: fw.programs.map((prog) => {
+        const projects = allProjects
+          .filter((project) => project.programId === prog.id)
+          .map((project) => project);
         // Apply any reorder overrides at program level
         const overriddenProjects = frameworkProjectsOverride[fw.id];
         if (overriddenProjects) {
+          const order = new Map(
+            overriddenProjects.map((project, index) => [project.id, index])
+          );
           return {
             ...prog,
-            projects: overriddenProjects.filter((p) => p.programId === prog.id),
+            projects: [...projects].sort(
+              (left, right) =>
+                (order.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
+                (order.get(right.id) ?? Number.MAX_SAFE_INTEGER)
+            ),
           };
         }
-        return prog;
+        return { ...prog, projects };
       }),
     }));
-  }, [portfolio, frameworkProjectsOverride]);
+  }, [portfolio, frameworkProjectsOverride, getProject, version]);
 
   const programOptions = useMemo(
     () =>
@@ -861,6 +906,24 @@ export default function DashboardView({ frameworks, existingQuarters }: Props) {
   function handleProgramsChange(
     nextPrograms: { id: number; name: string; frameworkId: number }[]
   ) {
+    const renamedPrograms = new Map(
+      nextPrograms.map((program) => [program.id, program.name])
+    );
+    for (const framework of portfolio) {
+      for (const program of framework.programs) {
+        const nextName = renamedPrograms.get(program.id);
+        if (!nextName || nextName === program.name) continue;
+        for (const project of program.projects) {
+          const cached = getProject(project.id);
+          if (cached) {
+            setProject({
+              ...cached,
+              program: { ...cached.program, name: nextName },
+            });
+          }
+        }
+      }
+    }
     setPortfolio((current) =>
       current.map((framework) => ({
         ...framework,
@@ -1363,7 +1426,10 @@ export default function DashboardView({ frameworks, existingQuarters }: Props) {
                                     selectedQuarter={selectedQuarter}
                                     isEven={rowIdx % 2 === 0}
                                     programName={prog.name}
-                                    onPrefetch={() => router.prefetch(`/projects/${project.id}`)}
+                                    onPrefetch={() => router.prefetch(`/projects/${project.id}?cached=1`)}
+                                    onNavigate={() => {
+                                      markDashboardNavigation(project.id);
+                                    }}
                                   />
                                 ))}
                               </SortableContext>

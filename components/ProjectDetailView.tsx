@@ -30,35 +30,10 @@ import ProjectFormModal from "@/components/ProjectFormModal";
 import TaskFormModal from "@/components/TaskFormModal";
 import ChangeDueQuarterModal from "@/components/ChangeDueQuarterModal";
 import ChangeHistoryModal from "@/components/ChangeHistoryModal";
+import { CachedProject, CachedTask, usePortfolioCache } from "@/components/PortfolioCacheProvider";
 
-interface Task {
-  id: number;
-  taskCode: string;
-  name: string;
-  assignee: string | null;
-  priority: string;
-  status: string;
-  description: string | null;
-  targetQuarter: string;
-  adjustedTargetQuarter: string;
-  deliverable: string | null;
-  attachmentUrl: string | null;
-  dependencies: string | null;
-  notes: string | null;
-}
-
-interface Project {
-  id: number;
-  name: string;
-  programId: number;
-  reference: string | null;
-  owner: string | null;
-  targetQuarter: string;
-  adjustedTargetQuarter: string;
-  actualCompletionDate: string | null;
-  program: { id: number; name: string };
-  tasks: Task[];
-}
+type Task = CachedTask;
+type Project = CachedProject;
 
 interface Props {
   project: Project;
@@ -202,8 +177,10 @@ function SortableTaskRow({
   );
 }
 
-export default function ProjectDetailView({ project }: Props) {
+export default function ProjectDetailView({ project: initialProject }: Props) {
   const router = useRouter();
+  const { canReturnToDashboard, setProject } = usePortfolioCache();
+  const [project, setCurrentProject] = useState(initialProject);
   const [showEditProject, setShowEditProject] = useState(false);
   const [showAddTask, setShowAddTask] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
@@ -218,11 +195,25 @@ export default function ProjectDetailView({ project }: Props) {
     field: "status" | "priority";
   } | null>(null);
   const selectRef = useRef<HTMLSelectElement>(null);
-  const [tasks, setTasks] = useState<Task[]>(project.tasks);
+  const [tasks, setTasks] = useState<Task[]>(initialProject.tasks);
 
   useEffect(() => {
-    setTasks(project.tasks);
-  }, [project.tasks]);
+    setCurrentProject(initialProject);
+    setTasks(initialProject.tasks);
+  }, [initialProject]);
+
+  function updateProject(next: Project) {
+    setCurrentProject(next);
+    setTasks(next.tasks);
+    setProject(next);
+  }
+
+  function updateTasks(nextTasks: Task[]) {
+    setTasks(nextTasks);
+    const nextProject = { ...project, tasks: nextTasks };
+    setCurrentProject(nextProject);
+    setProject(nextProject);
+  }
 
   const pct = computeProjectPercentComplete(tasks);
   const health =
@@ -237,19 +228,10 @@ export default function ProjectDetailView({ project }: Props) {
     })
   );
 
-  function handleRefresh() {
-    router.refresh();
-  }
-
   function handleBackToDashboard() {
-    try {
-      const referrer = document.referrer ? new URL(document.referrer) : null;
-      if (referrer?.origin === window.location.origin && referrer.pathname === "/") {
-        router.back();
-        return;
-      }
-    } catch {
-      // Fall through to a normal dashboard navigation.
+    if (canReturnToDashboard(project.id)) {
+      router.back();
+      return;
     }
     router.push("/");
   }
@@ -261,9 +243,7 @@ export default function ProjectDetailView({ project }: Props) {
   ) {
     const previousTasks = tasks;
     setEditingCell(null);
-    setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, [field]: value } : t))
-    );
+    updateTasks(tasks.map((t) => (t.id === taskId ? { ...t, [field]: value } : t)));
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: "PATCH",
@@ -271,9 +251,8 @@ export default function ProjectDetailView({ project }: Props) {
         body: JSON.stringify({ [field]: value }),
       });
       if (!response.ok) throw new Error("Update failed");
-      router.refresh();
     } catch {
-      setTasks(previousTasks);
+      updateTasks(previousTasks);
     }
   }
 
@@ -286,7 +265,7 @@ export default function ProjectDetailView({ project }: Props) {
     if (oldIndex === -1 || newIndex === -1) return;
     const previousTasks = tasks;
     const reordered = arrayMove(tasks, oldIndex, newIndex);
-    setTasks(reordered);
+    updateTasks(reordered);
 
     try {
       const response = await fetch("/api/reorder", {
@@ -298,9 +277,8 @@ export default function ProjectDetailView({ project }: Props) {
         }),
       });
       if (!response.ok) throw new Error("Reorder failed");
-      router.refresh();
     } catch {
-      setTasks(previousTasks);
+      updateTasks(previousTasks);
     }
   }
 
@@ -454,7 +432,14 @@ export default function ProjectDetailView({ project }: Props) {
         <ProjectFormModal
           open={showEditProject}
           onClose={() => setShowEditProject(false)}
-          onSave={handleRefresh}
+          onSave={(savedProject) => {
+            updateProject({
+              ...project,
+              ...savedProject,
+              program: savedProject.program || project.program,
+              tasks,
+            });
+          }}
           initialData={{
             id: project.id,
             name: project.name,
@@ -470,8 +455,7 @@ export default function ProjectDetailView({ project }: Props) {
           open={showAddTask}
           onClose={() => setShowAddTask(false)}
           onSave={(newTask) => {
-            setTasks((prev) => [...prev, newTask]);
-            router.refresh();
+            updateTasks([...tasks, newTask]);
           }}
           projectId={project.id}
         />
@@ -480,7 +464,12 @@ export default function ProjectDetailView({ project }: Props) {
           <TaskFormModal
             open={!!editTask}
             onClose={() => setEditTask(null)}
-            onSave={handleRefresh}
+            onSave={(savedTask) => {
+              updateTasks(tasks.map((task) =>
+                task.id === savedTask.id ? savedTask : task
+              ));
+              setEditTask(null);
+            }}
             projectId={project.id}
             initialData={{
               id: editTask.id,
@@ -502,7 +491,9 @@ export default function ProjectDetailView({ project }: Props) {
         <ChangeDueQuarterModal
           open={changeProjectQuarter}
           onClose={() => setChangeProjectQuarter(false)}
-          onSave={handleRefresh}
+          onSave={({ newQuarter }) => {
+            updateProject({ ...project, adjustedTargetQuarter: newQuarter, tasks });
+          }}
           entityType="Project"
           entityId={project.id}
           currentQuarter={project.adjustedTargetQuarter}
@@ -512,7 +503,14 @@ export default function ProjectDetailView({ project }: Props) {
           <ChangeDueQuarterModal
             open={!!changeTaskQuarter}
             onClose={() => setChangeTaskQuarter(null)}
-            onSave={handleRefresh}
+            onSave={({ newQuarter }) => {
+              updateTasks(tasks.map((task) =>
+                task.id === changeTaskQuarter.id
+                  ? { ...task, adjustedTargetQuarter: newQuarter }
+                  : task
+              ));
+              setChangeTaskQuarter(null);
+            }}
             entityType="Task"
             entityId={changeTaskQuarter.id}
             currentQuarter={changeTaskQuarter.adjustedTargetQuarter}

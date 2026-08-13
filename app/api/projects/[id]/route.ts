@@ -10,7 +10,10 @@ export async function GET(
   const { id } = await params;
   const project = await prisma.project.findUnique({
     where: { id: parseInt(id) },
-    include: { tasks: { orderBy: { sortOrder: "asc" } } },
+    include: {
+      program: { select: { id: true, name: true } },
+      tasks: { orderBy: { sortOrder: "asc" } },
+    },
   });
   if (!project) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
@@ -39,6 +42,7 @@ export async function PATCH(
   const project = await prisma.project.update({
     where: { id: parseInt(id) },
     data: updateData,
+    include: { program: { select: { id: true, name: true } } },
   });
   await touchLastModified();
   if (oldProject) {
