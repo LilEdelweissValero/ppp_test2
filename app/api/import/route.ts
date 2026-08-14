@@ -99,12 +99,7 @@ export async function GET() {
     ],
   ];
 
-  const headerRow = EXCEL_COLUMNS.map((c) =>
-    c
-      .split("_")
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(" ")
-  );
+  const headerRow = [...EXCEL_COLUMNS];
 
   const ws = XLSX.utils.aoa_to_sheet([headerRow, ...sampleRows]);
 
