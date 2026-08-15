@@ -75,6 +75,48 @@ export async function PATCH(
     });
   }
 
+  // Auto-set project completion date when all tasks are "Complete or Verified"
+  const allSiblings = await prisma.task.findMany({
+    where: { projectId: existingTask.projectId },
+  });
+  const allComplete = allSiblings.every(
+    (t) => t.status === "Complete or Verified"
+  );
+  const today = new Date().toISOString().slice(0, 10);
+
+  const project = await prisma.project.findUnique({
+    where: { id: existingTask.projectId },
+  });
+  if (project) {
+    const shouldSet = allComplete;
+    const currentVal = project.actualCompletionDate;
+    if (shouldSet && currentVal !== today) {
+      await prisma.project.update({
+        where: { id: existingTask.projectId },
+        data: { actualCompletionDate: today },
+      });
+      await logChange({
+        entityType: "Project",
+        entityId: existingTask.projectId,
+        entityName: project.name,
+        changeType: "update",
+        details: `Auto-set actual completion date to ${today} (all tasks completed)`,
+      });
+    } else if (!shouldSet && currentVal !== null) {
+      await prisma.project.update({
+        where: { id: existingTask.projectId },
+        data: { actualCompletionDate: null },
+      });
+      await logChange({
+        entityType: "Project",
+        entityId: existingTask.projectId,
+        entityName: project.name,
+        changeType: "update",
+        details: "Auto-cleared actual completion date (not all tasks completed)",
+      });
+    }
+  }
+
   await touchLastModified();
   return NextResponse.json(task);
 }

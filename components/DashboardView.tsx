@@ -233,9 +233,9 @@ function TableHeader() {
             {sc.label}
           </th>
         ))}
-        <th style={{ ...thStyle(true), width: 88 }}>Target Q</th>
-        <th style={{ ...thStyle(true), width: 88 }}>Adj. Q</th>
-        <th style={{ ...thStyle(true), width: 90 }}>Completed</th>
+        <th style={{ ...thStyle(true), width: 88 }}>Planned Q</th>
+        <th style={{ ...thStyle(true), width: 88 }}>Due Q</th>
+        <th style={{ ...thStyle(true), width: 90 }}>Completion Date</th>
         <th style={{ ...thStyle(true), width: 80 }}>Status</th>
         <th style={{ ...thCenter(true), width: 64 }} title="Percent complete">%</th>
         <th style={{ ...thStyle(true), width: 110 }}>Health</th>
@@ -571,7 +571,7 @@ function SortableProjectRow({
         </td>
       ))}
 
-      {/* target quarter */}
+      {/* planned quarter */}
       <td
         style={{
           ...tdMetric,
@@ -584,21 +584,26 @@ function SortableProjectRow({
         {project.targetQuarter}
       </td>
 
-      {/* adjusted quarter */}
+      {/* due quarter */}
       <td
         style={{
           ...tdMetric,
           textAlign: "left",
           width: 88,
-          color: "var(--ink-secondary)",
           fontSize: 11,
           fontWeight: project.adjustedTargetQuarter !== project.targetQuarter ? 600 : 400,
+          color: project.adjustedTargetQuarter === project.targetQuarter
+            ? "var(--ink-tertiary)"
+            : "var(--ink-secondary)",
+          fontStyle: project.adjustedTargetQuarter === project.targetQuarter ? "italic" : "normal",
         }}
       >
-        {project.adjustedTargetQuarter}
+        {project.adjustedTargetQuarter === project.targetQuarter
+          ? "as planned"
+          : project.adjustedTargetQuarter}
       </td>
 
-      {/* actual completion */}
+      {/* completion date */}
       <td
         style={{
           ...tdMetric,
