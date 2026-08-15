@@ -198,7 +198,9 @@ export default function ManageProgramsModal({
       setEditName("");
       setError("");
     }
-  }, [open, initialPrograms]);
+    // Only reset when modal opens/closes, not on prop changes while open
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   async function handleAdd() {
     if (!newName.trim() || !newFrameworkId) return;
@@ -294,7 +296,7 @@ export default function ManageProgramsModal({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Manage Programs">
+    <Modal open={open} onClose={onClose} title="Manage Programs" wide>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ display: "flex", gap: 8 }}>
