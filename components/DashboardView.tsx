@@ -49,7 +49,8 @@ import {
   computeProjectHealth,
   computeProjectDerivedStatus,
 } from "@/lib/health";
-import { countTasksByStatus, countTasksByStatusForQuarter } from "@/lib/status";
+import { countTasksByStatus, countTasksByStatusForQuarter, STATUS_SCORES } from "@/lib/status";
+import { compareQuarters } from "@/lib/quarters";
 import HealthBadge from "@/components/HealthBadge";
 import ProjectFormModal from "@/components/ProjectFormModal";
 import ManageFrameworksModal from "@/components/ManageFrameworksModal";
@@ -138,6 +139,96 @@ function hex2luma(hex: string): number {
   return 0.299 * r + 0.587 * g + 0.114 * b;
 }
 
+// ── Sort helpers ───────────────────────────────────────────────────────────
+
+type SortConfig = { key: string; direction: "asc" | "desc" } | null;
+
+const HEALTH_ORDINAL: Record<string, number> = {
+  Completed: 0,
+  "On Time": 1,
+  "At Risk": 2,
+  Delayed: 3,
+  "Not Yet Due": 4,
+};
+
+const PRIORITY_ORDINAL: Record<string, number> = {
+  Low: 0,
+  Moderate: 1,
+  High: 2,
+};
+
+function compareSortValues(
+  a: string | number | null,
+  b: string | number | null,
+  type: "text" | "numeric" | "quarter" | "status" | "priority" | "health" | "date"
+): number {
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  switch (type) {
+    case "text":
+      return String(a).localeCompare(String(b));
+    case "numeric":
+      return (a as number) - (b as number);
+    case "quarter":
+      return compareQuarters(String(a), String(b));
+    case "status":
+      return (STATUS_SCORES[a as keyof typeof STATUS_SCORES] ?? 0) - (STATUS_SCORES[b as keyof typeof STATUS_SCORES] ?? 0);
+    case "priority":
+      return (PRIORITY_ORDINAL[String(a)] ?? 0) - (PRIORITY_ORDINAL[String(b)] ?? 0);
+    case "health":
+      return (HEALTH_ORDINAL[String(a)] ?? 5) - (HEALTH_ORDINAL[String(b)] ?? 5);
+    case "date":
+      return String(a).localeCompare(String(b));
+    default:
+      return 0;
+  }
+}
+
+function getSortValue(
+  project: Project,
+  key: string,
+  selectedQuarter: string
+): string | number | null {
+  const allTasks = project.tasks;
+  const filteredTasks = filterTasksByQuarter(allTasks, selectedQuarter);
+  const counts =
+    selectedQuarter === ALL_TIME
+      ? countTasksByStatus(allTasks)
+      : countTasksByStatusForQuarter(allTasks, selectedQuarter);
+  switch (key) {
+    case "name": return project.name;
+    case "programName": return project.programName ?? "";
+    case "reference": return project.reference ?? "";
+    case "owner": return project.owner ?? "";
+    case "taskCount": return filteredTasks.length;
+    case "count_nys": return counts["Not Yet Started"];
+    case "count_plan": return counts["In Progress, Planning or Initiated"];
+    case "count_part": return counts["In Progress, Partial"];
+    case "count_mostly": return counts["In Progress, Mostly Done or Testing"];
+    case "count_done": return counts["Complete or Verified"];
+    case "plannedQ": return project.targetQuarter;
+    case "dueQ": return project.adjustedTargetQuarter;
+    case "completionDate": return project.actualCompletionDate ?? "";
+    case "status": return computeProjectDerivedStatus(filteredTasks);
+    case "pct": return Math.round(computeProjectPercentComplete(filteredTasks) * 100);
+    case "health": {
+      const pct = computeProjectPercentComplete(filteredTasks) * 100;
+      if (filteredTasks.length === 0) return "";
+      return computeProjectHealth(pct, project.adjustedTargetQuarter) ?? "";
+    }
+    default: return "";
+  }
+}
+
+const SORT_TYPE_MAP: Record<string, "text" | "numeric" | "quarter" | "status" | "priority" | "health" | "date"> = {
+  name: "text", programName: "text", reference: "text", owner: "text",
+  taskCount: "numeric", count_nys: "numeric", count_plan: "numeric",
+  count_part: "numeric", count_mostly: "numeric", count_done: "numeric",
+  plannedQ: "quarter", dueQ: "quarter", completionDate: "date",
+  status: "text", pct: "numeric", health: "health",
+};
+
 // ── Grip icon ─────────────────────────────────────────────────────────────
 
 function GripIcon() {
@@ -196,7 +287,13 @@ function StatusMiniBar({
 
 // ── Column header row ─────────────────────────────────────────────────────
 
-function TableHeader() {
+function TableHeader({
+  sortConfig,
+  onSort,
+}: {
+  sortConfig: SortConfig;
+  onSort: (key: string) => void;
+}) {
   const thStyle = (isMetric: boolean): React.CSSProperties => ({
     padding: "7px 10px",
     fontSize: 10,
@@ -216,29 +313,58 @@ function TableHeader() {
     textAlign: "center",
   });
 
+  function sortableTh(
+    label: string,
+    sortKey: string,
+    baseStyle: React.CSSProperties,
+    extra?: React.CSSProperties
+  ) {
+    const active = sortConfig?.key === sortKey;
+    const arrow = active ? (sortConfig!.direction === "asc" ? " \u25B2" : " \u25BC") : "";
+    return (
+      <th
+        key={sortKey}
+        style={{
+          ...baseStyle,
+          cursor: "pointer",
+          userSelect: "none",
+          ...extra,
+        }}
+        onClick={() => onSort(sortKey)}
+        title={label}
+      >
+        {label}
+        {arrow && (
+          <span style={{ fontSize: 7, marginLeft: 2, opacity: active ? 1 : 0.3 }}>
+            {arrow}
+          </span>
+        )}
+      </th>
+    );
+  }
+
   return (
     <thead>
       <tr>
-        {/* drag handle */}
+        {/* drag handle — not sortable */}
         <th style={{ ...thStyle(false), width: 32, padding: "7px 8px" }} />
         {/* identity zone */}
-        <th style={{ ...thStyle(false), width: 220 }}>Project</th>
-        <th style={{ ...thStyle(false), width: 150 }}>Program</th>
-        <th style={{ ...thStyle(false), width: 100 }}>Reference</th>
-        <th style={{ ...thStyle(false), width: 110, borderRight: "1px solid rgba(255,255,255,0.15)" }}>Owner</th>
+        {sortableTh("Project", "name", thStyle(false), { width: 220 })}
+        {sortableTh("Program", "programName", thStyle(false), { width: 150 })}
+        {sortableTh("Reference", "reference", thStyle(false), { width: 100 })}
+        {sortableTh("Owner", "owner", thStyle(false), { width: 110, borderRight: "1px solid rgba(255,255,255,0.15)" })}
         {/* metric zone */}
-        <th style={{ ...thCenter(true), width: 56 }} title="Total tasks">#</th>
-        {STATUS_COLS.map((sc) => (
-          <th key={sc.key} style={{ ...thCenter(true), width: 56 }} title={sc.title}>
-            {sc.label}
-          </th>
-        ))}
-        <th style={{ ...thStyle(true), width: 88 }}>Planned Q</th>
-        <th style={{ ...thStyle(true), width: 88 }}>Due Q</th>
-        <th style={{ ...thStyle(true), width: 90 }}>Completion Date</th>
-        <th style={{ ...thStyle(true), width: 80 }}>Status</th>
-        <th style={{ ...thCenter(true), width: 64 }} title="Percent complete">%</th>
-        <th style={{ ...thStyle(true), width: 110 }}>Health</th>
+        {sortableTh("#", "taskCount", thCenter(true), { width: 56 })}
+        {STATUS_COLS.map((sc, i) => {
+          const keys = ["count_nys", "count_plan", "count_part", "count_mostly", "count_done"];
+          return sortableTh(sc.label, keys[i], thCenter(true), { width: 56 });
+        })}
+        {sortableTh("Planned Q", "plannedQ", thStyle(true), { width: 88 })}
+        {sortableTh("Due Q", "dueQ", thStyle(true), { width: 88 })}
+        {sortableTh("Completion Date", "completionDate", thStyle(true), { width: 90 })}
+        {sortableTh("Status", "status", thStyle(true), { width: 80 })}
+        {sortableTh("%", "pct", thCenter(true), { width: 64 })}
+        {sortableTh("Health", "health", thStyle(true), { width: 110 })}
       </tr>
     </thead>
   );
@@ -929,6 +1055,7 @@ export default function DashboardView({
   const [showManagePrograms, setShowManagePrograms] = useState(false);
   const [showImportExcel, setShowImportExcel] = useState(false);
   const [showHistoryLog, setShowHistoryLog] = useState(false);
+  const [sortConfig, setSortConfig] = useState<SortConfig>(null);
   const deferredSearch = useDeferredValue(search);
 
   useEffect(() => {
@@ -1111,6 +1238,16 @@ export default function DashboardView({
 
   function handleRefresh() {
     router.refresh();
+  }
+
+  function handleSort(key: string) {
+    setSortConfig((prev) => {
+      if (prev?.key === key) {
+        return prev.direction === "asc" ? { key, direction: "desc" } : null;
+      }
+      const numericKeys = new Set(["taskCount", "count_nys", "count_plan", "count_part", "count_mostly", "count_done", "pct"]);
+      return { key, direction: numericKeys.has(key) ? "desc" : "asc" };
+    });
   }
 
   async function handleProjectDragEnd(fwId: number, event: DragEndEvent) {
@@ -1531,7 +1668,7 @@ export default function DashboardView({
                         }}
                         role="table"
                       >
-                        <TableHeader />
+                        <TableHeader sortConfig={sortConfig} onSort={handleSort} />
                         <tbody>
                           {/* Framework totals */}
                           <FrameworkSummaryRow
@@ -1542,10 +1679,18 @@ export default function DashboardView({
                           {/* Programs + their projects */}
                           {fw.programs.map((prog) => {
                             if (prog.projects.length === 0) return null;
+                            const sortedProjects = sortConfig
+                              ? [...prog.projects].sort((a, b) => {
+                                  const va = getSortValue(a, sortConfig.key, selectedQuarter);
+                                  const vb = getSortValue(b, sortConfig.key, selectedQuarter);
+                                  const cmp = compareSortValues(va, vb, SORT_TYPE_MAP[sortConfig.key] ?? "text");
+                                  return sortConfig.direction === "asc" ? cmp : -cmp;
+                                })
+                              : prog.projects;
                             return (
                               <SortableContext
                                 key={prog.id}
-                                items={prog.projects.map((p) => p.id)}
+                                items={sortedProjects.map((p) => p.id)}
                                 strategy={verticalListSortingStrategy}
                               >
                                 {/* Program sub-header */}
@@ -1554,7 +1699,7 @@ export default function DashboardView({
                                   selectedQuarter={selectedQuarter}
                                 />
                                 {/* Project rows */}
-                                {prog.projects.map((project, rowIdx) => (
+                                {sortedProjects.map((project, rowIdx) => (
                                   <SortableProjectRow
                                     key={project.id}
                                     project={project}

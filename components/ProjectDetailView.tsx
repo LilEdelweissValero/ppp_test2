@@ -24,7 +24,8 @@ import {
   computeProjectHealth,
   computeTaskPercentDone,
 } from "@/lib/health";
-import { STATUS_LABELS, PRIORITY_LABELS } from "@/lib/status";
+import { STATUS_LABELS, PRIORITY_LABELS, STATUS_SCORES } from "@/lib/status";
+import { compareQuarters } from "@/lib/quarters";
 import HealthBadge from "@/components/HealthBadge";
 import ProjectFormModal from "@/components/ProjectFormModal";
 import TaskFormModal from "@/components/TaskFormModal";
@@ -196,6 +197,7 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
   } | null>(null);
   const selectRef = useRef<HTMLSelectElement>(null);
   const [tasks, setTasks] = useState<Task[]>(initialProject.tasks);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
 
   useEffect(() => {
     setCurrentProject(initialProject);
@@ -235,6 +237,47 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
     }
     router.push("/");
   }
+
+  function handleSort(key: string) {
+    setSortConfig((prev) => {
+      if (prev?.key === key) {
+        return prev.direction === "asc" ? { key, direction: "desc" } : null;
+      }
+      const numericKeys = new Set(["pct"]);
+      return { key, direction: numericKeys.has(key) ? "desc" : "asc" };
+    });
+  }
+
+  const PRIORITY_ORDINAL: Record<string, number> = { Low: 0, Moderate: 1, High: 2 };
+
+  function getTaskSortValue(task: Task, key: string): string | number {
+    switch (key) {
+      case "taskCode": return task.taskCode;
+      case "name": return task.name;
+      case "assignee": return task.assignee ?? "";
+      case "priority": return PRIORITY_ORDINAL[task.priority] ?? 0;
+      case "status": return STATUS_SCORES[task.status as keyof typeof STATUS_SCORES] ?? 0;
+      case "adjustedTargetQuarter": return task.adjustedTargetQuarter;
+      case "pct": return Math.round(computeTaskPercentDone(task.status) * 100);
+      default: return "";
+    }
+  }
+
+  const sortedTasks = sortConfig
+    ? [...tasks].sort((a, b) => {
+        const va = getTaskSortValue(a, sortConfig.key);
+        const vb = getTaskSortValue(b, sortConfig.key);
+        let cmp: number;
+        if (sortConfig.key === "adjustedTargetQuarter") {
+          cmp = compareQuarters(String(va), String(vb));
+        } else if (typeof va === "number" && typeof vb === "number") {
+          cmp = va - vb;
+        } else {
+          cmp = String(va).localeCompare(String(vb));
+        }
+        return sortConfig.direction === "asc" ? cmp : -cmp;
+      })
+    : tasks;
 
   async function handleInlineSave(
     taskId: number,
@@ -387,7 +430,7 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
               onDragEnd={handleDragEnd}
             >
               <SortableContext
-                items={tasks.map((t) => t.id)}
+                items={sortedTasks.map((t) => t.id)}
                 strategy={verticalListSortingStrategy}
               >
                 <div className="overflow-x-auto">
@@ -395,18 +438,37 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                     <thead>
                       <tr>
                         <th aria-label="Reorder" />
-                        <th>Code</th>
-                        <th>Name</th>
-                        <th>Assignee</th>
-                        <th>Priority</th>
-                        <th>Status</th>
-                        <th>Quarter Due</th>
-                        <th>%</th>
+                        {[
+                          { label: "Code", key: "taskCode" },
+                          { label: "Name", key: "name" },
+                          { label: "Assignee", key: "assignee" },
+                          { label: "Priority", key: "priority" },
+                          { label: "Status", key: "status" },
+                          { label: "Quarter Due", key: "adjustedTargetQuarter" },
+                          { label: "%", key: "pct" },
+                        ].map(({ label, key }) => {
+                          const active = sortConfig?.key === key;
+                          const arrow = active ? (sortConfig!.direction === "asc" ? " \u25B2" : " \u25BC") : "";
+                          return (
+                            <th
+                              key={key}
+                              onClick={() => handleSort(key)}
+                              style={{ cursor: "pointer", userSelect: "none" }}
+                            >
+                              {label}
+                              {arrow && (
+                                <span style={{ fontSize: 8, marginLeft: 2, opacity: active ? 1 : 0.4 }}>
+                                  {arrow}
+                                </span>
+                              )}
+                            </th>
+                          );
+                        })}
                         <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {tasks.map((task) => (
+                      {sortedTasks.map((task) => (
                         <SortableTaskRow
                           key={task.id}
                           task={task}
