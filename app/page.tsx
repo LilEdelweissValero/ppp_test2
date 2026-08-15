@@ -1,4 +1,5 @@
 import DashboardView from "@/components/DashboardView";
+import LastUpdated from "@/components/LastUpdated";
 import { compareQuarters } from "@/lib/quarters";
 import { getDashboardData } from "@/lib/portfolio-data";
 
@@ -19,23 +20,6 @@ export default async function DashboardPage() {
     }
   }
   const existingQuarters = [...quarterSet].sort(compareQuarters);
-
-  let formattedDate = "Never";
-  if (lastModifiedAt) {
-    const date = new Date(lastModifiedAt);
-    formattedDate =
-      date.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      }) +
-      " at " +
-      date.toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      });
-  }
 
   return (
     <div className="min-h-screen" style={{ background: "var(--ground)" }}>
@@ -98,7 +82,7 @@ export default async function DashboardPage() {
             <span style={{ color: "rgba(247,248,250,0.22)", marginRight: 6 }}>
               LAST UPDATED
             </span>
-            {formattedDate}
+            <LastUpdated iso={lastModifiedAt} />
           </div>
         </div>
       </header>
