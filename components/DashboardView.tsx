@@ -408,12 +408,18 @@ function ProgramSummaryRow({
       )
     : "—";
 
-  // Completion date: latest actualCompletionDate across projects
-  const completionDate = program.projects
-    .map((p) => p.actualCompletionDate)
-    .filter((d): d is string => d !== null)
-    .sort()
-    .pop() || null;
+  // Completion date: only show if ALL projects are fully complete
+  const allProjectsComplete = program.projects.length > 0 &&
+    program.projects.every((p) =>
+      p.tasks.length > 0 && p.tasks.every((t) => t.status === "Complete or Verified")
+    );
+  const completionDate = allProjectsComplete
+    ? program.projects
+        .map((p) => p.actualCompletionDate)
+        .filter((d): d is string => d !== null)
+        .sort()
+        .pop() || null
+    : null;
 
   // Health: computed from program % and latest due quarter
   const programHealth =
