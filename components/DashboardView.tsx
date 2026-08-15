@@ -429,7 +429,7 @@ function ProgramSummaryRow({
       ? computeProjectHealth(programPctRounded, dueQ)
       : null;
 
-  const programBg = `color-mix(in srgb, ${accentColor} 10%, var(--ground-metric))`;
+  const programBg = `color-mix(in srgb, ${accentColor} 75%, white)`;
 
   return (
     <tr
@@ -1646,14 +1646,7 @@ export default function DashboardView({
 
               {/* ── Framework table ── */}
               {!isCollapsed && hasProjects && hasTasksInQuarter && (
-                <div style={{ display: "flex" }}>
-                  {/* Color spine continuation */}
-                  <div
-                    style={{ width: 6, background: fw.color, flexShrink: 0, opacity: 0.25 }}
-                    aria-hidden="true"
-                  />
-
-                  <div style={{ flex: 1, overflowX: "auto" }}>
+                <div style={{ flex: 1, overflowX: "auto" }}>
                     <DndContext
                       id={`project-sort-${fw.id}`}
                       sensors={sensors}
@@ -1725,41 +1718,30 @@ export default function DashboardView({
                       </table>
                     </DndContext>
                   </div>
-                </div>
               )}
 
               {/* Empty framework */}
               {!isCollapsed && !hasProjects && (
-                <div style={{ display: "flex" }}>
-                  <div
-                    style={{ width: 6, background: fw.color, opacity: 0.2, flexShrink: 0 }}
-                  />
-                  <p
-                    style={{
-                      padding: "16px 20px",
-                      fontSize: 12,
-                      color: "var(--ink-tertiary)",
-                    }}
-                  >
-                    No projects in this framework yet.
-                  </p>
-                </div>
+                <p
+                  style={{
+                    padding: "16px 20px",
+                    fontSize: 12,
+                    color: "var(--ink-tertiary)",
+                  }}
+                >
+                  No projects in this framework yet.
+                </p>
               )}
               {!isCollapsed && hasProjects && !hasTasksInQuarter && (
-                <div style={{ display: "flex" }}>
-                  <div
-                    style={{ width: 6, background: fw.color, opacity: 0.2, flexShrink: 0 }}
-                  />
-                  <p
-                    style={{
-                      padding: "16px 20px",
-                      fontSize: 12,
-                      color: "var(--ink-tertiary)",
-                    }}
-                  >
-                    No tasks in {selectedQuarter === ALL_TIME ? "any quarter" : selectedQuarter}.
-                  </p>
-                </div>
+                <p
+                  style={{
+                    padding: "16px 20px",
+                    fontSize: 12,
+                    color: "var(--ink-tertiary)",
+                  }}
+                >
+                  No tasks in {selectedQuarter === ALL_TIME ? "any quarter" : selectedQuarter}.
+                </p>
               )}
             </div>
           );
