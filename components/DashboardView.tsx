@@ -387,8 +387,16 @@ function ProgramSummaryRow({
       : countTasksByStatusForQuarter(allTasks, selectedQuarter);
   const total = filteredTasks.length;
 
-  // Aggregate program-level metrics from projects
-  const programPct = computeProjectPercentComplete(filteredTasks);
+  // Aggregate program-level metrics from projects (mean of project %'s)
+  const projectPcts = program.projects
+    .map((p) => {
+      const ft = filterTasksByQuarter(p.tasks, selectedQuarter);
+      return ft.length > 0 ? computeProjectPercentComplete(ft) : null;
+    })
+    .filter((p): p is number => p !== null);
+  const programPct = projectPcts.length > 0
+    ? projectPcts.reduce((a, b) => a + b, 0) / projectPcts.length
+    : 0;
   const programPctRounded = Math.round(programPct * 100);
   const programDerivedStatus = computeProjectDerivedStatus(filteredTasks);
 
@@ -1616,7 +1624,23 @@ export default function DashboardView({
                         ? countTasksByStatus(allTasks)
                         : countTasksByStatusForQuarter(allTasks, selectedQuarter);
                     const total = filteredTasks.length;
-                    const fwPct = computeProjectPercentComplete(filteredTasks);
+                    // Framework % = mean of programs' % (each program % = mean of its projects' %)
+                    const programPcts = fw.programs
+                      .map((prog) => {
+                        const projPcts = prog.projects
+                          .map((p) => {
+                            const ft = filterTasksByQuarter(p.tasks, selectedQuarter);
+                            return ft.length > 0 ? computeProjectPercentComplete(ft) : null;
+                          })
+                          .filter((p): p is number => p !== null);
+                        return projPcts.length > 0
+                          ? projPcts.reduce((a, b) => a + b, 0) / projPcts.length
+                          : null;
+                      })
+                      .filter((p): p is number => p !== null);
+                    const fwPct = programPcts.length > 0
+                      ? programPcts.reduce((a, b) => a + b, 0) / programPcts.length
+                      : 0;
                     const fwPctRounded = Math.round(fwPct * 100);
                     const fwHealth =
                       total > 0
