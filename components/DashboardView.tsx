@@ -25,7 +25,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect, useDeferredValue } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   DndContext,
@@ -1092,6 +1092,7 @@ export default function DashboardView({
   sourceVersion,
 }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const {
     getProject,
     setProject,
@@ -1101,7 +1102,18 @@ export default function DashboardView({
   } = usePortfolioCache();
   const [portfolio, setPortfolio] = useState(frameworks);
 
-  const [selectedQuarter, setSelectedQuarter] = useState(ALL_TIME);
+  const [selectedQuarter, setSelectedQuarter] = useState(searchParams.get("q") || ALL_TIME);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (selectedQuarter === ALL_TIME) {
+      params.delete("q");
+    } else {
+      params.set("q", selectedQuarter);
+    }
+    const qs = params.toString();
+    router.replace(qs ? `?${qs}` : window.location.pathname);
+  }, [selectedQuarter, router]);
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
   const [showAddProject, setShowAddProject] = useState(false);
