@@ -429,6 +429,8 @@ function ProgramSummaryRow({
       ? computeProjectHealth(programPctRounded, dueQ)
       : null;
 
+  const programBg = `color-mix(in srgb, ${accentColor} 10%, var(--ground-metric))`;
+
   return (
     <tr
       style={{
@@ -462,7 +464,7 @@ function ProgramSummaryRow({
           fontSize: 11,
           fontVariantNumeric: "tabular-nums",
           color: "var(--ink-secondary)",
-          background: "var(--ground-metric)",
+          background: programBg,
           fontWeight: 600,
         }}
       >
@@ -479,7 +481,7 @@ function ProgramSummaryRow({
             fontVariantNumeric: "tabular-nums",
             color: counts[sc.key] > 0 ? sc.color : "var(--ink-tertiary)",
             fontWeight: counts[sc.key] > 0 ? 600 : 400,
-            background: "var(--ground-metric)",
+            background: programBg,
           }}
         >
           {counts[sc.key]}
@@ -493,7 +495,7 @@ function ProgramSummaryRow({
           width: 88,
           fontSize: 11,
           color: "var(--ink-tertiary)",
-          background: "var(--ground-metric)",
+          background: programBg,
         }}
       >
         {plannedQ}
@@ -508,7 +510,7 @@ function ProgramSummaryRow({
           fontWeight: dueQ !== plannedQ ? 600 : 400,
           color: dueQ === plannedQ ? "var(--ink-tertiary)" : "var(--ink-secondary)",
           fontStyle: dueQ === plannedQ ? "italic" : "normal",
-          background: "var(--ground-metric)",
+          background: programBg,
         }}
       >
         {dueQ === plannedQ ? "as planned" : dueQ}
@@ -521,13 +523,13 @@ function ProgramSummaryRow({
           width: 90,
           fontSize: 11,
           color: completionDate ? "var(--ink-secondary)" : "var(--rule-strong)",
-          background: "var(--ground-metric)",
+          background: programBg,
         }}
       >
         {completionDate || "—"}
       </td>
       {/* derived status */}
-      <td style={{ padding: "5px 10px", textAlign: "left", width: 80, background: "var(--ground-metric)" }}>
+      <td style={{ padding: "5px 10px", textAlign: "left", width: 80, background: programBg }}>
         <span
           style={{
             fontSize: 11,
@@ -542,7 +544,7 @@ function ProgramSummaryRow({
         </span>
       </td>
       {/* percent complete */}
-      <td style={{ padding: "5px 10px", textAlign: "center", width: 64, background: "var(--ground-metric)" }}>
+      <td style={{ padding: "5px 10px", textAlign: "center", width: 64, background: programBg }}>
         <span
           style={{
             fontSize: 11,
@@ -557,7 +559,7 @@ function ProgramSummaryRow({
         </span>
       </td>
       {/* health badge */}
-      <td style={{ padding: "5px 10px", textAlign: "left", width: 110, background: "var(--ground-metric)" }}>
+      <td style={{ padding: "5px 10px", textAlign: "left", width: 110, background: programBg }}>
         <HealthBadge health={programHealth} />
       </td>
     </tr>
