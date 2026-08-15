@@ -261,6 +261,40 @@ function ProgramSummaryRow({
       : countTasksByStatusForQuarter(allTasks, selectedQuarter);
   const total = filteredTasks.length;
 
+  // Aggregate program-level metrics from projects
+  const programPct = computeProjectPercentComplete(filteredTasks);
+  const programPctRounded = Math.round(programPct * 100);
+  const programDerivedStatus = computeProjectDerivedStatus(filteredTasks);
+
+  // Planned Q: earliest targetQuarter across projects
+  const plannedQ = program.projects.length > 0
+    ? program.projects.reduce((earliest, p) =>
+        p.targetQuarter < earliest ? p.targetQuarter : earliest,
+        program.projects[0].targetQuarter
+      )
+    : "—";
+
+  // Due Q: latest adjustedTargetQuarter across projects
+  const dueQ = program.projects.length > 0
+    ? program.projects.reduce((latest, p) =>
+        p.adjustedTargetQuarter > latest ? p.adjustedTargetQuarter : latest,
+        program.projects[0].adjustedTargetQuarter
+      )
+    : "—";
+
+  // Completion date: latest actualCompletionDate across projects
+  const completionDate = program.projects
+    .map((p) => p.actualCompletionDate)
+    .filter((d): d is string => d !== null)
+    .sort()
+    .pop() || null;
+
+  // Health: computed from program % and latest due quarter
+  const programHealth =
+    filteredTasks.length > 0
+      ? computeProjectHealth(programPctRounded, dueQ)
+      : null;
+
   return (
     <tr
       style={{
@@ -295,6 +329,7 @@ function ProgramSummaryRow({
           fontVariantNumeric: "tabular-nums",
           color: "var(--ink-secondary)",
           background: "var(--ground-metric)",
+          fontWeight: 600,
         }}
       >
         {total}
@@ -316,11 +351,81 @@ function ProgramSummaryRow({
           {counts[sc.key]}
         </td>
       ))}
-      {/* empty trailing cols */}
+      {/* planned quarter */}
       <td
-        colSpan={6}
-        style={{ padding: "5px 10px", background: "var(--ground-metric)" }}
-      />
+        style={{
+          padding: "5px 10px",
+          textAlign: "left",
+          width: 88,
+          fontSize: 11,
+          color: "var(--ink-tertiary)",
+          background: "var(--ground-metric)",
+        }}
+      >
+        {plannedQ}
+      </td>
+      {/* due quarter */}
+      <td
+        style={{
+          padding: "5px 10px",
+          textAlign: "left",
+          width: 88,
+          fontSize: 11,
+          fontWeight: dueQ !== plannedQ ? 600 : 400,
+          color: dueQ === plannedQ ? "var(--ink-tertiary)" : "var(--ink-secondary)",
+          fontStyle: dueQ === plannedQ ? "italic" : "normal",
+          background: "var(--ground-metric)",
+        }}
+      >
+        {dueQ === plannedQ ? "as planned" : dueQ}
+      </td>
+      {/* completion date */}
+      <td
+        style={{
+          padding: "5px 10px",
+          textAlign: "left",
+          width: 90,
+          fontSize: 11,
+          color: completionDate ? "var(--ink-secondary)" : "var(--rule-strong)",
+          background: "var(--ground-metric)",
+        }}
+      >
+        {completionDate || "—"}
+      </td>
+      {/* derived status */}
+      <td style={{ padding: "5px 10px", textAlign: "left", width: 80, background: "var(--ground-metric)" }}>
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            color:
+              programDerivedStatus === "Completed"
+                ? "var(--health-completed-ink)"
+                : "var(--ink-secondary)",
+          }}
+        >
+          {programDerivedStatus}
+        </span>
+      </td>
+      {/* percent complete */}
+      <td style={{ padding: "5px 10px", textAlign: "center", width: 64, background: "var(--ground-metric)" }}>
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color:
+              programPctRounded === 100
+                ? "var(--health-completed-ink)"
+                : "var(--ink-primary)",
+          }}
+        >
+          {programPctRounded}%
+        </span>
+      </td>
+      {/* health badge */}
+      <td style={{ padding: "5px 10px", textAlign: "left", width: 110, background: "var(--ground-metric)" }}>
+        <HealthBadge health={programHealth} />
+      </td>
     </tr>
   );
 }
@@ -1356,7 +1461,7 @@ export default function DashboardView({
                     </span>
                   </div>
 
-                  {/* Mini status bar */}
+                  {/* Framework aggregate stats */}
                   {hasProjects && (() => {
                     const allTasks = allProjects.flatMap((p) => p.tasks);
                     const filteredTasks = filterTasksByQuarter(allTasks, selectedQuarter);
@@ -1365,12 +1470,37 @@ export default function DashboardView({
                         ? countTasksByStatus(allTasks)
                         : countTasksByStatusForQuarter(allTasks, selectedQuarter);
                     const total = filteredTasks.length;
+                    const fwPct = computeProjectPercentComplete(filteredTasks);
+                    const fwPctRounded = Math.round(fwPct * 100);
+                    const fwHealth =
+                      total > 0
+                        ? computeProjectHealth(fwPctRounded, allProjects.reduce((latest, p) =>
+                            p.adjustedTargetQuarter > latest ? p.adjustedTargetQuarter : latest,
+                            allProjects[0].adjustedTargetQuarter
+                          ))
+                        : null;
+                    const completedCount = allProjects.filter((p) =>
+                      p.tasks.length > 0 && p.tasks.every((t) => t.status === "Complete or Verified")
+                    ).length;
                     return (
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                         <span style={{ fontSize: 11, color: "var(--ink-tertiary)" }}>
                           {total} task{total !== 1 ? "s" : ""}
                         </span>
                         <StatusMiniBar counts={counts} total={total} />
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: fwPctRounded === 100 ? "var(--health-completed-ink)" : "var(--ink-primary)",
+                          }}
+                        >
+                          {fwPctRounded}%
+                        </span>
+                        <HealthBadge health={fwHealth} />
+                        <span style={{ fontSize: 11, color: "var(--ink-tertiary)" }}>
+                          {completedCount}/{allProjects.length} done
+                        </span>
                       </div>
                     );
                   })()}
