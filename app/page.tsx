@@ -12,7 +12,6 @@ export default async function DashboardPage() {
   for (const framework of frameworks) {
     for (const program of framework.programs) {
       for (const project of program.projects) {
-        quarterSet.add(project.adjustedTargetQuarter);
         for (const task of project.tasks) {
           quarterSet.add(task.adjustedTargetQuarter);
         }
