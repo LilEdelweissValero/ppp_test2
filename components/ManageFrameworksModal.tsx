@@ -333,7 +333,7 @@ export default function ManageFrameworksModal({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Manage Frameworks">
+    <Modal open={open} onClose={onClose} title="Manage Frameworks" wide>
       <div>
         <div style={{ marginBottom: 16 }}>
           <input

@@ -131,14 +131,6 @@ function filterTasksByQuarter(tasks: Task[], selectedQuarter: string): Task[] {
   return tasks.filter((t) => t.adjustedTargetQuarter === selectedQuarter);
 }
 
-function hex2luma(hex: string): number {
-  const c = hex.replace("#", "");
-  const r = parseInt(c.substring(0, 2), 16);
-  const g = parseInt(c.substring(2, 4), 16);
-  const b = parseInt(c.substring(4, 6), 16);
-  return 0.299 * r + 0.587 * g + 0.114 * b;
-}
-
 // ── Sort helpers ───────────────────────────────────────────────────────────
 
 type SortConfig = { key: string; direction: "asc" | "desc" } | null;
@@ -375,9 +367,11 @@ function TableHeader({
 function ProgramSummaryRow({
   program,
   selectedQuarter,
+  accentColor,
 }: {
   program: Program;
   selectedQuarter: string;
+  accentColor: string;
 }) {
   const allTasks = program.projects.flatMap((p) => p.tasks);
   const filteredTasks = filterTasksByQuarter(allTasks, selectedQuarter);
@@ -438,7 +432,7 @@ function ProgramSummaryRow({
   return (
     <tr
       style={{
-        background: "#EAEDF3",
+        background: `color-mix(in srgb, ${accentColor} 10%, var(--ground-metric))`,
         borderTop: "1px solid var(--rule-strong)",
         borderBottom: "1px solid var(--rule)",
       }}
@@ -1508,8 +1502,6 @@ export default function DashboardView({
           const hasTasksInQuarter = selectedQuarter === ALL_TIME
             ? allProjects.some((p) => p.tasks.length > 0)
             : allProjects.some((p) => p.tasks.some((t) => t.adjustedTargetQuarter === selectedQuarter));
-          const luma = hex2luma(fw.color);
-
           return (
             <div
               key={fw.id}
@@ -1520,32 +1512,19 @@ export default function DashboardView({
               }}
             >
               {/* ── Framework header ── */}
-              <div style={{ display: "flex" }}>
-                {/* Color spine */}
-                <div
-                  style={{
-                    width: 6,
-                    background: fw.color,
-                    flexShrink: 0,
-                  }}
-                  aria-hidden="true"
-                />
-
-                {/* Framework name row */}
-                <div
-                  onClick={() => hasProjects && hasTasksInQuarter && toggleCollapse(fw.id)}
-                  style={{
-                    flex: 1,
-                    background: "var(--surface)",
-                    borderBottom: "1px solid var(--rule)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "10px 14px",
-                    cursor: hasProjects && hasTasksInQuarter ? "pointer" : "default",
-                    userSelect: "none",
-                  }}
-                >
+              <div
+                onClick={() => hasProjects && hasTasksInQuarter && toggleCollapse(fw.id)}
+                style={{
+                  background: fw.color,
+                  borderBottom: "1px solid var(--rule)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "10px 14px",
+                  cursor: hasProjects && hasTasksInQuarter ? "pointer" : "default",
+                  userSelect: "none",
+                }}
+              >
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     {hasProjects && hasTasksInQuarter && (
                       <span
@@ -1577,19 +1556,6 @@ export default function DashboardView({
                         </svg>
                       </span>
                     )}
-
-                    {/* Color pip */}
-                    <span
-                      style={{
-                        display: "inline-block",
-                        width: 8,
-                        height: 8,
-                        borderRadius: "50%",
-                        background: fw.color,
-                        flexShrink: 0,
-                        border: luma > 220 ? "1px solid var(--rule-strong)" : "none",
-                      }}
-                    />
 
                     <span
                       style={{
@@ -1675,7 +1641,6 @@ export default function DashboardView({
                     );
                   })()}
                 </div>
-              </div>
 
               {/* ── Framework table ── */}
               {!isCollapsed && hasProjects && hasTasksInQuarter && (
@@ -1701,13 +1666,14 @@ export default function DashboardView({
                         }}
                         role="table"
                       >
-                        <TableHeader sortConfig={sortConfig} onSort={handleSort} />
-                        <tbody>
-                          {/* Framework totals */}
+                        <thead>
                           <FrameworkSummaryRow
                             framework={fw}
                             selectedQuarter={selectedQuarter}
                           />
+                        </thead>
+                        <TableHeader sortConfig={sortConfig} onSort={handleSort} />
+                        <tbody>
 
                           {/* Programs + their projects */}
                           {fw.programs.map((prog) => {
@@ -1734,6 +1700,7 @@ export default function DashboardView({
                                 <ProgramSummaryRow
                                   program={prog}
                                   selectedQuarter={selectedQuarter}
+                                  accentColor={fw.color}
                                 />
                                 {/* Project rows */}
                                 {sortedProjects.map((project, rowIdx) => (
