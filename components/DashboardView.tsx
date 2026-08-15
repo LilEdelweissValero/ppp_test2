@@ -1491,6 +1491,9 @@ export default function DashboardView({
           const isCollapsed = collapsed.has(fw.id);
           const allProjects = fw.programs.flatMap((p) => p.projects);
           const hasProjects = allProjects.length > 0;
+          const hasTasksInQuarter = selectedQuarter === ALL_TIME
+            ? allProjects.some((p) => p.tasks.length > 0)
+            : allProjects.some((p) => p.tasks.some((t) => t.adjustedTargetQuarter === selectedQuarter));
           const luma = hex2luma(fw.color);
 
           return (
@@ -1516,7 +1519,7 @@ export default function DashboardView({
 
                 {/* Framework name row */}
                 <div
-                  onClick={() => hasProjects && toggleCollapse(fw.id)}
+                  onClick={() => hasProjects && hasTasksInQuarter && toggleCollapse(fw.id)}
                   style={{
                     flex: 1,
                     background: "var(--surface)",
@@ -1525,12 +1528,12 @@ export default function DashboardView({
                     alignItems: "center",
                     justifyContent: "space-between",
                     padding: "10px 14px",
-                    cursor: hasProjects ? "pointer" : "default",
+                    cursor: hasProjects && hasTasksInQuarter ? "pointer" : "default",
                     userSelect: "none",
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    {hasProjects && (
+                    {hasProjects && hasTasksInQuarter && (
                       <span
                         aria-hidden="true"
                         style={{
@@ -1599,7 +1602,7 @@ export default function DashboardView({
                   </div>
 
                   {/* Framework aggregate stats */}
-                  {hasProjects && (() => {
+                  {hasProjects && hasTasksInQuarter && (() => {
                     const allTasks = allProjects.flatMap((p) => p.tasks);
                     const filteredTasks = filterTasksByQuarter(allTasks, selectedQuarter);
                     const counts =
@@ -1645,7 +1648,7 @@ export default function DashboardView({
               </div>
 
               {/* ── Framework table ── */}
-              {!isCollapsed && hasProjects && (
+              {!isCollapsed && hasProjects && hasTasksInQuarter && (
                 <div style={{ display: "flex" }}>
                   {/* Color spine continuation */}
                   <div
@@ -1679,6 +1682,10 @@ export default function DashboardView({
                           {/* Programs + their projects */}
                           {fw.programs.map((prog) => {
                             if (prog.projects.length === 0) return null;
+                            const hasTasksInProgram = selectedQuarter === ALL_TIME
+                              ? prog.projects.some((p) => p.tasks.length > 0)
+                              : prog.projects.some((p) => p.tasks.some((t) => t.adjustedTargetQuarter === selectedQuarter));
+                            if (!hasTasksInProgram) return null;
                             const sortedProjects = sortConfig
                               ? [...prog.projects].sort((a, b) => {
                                   const va = getSortValue(a, sortConfig.key, selectedQuarter);
@@ -1736,6 +1743,22 @@ export default function DashboardView({
                     }}
                   >
                     No projects in this framework yet.
+                  </p>
+                </div>
+              )}
+              {!isCollapsed && hasProjects && !hasTasksInQuarter && (
+                <div style={{ display: "flex" }}>
+                  <div
+                    style={{ width: 6, background: fw.color, opacity: 0.2, flexShrink: 0 }}
+                  />
+                  <p
+                    style={{
+                      padding: "16px 20px",
+                      fontSize: 12,
+                      color: "var(--ink-tertiary)",
+                    }}
+                  >
+                    No tasks in {selectedQuarter === ALL_TIME ? "any quarter" : selectedQuarter}.
                   </p>
                 </div>
               )}
