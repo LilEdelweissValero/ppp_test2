@@ -674,6 +674,63 @@ function SortableProjectRow({
   };
 
   const filteredTasks = filterTasksByQuarter(project.tasks, selectedQuarter);
+
+  const rowBg = hovered
+    ? "var(--accent-bg)"
+    : isEven
+    ? "var(--surface)"
+    : "var(--ground)";
+
+  const tdBase: React.CSSProperties = {
+    padding: "8px 10px",
+    borderBottom: "1px solid var(--rule)",
+    fontSize: 12,
+    color: "var(--ink-primary)",
+    background: rowBg,
+    verticalAlign: "middle",
+  };
+
+  if (filteredTasks.length === 0 && selectedQuarter !== ALL_TIME) {
+    return (
+      <tr
+        ref={setNodeRef}
+        style={style}
+        onMouseEnter={() => { setHovered(true); setShouldPrefetch(true); onPrefetch(); }}
+        onFocus={onPrefetch}
+        onMouseLeave={() => setHovered(false)}
+      >
+        <td style={{ ...tdBase, padding: "8px 8px", width: 32 }}>
+          <button
+            {...attributes}
+            {...listeners}
+            style={{ cursor: "grab", color: "var(--ink-tertiary)", display: "flex", alignItems: "center", padding: 2, borderRadius: 2, background: "none", border: "none" }}
+            aria-label="Drag to reorder"
+          >
+            <GripIcon />
+          </button>
+        </td>
+        <td style={{ ...tdBase, width: 220 }}>
+          <Link
+            href={`/projects/${project.id}?cached=1`}
+            prefetch={shouldPrefetch}
+            onPointerEnter={onPrefetch}
+            onFocus={onPrefetch}
+            onTouchStart={onPrefetch}
+            onNavigate={onNavigate}
+            style={{ fontWeight: 600, fontSize: 12, color: "var(--accent)", textDecoration: "none" }}
+          >
+            {project.name}
+          </Link>
+        </td>
+        <td style={{ ...tdBase, width: 150, fontSize: 11, color: "var(--ink-secondary)" }}>{programName}</td>
+        <td style={{ ...tdBase, width: 100, fontSize: 11, color: "var(--ink-secondary)" }}>{project.reference || "—"}</td>
+        <td style={{ ...tdBase, width: 110, fontSize: 11, color: "var(--ink-secondary)" }}>{project.owner || "—"}</td>
+        <td colSpan={12} style={{ ...tdBase, fontSize: 11, color: "var(--ink-tertiary)", fontStyle: "italic" }}>
+          No tasks due in {selectedQuarter}
+        </td>
+      </tr>
+    );
+  }
   const pct = computeProjectPercentComplete(filteredTasks);
   const health =
     filteredTasks.length > 0
@@ -686,25 +743,12 @@ function SortableProjectRow({
   const derivedStatus = computeProjectDerivedStatus(filteredTasks);
   const pctRounded = Math.round(pct * 100);
 
-  const rowBg = hovered
-    ? "var(--accent-bg)"
-    : isEven
-    ? "var(--surface)"
-    : "var(--ground)";
   const metricBg = hovered
     ? "#E3EDFF"
     : isEven
     ? "#F4F6FA"
     : "var(--ground-metric)";
 
-  const tdBase: React.CSSProperties = {
-    padding: "8px 10px",
-    borderBottom: "1px solid var(--rule)",
-    fontSize: 12,
-    color: "var(--ink-primary)",
-    background: rowBg,
-    verticalAlign: "middle",
-  };
   const tdMetric: React.CSSProperties = {
     ...tdBase,
     background: metricBg,
