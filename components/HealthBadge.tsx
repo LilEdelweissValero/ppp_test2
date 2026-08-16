@@ -80,6 +80,7 @@ export default function HealthBadge({
         letterSpacing: "0.03em",
         borderRadius: 2,
         whiteSpace: "nowrap",
+        minWidth: 108,
       }}
     >
       <span

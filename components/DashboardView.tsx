@@ -585,6 +585,32 @@ function FrameworkSummaryRow({
       : countTasksByStatusForQuarter(allTasks, selectedQuarter);
   const total = filteredTasks.length;
 
+  const allProjects = framework.programs.flatMap((prog) => prog.projects);
+  const dueQ = allProjects.length > 0
+    ? allProjects.reduce((latest, p) =>
+        p.adjustedTargetQuarter > latest ? p.adjustedTargetQuarter : latest,
+        allProjects[0].adjustedTargetQuarter
+      )
+    : "—";
+  const completionDate = (() => {
+    const completeProgramDates = framework.programs
+      .filter((prog) =>
+        prog.projects.length > 0 &&
+        prog.projects.every((p) =>
+          p.tasks.length > 0 && p.tasks.every((t) => t.status === "Complete or Verified")
+        )
+      )
+      .flatMap((prog) =>
+        prog.projects
+          .map((p) => p.actualCompletionDate)
+          .filter((d): d is string => d !== null)
+      )
+      .sort();
+    return completeProgramDates.length > 0
+      ? completeProgramDates[completeProgramDates.length - 1]
+      : null;
+  })();
+
   return (
     <tr
       style={{
@@ -633,7 +659,34 @@ function FrameworkSummaryRow({
           {counts[sc.key]}
         </td>
       ))}
-      <td colSpan={6} />
+      {/* planned Q — blank */}
+      <td style={{ padding: "5px 10px", textAlign: "left", width: 88 }} />
+      {/* due Q */}
+      <td
+        style={{
+          padding: "5px 10px",
+          textAlign: "left",
+          width: 88,
+          fontSize: 11,
+          color: "var(--ink-secondary)",
+          fontWeight: 600,
+        }}
+      >
+        {dueQ}
+      </td>
+      {/* completion date */}
+      <td
+        style={{
+          padding: "5px 10px",
+          textAlign: "left",
+          width: 90,
+          fontSize: 11,
+          color: completionDate ? "var(--ink-secondary)" : "var(--rule-strong)",
+        }}
+      >
+        {completionDate || "—"}
+      </td>
+      <td colSpan={3} />
     </tr>
   );
 }
@@ -1677,9 +1730,6 @@ export default function DashboardView({
                             allProjects[0].adjustedTargetQuarter
                           ))
                         : null;
-                    const completedCount = allProjects.filter((p) =>
-                      p.tasks.length > 0 && p.tasks.every((t) => t.status === "Complete or Verified")
-                    ).length;
                     return (
                       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                         <span style={{ fontSize: 11, color: "var(--ink-tertiary)" }}>
@@ -1696,9 +1746,6 @@ export default function DashboardView({
                           {fwPctRounded}%
                         </span>
                         <HealthBadge health={fwHealth} />
-                        <span style={{ fontSize: 11, color: "var(--ink-tertiary)" }}>
-                          {completedCount}/{allProjects.length} done
-                        </span>
                       </div>
                     );
                   })()}
