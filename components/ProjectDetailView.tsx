@@ -417,10 +417,16 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
     setEditingSpecialCell(null);
     updateSpecialTasks(specialTasks.map((st) => (st.id === taskId ? { ...st, [field]: value } : st)));
     try {
+      const task = specialTasks.find((st) => st.id === taskId);
+      const patch: Record<string, number | string> = { [field]: value };
+      if (task && ["nys", "plan", "part", "mostly", "done"].includes(field)) {
+        const updated = { ...task, [field]: value };
+        patch.total = updated.nys + updated.plan + updated.part + updated.mostly + updated.done;
+      }
       const response = await fetch(`/api/special-tasks/${taskId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ [field]: value }),
+        body: JSON.stringify(patch),
       });
       if (!response.ok) throw new Error("Update failed");
       const updated = await response.json();
@@ -659,12 +665,7 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
             </div>
           </div>
 
-          {specialTasks.length === 0 ? (
-            <div className="detail-empty">
-              <p>No special tasks yet.</p>
-              <p>Use Add Task and select &quot;Special&quot; type to create one.</p>
-            </div>
-          ) : (
+          {specialTasks.length > 0 && (
             <div className="overflow-x-auto">
               <table className="detail-task-table">
                 <thead>
@@ -691,33 +692,15 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                 </thead>
                 <tbody>
                   {specialTasks.map((st) => {
-                    const pctVal = st.total > 0 ? Math.round((st.done / st.total) * 100) : 0;
+                    const total = st.nys + st.plan + st.part + st.mostly + st.done;
+                    const pctVal = total > 0 ? Math.round((st.done / total) * 100) : 0;
                     return (
                       <tr key={st.id} className="detail-task-row">
                         <td className="detail-task-code" style={{ width: 100 }}>{st.specialTaskCode}</td>
                         <td style={{ width: 180 }}>{st.name}</td>
                         {/* # */}
-                        <td
-                          className="detail-inline-cell"
-                          style={{ width: 50, textAlign: "center" }}
-                          onClick={() => setEditingSpecialCell({ taskId: st.id, field: "total" })}
-                        >
-                          {editingSpecialCell?.taskId === st.id && editingSpecialCell.field === "total" ? (
-                            <input
-                              type="number"
-                              defaultValue={st.total}
-                              autoFocus
-                              className="detail-inline-input"
-                              onBlur={(e) => handleSpecialInlineSave(st.id, "total", parseInt(e.target.value) || 0)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Escape") setEditingSpecialCell(null);
-                                if (e.key === "Enter") handleSpecialInlineSave(st.id, "total", parseInt((e.target as HTMLInputElement).value) || 0);
-                              }}
-                              style={{ width: 45, fontSize: 11, textAlign: "center" }}
-                            />
-                          ) : (
-                            st.total
-                          )}
+                        <td style={{ width: 50, textAlign: "center", fontSize: 11 }}>
+                          {total}
                         </td>
                         {/* NYS */}
                         <td
