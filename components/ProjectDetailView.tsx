@@ -112,7 +112,9 @@ function SortableTaskRow({
             onBlur={(e) => onInlineSave(task.id, "priority", e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Escape") setEditingCell(null);
-              if (e.key === "Enter") (e.target as HTMLSelectElement).blur();
+              if (e.key === "Enter") {
+                onInlineSave(task.id, "priority", (e.target as HTMLSelectElement).value);
+              }
             }}
             className="detail-inline-select"
           >
@@ -139,7 +141,9 @@ function SortableTaskRow({
             onBlur={(e) => onInlineSave(task.id, "status", e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Escape") setEditingCell(null);
-              if (e.key === "Enter") (e.target as HTMLSelectElement).blur();
+              if (e.key === "Enter") {
+                onInlineSave(task.id, "status", (e.target as HTMLSelectElement).value);
+              }
             }}
             className="detail-inline-select"
           >
