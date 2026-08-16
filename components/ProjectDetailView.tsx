@@ -287,7 +287,7 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
   function handleTaskMouseEnter(task: Task, e: React.MouseEvent<HTMLTableRowElement>) {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
     const rect = e.currentTarget.getBoundingClientRect();
-    setTooltipPos({ top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX });
+    setTooltipPos({ top: rect.bottom + window.scrollY, left: rect.left + window.scrollX });
     hoverTimerRef.current = setTimeout(() => setHoveredTask(task), 250);
   }
 
