@@ -79,7 +79,7 @@ function SortableTaskRow({
       style={style}
       className="detail-task-row"
     >
-      <td>
+      <td style={{ width: 32 }}>
         <button
           className="detail-task-action"
           style={{ cursor: "grab", color: "var(--ink-tertiary)", textDecoration: "none" }}
@@ -90,11 +90,12 @@ function SortableTaskRow({
           <span aria-hidden="true">⠿</span>
         </button>
       </td>
-      <td className="detail-task-code">{task.taskCode}</td>
-      <td>{task.name}</td>
-      <td className="detail-muted">{task.assignee || "—"}</td>
+      <td className="detail-task-code" style={{ width: 100 }}>{task.taskCode}</td>
+      <td style={{ width: 220 }}>{task.name}</td>
+      <td className="detail-muted" style={{ width: 110 }}>{task.assignee || "—"}</td>
       <td
         className="detail-inline-cell detail-muted"
+        style={{ width: 80 }}
         onClick={() => setEditingCell({ taskId: task.id, field: "priority" })}
       >
         {editingCell?.taskId === task.id && editingCell.field === "priority" ? (
@@ -121,6 +122,7 @@ function SortableTaskRow({
       </td>
       <td
         className="detail-inline-cell"
+        style={{ width: 160 }}
         onClick={() => setEditingCell({ taskId: task.id, field: "status" })}
       >
         {editingCell?.taskId === task.id && editingCell.field === "status" ? (
@@ -145,8 +147,8 @@ function SortableTaskRow({
           <span>{task.status}</span>
         )}
       </td>
-      <td className="detail-muted">{task.adjustedTargetQuarter}</td>
-      <td style={{ textAlign: "center" }}>
+      <td className="detail-muted" style={{ width: 90 }}>{task.adjustedTargetQuarter}</td>
+      <td style={{ textAlign: "center", width: 50 }}>
         <span style={{
           fontSize: 11,
           fontWeight: 600,
@@ -155,7 +157,7 @@ function SortableTaskRow({
           {Math.round(pct * 100)}%
         </span>
       </td>
-      <td>
+      <td style={{ width: 120 }}>
         <div className="detail-task-actions">
           <button
             onClick={onEdit}
@@ -500,23 +502,23 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                   <table className="detail-task-table">
                     <thead>
                       <tr>
-                        <th aria-label="Reorder" />
+                        <th aria-label="Reorder" style={{ width: 32 }} />
                         {[
-                          { label: "Code", key: "taskCode" },
-                          { label: "Name", key: "name" },
-                          { label: "Assignee", key: "assignee" },
-                          { label: "Priority", key: "priority" },
-                          { label: "Status", key: "status" },
-                          { label: "Quarter Due", key: "adjustedTargetQuarter" },
-                          { label: "%", key: "pct" },
-                        ].map(({ label, key }) => {
+                          { label: "Code", key: "taskCode", width: 100 },
+                          { label: "Name", key: "name", width: 220 },
+                          { label: "Assignee", key: "assignee", width: 110 },
+                          { label: "Priority", key: "priority", width: 80 },
+                          { label: "Status", key: "status", width: 160 },
+                          { label: "Quarter Due", key: "adjustedTargetQuarter", width: 90 },
+                          { label: "%", key: "pct", width: 50 },
+                        ].map(({ label, key, width }) => {
                           const active = sortConfig?.key === key;
                           const arrow = active ? (sortConfig!.direction === "asc" ? " \u25B2" : " \u25BC") : "";
                           return (
                             <th
                               key={key}
                               onClick={() => handleSort(key)}
-                              style={{ cursor: "pointer", userSelect: "none" }}
+                              style={{ cursor: "pointer", userSelect: "none", width }}
                             >
                               {label}
                               {arrow && (
@@ -527,7 +529,7 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                             </th>
                           );
                         })}
-                        <th>Actions</th>
+                        <th style={{ width: 120 }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>

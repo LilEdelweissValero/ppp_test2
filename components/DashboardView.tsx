@@ -50,7 +50,7 @@ import {
   computeProjectDerivedStatus,
 } from "@/lib/health";
 import { countTasksByStatus, countTasksByStatusForQuarter, STATUS_SCORES } from "@/lib/status";
-import { compareQuarters } from "@/lib/quarters";
+import { compareQuarters, quarterRange } from "@/lib/quarters";
 import HealthBadge from "@/components/HealthBadge";
 import ProjectFormModal from "@/components/ProjectFormModal";
 import ManageFrameworksModal from "@/components/ManageFrameworksModal";
@@ -700,6 +700,7 @@ function SortableProjectRow({
   selectedQuarter,
   isEven,
   programName,
+  onProjectUpdate,
 }: {
   project: Project;
   onPrefetch: () => void;
@@ -707,6 +708,7 @@ function SortableProjectRow({
   selectedQuarter: string;
   isEven: boolean;
   programName: string;
+  onProjectUpdate: (fields: Record<string, unknown>) => void;
 }) {
   const [shouldPrefetch, setShouldPrefetch] = useState(false);
   const {
@@ -719,6 +721,8 @@ function SortableProjectRow({
   } = useSortable({ id: project.id });
 
   const [hovered, setHovered] = useState(false);
+  const [editingCell, setEditingCell] = useState<{ field: string } | null>(null);
+  const editingRef = useRef<HTMLInputElement | HTMLSelectElement>(null);
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -776,8 +780,66 @@ function SortableProjectRow({
           </Link>
         </td>
         <td style={{ ...tdBase, width: 150, fontSize: 11, color: "var(--ink-secondary)" }}>{programName}</td>
-        <td style={{ ...tdBase, width: 100, fontSize: 11, color: "var(--ink-secondary)" }}>{project.reference || "—"}</td>
-        <td style={{ ...tdBase, width: 110, fontSize: 11, color: "var(--ink-secondary)" }}>{project.owner || "—"}</td>
+        <td
+          style={{ ...tdBase, width: 100, fontSize: 11, color: "var(--ink-tertiary)", fontFamily: "var(--font-mono)", cursor: "text" }}
+          onClick={() => !editingCell && setEditingCell({ field: "reference" })}
+        >
+          {editingCell?.field === "reference" ? (
+            <input
+              ref={editingRef as React.RefObject<HTMLInputElement>}
+              autoFocus
+              defaultValue={project.reference ?? ""}
+              onBlur={(e) => {
+                const value = e.target.value.trim();
+                setEditingCell(null);
+                if (value !== (project.reference ?? "")) {
+                  fetch(`/api/projects/${project.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ reference: value || null }),
+                  }).then(() => onProjectUpdate({ reference: value || null }));
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setEditingCell(null);
+                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+              }}
+              style={{ width: "100%", fontSize: 11, fontFamily: "var(--font-mono)", padding: "1px 4px", border: "1px solid var(--accent)", borderRadius: 2, background: "var(--surface)", color: "var(--ink-primary)", boxSizing: "border-box" }}
+            />
+          ) : (
+            project.reference || "—"
+          )}
+        </td>
+        <td
+          style={{ ...tdBase, width: 110, fontSize: 11, color: "var(--ink-secondary)", cursor: "text" }}
+          onClick={() => !editingCell && setEditingCell({ field: "owner" })}
+        >
+          {editingCell?.field === "owner" ? (
+            <input
+              ref={editingRef as React.RefObject<HTMLInputElement>}
+              autoFocus
+              defaultValue={project.owner ?? ""}
+              onBlur={(e) => {
+                const value = e.target.value.trim();
+                setEditingCell(null);
+                if (value !== (project.owner ?? "")) {
+                  fetch(`/api/projects/${project.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ owner: value || null }),
+                  }).then(() => onProjectUpdate({ owner: value || null }));
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setEditingCell(null);
+                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+              }}
+              style={{ width: "100%", fontSize: 11, padding: "1px 4px", border: "1px solid var(--accent)", borderRadius: 2, background: "var(--surface)", color: "var(--ink-primary)", boxSizing: "border-box" }}
+            />
+          ) : (
+            project.owner || "—"
+          )}
+        </td>
         <td colSpan={12} style={{ ...tdBase, fontSize: 11, color: "var(--ink-tertiary)", fontStyle: "italic" }}>
           No tasks due in {selectedQuarter}
         </td>
@@ -879,14 +941,93 @@ function SortableProjectRow({
           color: "var(--ink-tertiary)",
           fontSize: 11,
           fontFamily: "var(--font-mono)",
+          cursor: "text",
         }}
+        onClick={() => !editingCell && setEditingCell({ field: "reference" })}
       >
-        {project.reference || "—"}
+        {editingCell?.field === "reference" ? (
+          <input
+            ref={editingRef as React.RefObject<HTMLInputElement>}
+            autoFocus
+            defaultValue={project.reference ?? ""}
+            onBlur={(e) => {
+              const value = e.target.value.trim();
+              setEditingCell(null);
+              if (value !== (project.reference ?? "")) {
+                fetch(`/api/projects/${project.id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ reference: value || null }),
+                }).then(() => onProjectUpdate({ reference: value || null }));
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setEditingCell(null);
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            }}
+            style={{
+              width: "100%",
+              fontSize: 11,
+              fontFamily: "var(--font-mono)",
+              padding: "1px 4px",
+              border: "1px solid var(--accent)",
+              borderRadius: 2,
+              background: "var(--surface)",
+              color: "var(--ink-primary)",
+              boxSizing: "border-box",
+            }}
+          />
+        ) : (
+          project.reference || "—"
+        )}
       </td>
 
       {/* owner */}
-      <td style={{ ...tdBase, width: 110, color: "var(--ink-secondary)", fontSize: 11, borderRight: "1px solid var(--rule-strong)" }}>
-        {project.owner || "—"}
+      <td
+        style={{
+          ...tdBase,
+          width: 110,
+          color: "var(--ink-secondary)",
+          fontSize: 11,
+          borderRight: "1px solid var(--rule-strong)",
+          cursor: "text",
+        }}
+        onClick={() => !editingCell && setEditingCell({ field: "owner" })}
+      >
+        {editingCell?.field === "owner" ? (
+          <input
+            ref={editingRef as React.RefObject<HTMLInputElement>}
+            autoFocus
+            defaultValue={project.owner ?? ""}
+            onBlur={(e) => {
+              const value = e.target.value.trim();
+              setEditingCell(null);
+              if (value !== (project.owner ?? "")) {
+                fetch(`/api/projects/${project.id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ owner: value || null }),
+                }).then(() => onProjectUpdate({ owner: value || null }));
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setEditingCell(null);
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            }}
+            style={{
+              width: "100%",
+              fontSize: 11,
+              padding: "1px 4px",
+              border: "1px solid var(--accent)",
+              borderRadius: 2,
+              background: "var(--surface)",
+              color: "var(--ink-primary)",
+              boxSizing: "border-box",
+            }}
+          />
+        ) : (
+          project.owner || "—"
+        )}
       </td>
 
       {/* task total */}
@@ -934,11 +1075,50 @@ function SortableProjectRow({
             ? "var(--ink-tertiary)"
             : "var(--ink-secondary)",
           fontStyle: project.adjustedTargetQuarter === project.targetQuarter ? "italic" : "normal",
+          cursor: "pointer",
         }}
+        onClick={() => !editingCell && setEditingCell({ field: "dueQ" })}
       >
-        {project.adjustedTargetQuarter === project.targetQuarter
-          ? "as planned"
-          : project.adjustedTargetQuarter}
+        {editingCell?.field === "dueQ" ? (
+          <select
+            ref={editingRef as React.RefObject<HTMLSelectElement>}
+            autoFocus
+            defaultValue={project.adjustedTargetQuarter}
+            onBlur={(e) => {
+              const value = e.target.value;
+              setEditingCell(null);
+              if (value && value !== project.adjustedTargetQuarter) {
+                fetch(`/api/projects/${project.id}/change-quarter`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ newQuarter: value }),
+                }).then(() => onProjectUpdate({ adjustedTargetQuarter: value }));
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setEditingCell(null);
+              if (e.key === "Enter") (e.target as HTMLSelectElement).blur();
+            }}
+            style={{
+              width: "100%",
+              fontSize: 11,
+              padding: "1px 2px",
+              border: "1px solid var(--accent)",
+              borderRadius: 2,
+              background: "var(--surface)",
+              color: "var(--ink-primary)",
+              boxSizing: "border-box",
+            }}
+          >
+            {quarterRange(2, 2).map((q) => (
+              <option key={q} value={q}>{q}</option>
+            ))}
+          </select>
+        ) : (
+          project.adjustedTargetQuarter === project.targetQuarter
+            ? "as planned"
+            : project.adjustedTargetQuarter
+        )}
       </td>
 
       {/* completion date */}
@@ -1815,6 +1995,10 @@ export default function DashboardView({
                                     onPrefetch={() => router.prefetch(`/projects/${project.id}?cached=1`)}
                                     onNavigate={() => {
                                       markDashboardNavigation(project.id);
+                                    }}
+                                    onProjectUpdate={(fields) => {
+                                      const cached = getProject(project.id);
+                                      if (cached) setProject({ ...cached, ...fields });
                                     }}
                                   />
                                 ))}

@@ -389,6 +389,7 @@ select:focus-visible {
   min-width: 1280px;
   border-collapse: collapse;
   font-size: 12px;
+  table-layout: fixed;
 }
 
 .detail-task-table th {
@@ -466,6 +467,7 @@ select:focus-visible {
   background: var(--surface);
   color: var(--ink-primary);
   font-size: 11px;
+  box-sizing: border-box;
 }
 
 .detail-task-actions {
