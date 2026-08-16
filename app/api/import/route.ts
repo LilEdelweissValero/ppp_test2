@@ -286,7 +286,7 @@ export async function POST(request: NextRequest) {
     }
 
     const existingTask = await prisma.task.findFirst({
-      where: { projectId: project.id, taskCode },
+      where: { taskCode },
     });
     if (existingTask) {
       tasksSkipped++;

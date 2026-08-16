@@ -41,6 +41,23 @@ export async function PATCH(
     return NextResponse.json({ error: "Task not found" }, { status: 404 });
   }
 
+  if (taskCode !== undefined && taskCode.trim() !== existingTask.taskCode) {
+    const newCode = taskCode.trim();
+    if (!newCode) {
+      return NextResponse.json({ error: "Task code cannot be empty" }, { status: 400 });
+    }
+    const duplicate = await prisma.task.findFirst({
+      where: { taskCode: newCode, id: { not: parseInt(id) } },
+      select: { id: true },
+    });
+    if (duplicate) {
+      return NextResponse.json(
+        { error: "A task with this code already exists" },
+        { status: 409 }
+      );
+    }
+  }
+
   const updateData: Record<string, string | null> = {};
   if (taskCode !== undefined) updateData.taskCode = taskCode.trim();
   if (name !== undefined) updateData.name = name.trim();
@@ -59,6 +76,22 @@ export async function PATCH(
     where: { id: parseInt(id) },
     data: updateData,
   });
+
+  if (updateData.taskCode && updateData.taskCode !== existingTask.taskCode) {
+    const oldCode = existingTask.taskCode;
+    const newCode = updateData.taskCode;
+    const siblings = await prisma.task.findMany({
+      where: { projectId: existingTask.projectId, id: { not: task.id } },
+    });
+    for (const sibling of siblings) {
+      if (sibling.dependencies && sibling.dependencies.includes(oldCode)) {
+        await prisma.task.update({
+          where: { id: sibling.id },
+          data: { dependencies: sibling.dependencies.replaceAll(oldCode, newCode) },
+        });
+      }
+    }
+  }
 
   const details = diffFields(
     existingTask as Record<string, unknown>,

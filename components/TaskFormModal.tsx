@@ -182,7 +182,6 @@ export default function TaskFormModal({
                 type="text"
                 value={taskCode}
                 onChange={(e) => setTaskCode(e.target.value)}
-                disabled={isEdit}
                 style={{
                   width: "100%",
                   border: `1px solid ${taskCodeInvalid ? "#B91C1C" : "var(--rule-strong)"}`,
@@ -190,7 +189,7 @@ export default function TaskFormModal({
                   padding: "6px 10px",
                   fontSize: 12,
                   color: "var(--ink-primary)",
-                  background: isEdit ? "var(--ground)" : "var(--surface)",
+                  background: "var(--surface)",
                   outline: "none",
                 }}
               />

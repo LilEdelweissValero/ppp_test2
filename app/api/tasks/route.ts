@@ -45,7 +45,6 @@ export async function POST(request: NextRequest) {
     }),
     prisma.task.findFirst({
       where: {
-        projectId: parsedProjectId,
         taskCode: taskCode.trim(),
       },
       select: { id: true },
@@ -61,7 +60,7 @@ export async function POST(request: NextRequest) {
 
   if (existing) {
     return NextResponse.json(
-      { error: "A task with this code already exists in this project" },
+      { error: "A task with this code already exists" },
       { status: 409 }
     );
   }
