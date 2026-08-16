@@ -72,7 +72,7 @@ interface Task {
   targetQuarter: string;
   notes: string | null;
   deliverable: string | null;
-  attachmentUrl: string | null;
+  attachments: { url: string; title: string | null }[] | null;
   dependencies: string | null;
   adjustedTargetQuarter: string;
 }

@@ -33,7 +33,7 @@ export async function PATCH(
     targetQuarter,
     adjustedTargetQuarter,
     deliverable,
-    attachmentUrl,
+    attachments,
     archived,
   } = body;
 
@@ -71,7 +71,11 @@ export async function PATCH(
   if (targetQuarter !== undefined) updateData.targetQuarter = targetQuarter;
   if (adjustedTargetQuarter !== undefined) updateData.adjustedTargetQuarter = adjustedTargetQuarter;
   if (deliverable !== undefined) updateData.deliverable = deliverable || null;
-  if (attachmentUrl !== undefined) updateData.attachmentUrl = attachmentUrl || null;
+  if (attachments !== undefined) {
+    updateData.attachments = Array.isArray(attachments) && attachments.length > 0
+      ? JSON.stringify(attachments)
+      : null;
+  }
   if (archived !== undefined && typeof archived === "boolean") updateData.archived = archived;
 
   const task = await prisma.task.update({
@@ -98,7 +102,7 @@ export async function PATCH(
   const details = diffFields(
     existingTask as Record<string, unknown>,
     updateData,
-    ["taskCode", "name", "assignee", "priority", "status", "description", "dependencies", "notes", "deliverable", "attachmentUrl", "targetQuarter", "adjustedTargetQuarter"]
+    ["taskCode", "name", "assignee", "priority", "status", "description", "dependencies", "notes", "deliverable", "attachments", "targetQuarter", "adjustedTargetQuarter"]
   );
   if (details) {
     await logChange({

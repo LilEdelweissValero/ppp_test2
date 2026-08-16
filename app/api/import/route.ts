@@ -314,7 +314,17 @@ export async function POST(request: NextRequest) {
         targetQuarter: taskTargetQuarter || "Q1 2026",
         adjustedTargetQuarter: taskTargetQuarter || "Q1 2026",
         deliverable: row.task_deliverable || null,
-        attachmentUrl: row.task_attachment_url || null,
+        attachments: (() => {
+          const raw = row.task_attachment_url || "";
+          if (!raw) return null;
+          if (raw.trimStart().startsWith("[")) {
+            try {
+              const parsed = JSON.parse(raw);
+              if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            } catch {}
+          }
+          return raw.split(",").map((u: string) => ({ url: u.trim(), title: null })).filter((a: { url: string; title: null }) => a.url);
+        })(),
         archived: taskArchived,
       },
     });

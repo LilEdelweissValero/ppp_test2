@@ -51,6 +51,8 @@ function SortableTaskRow({
   editingCell,
   setEditingCell,
   selectRef,
+  onMouseEnter,
+  onMouseLeave,
 }: {
   task: Task;
   onEdit: () => void;
@@ -61,6 +63,8 @@ function SortableTaskRow({
   editingCell: { taskId: number; field: "status" | "priority" } | null;
   setEditingCell: (cell: { taskId: number; field: "status" | "priority" } | null) => void;
   selectRef: React.RefObject<HTMLSelectElement | null>;
+  onMouseEnter: (e: React.MouseEvent<HTMLTableRowElement>) => void;
+  onMouseLeave: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: task.id });
@@ -78,6 +82,8 @@ function SortableTaskRow({
       ref={setNodeRef}
       style={style}
       className="detail-task-row"
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
       <td style={{ width: 32 }}>
         <button
@@ -220,11 +226,26 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
     entityName: string;
   } | null>(null);
   const [archiveLoading, setArchiveLoading] = useState(false);
+  const [hoveredTask, setHoveredTask] = useState<Task | null>(null);
+  const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setCurrentProject(initialProject);
     setTasks(initialProject.tasks);
   }, [initialProject]);
+
+  function handleTaskMouseEnter(task: Task, e: React.MouseEvent<HTMLTableRowElement>) {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    const rect = e.currentTarget.getBoundingClientRect();
+    setTooltipPos({ top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX });
+    hoverTimerRef.current = setTimeout(() => setHoveredTask(task), 250);
+  }
+
+  function handleTaskMouseLeave() {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = setTimeout(() => setHoveredTask(null), 100);
+  }
 
   function updateProject(next: Project) {
     setCurrentProject(next);
@@ -553,6 +574,8 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                           editingCell={editingCell}
                           setEditingCell={setEditingCell}
                           selectRef={selectRef}
+                          onMouseEnter={(e) => handleTaskMouseEnter(task, e)}
+                          onMouseLeave={handleTaskMouseLeave}
                           />
                       ))}
                     </tbody>
@@ -617,7 +640,7 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
               status: editTask.status,
               targetQuarter: editTask.targetQuarter,
               deliverable: editTask.deliverable || "",
-              attachmentUrl: editTask.attachmentUrl || "",
+              attachments: editTask.attachments || [],
             }}
           />
         )}
@@ -670,6 +693,43 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
             entityId={archiveTarget.entityId}
             loading={archiveLoading}
           />
+        )}
+
+        {hoveredTask && (hoveredTask.description || (Array.isArray(hoveredTask.attachments) && hoveredTask.attachments.length > 0)) && (
+          <div
+            className="task-tooltip"
+            style={{ top: tooltipPos.top, left: tooltipPos.left }}
+            onMouseEnter={() => {
+              if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+            }}
+            onMouseLeave={handleTaskMouseLeave}
+          >
+            {hoveredTask.description && (
+              <div className="task-tooltip-section">
+                <span className="task-tooltip-label">Description</span>
+                <p className="task-tooltip-text">{hoveredTask.description}</p>
+              </div>
+            )}
+            {Array.isArray(hoveredTask.attachments) && hoveredTask.attachments.length > 0 && (
+              <div className="task-tooltip-section">
+                <span className="task-tooltip-label">Attachments</span>
+                <ul className="task-tooltip-links">
+                  {hoveredTask.attachments.map((att, i) => (
+                    <li key={i}>
+                      <a
+                        href={att.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="task-tooltip-link"
+                      >
+                        {att.title || att.url}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </main>

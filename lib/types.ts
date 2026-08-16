@@ -38,7 +38,7 @@ export interface Task {
   targetQuarter: string;
   adjustedTargetQuarter: string;
   deliverable: string | null;
-  attachmentUrl: string | null;
+  attachments: { url: string; title: string | null }[] | null;
 }
 
 export interface ProjectForDashboard {

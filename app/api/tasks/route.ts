@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     status,
     targetQuarter,
     deliverable,
-    attachmentUrl,
+    attachments,
   } = body;
 
   if (!projectId) {
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
       targetQuarter,
       adjustedTargetQuarter: targetQuarter,
       deliverable: deliverable || null,
-      attachmentUrl: attachmentUrl || null,
+      attachments: attachments || null,
     },
   });
   await Promise.all([

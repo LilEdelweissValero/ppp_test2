@@ -5,10 +5,15 @@ import Modal from "./Modal";
 import QuarterSelect from "./QuarterSelect";
 import { STATUS_LABELS, PRIORITY_LABELS } from "@/lib/status";
 
+interface Attachment {
+  title: string;
+  url: string;
+}
+
 interface Props {
   open: boolean;
   onClose: () => void;
-  onSave: (task: { id: number; taskCode: string; name: string; assignee: string | null; priority: string; status: string; description: string | null; dependencies: string | null; notes: string | null; targetQuarter: string; adjustedTargetQuarter: string; deliverable: string | null; attachmentUrl: string | null; projectId: number; sortOrder: number }) => void;
+  onSave: (task: { id: number; taskCode: string; name: string; assignee: string | null; priority: string; status: string; description: string | null; dependencies: string | null; notes: string | null; targetQuarter: string; adjustedTargetQuarter: string; deliverable: string | null; attachments: { url: string; title: string | null }[] | null; projectId: number; sortOrder: number }) => void;
   projectId: number;
   initialData?: {
     id: number;
@@ -22,7 +27,7 @@ interface Props {
     status: string;
     targetQuarter: string;
     deliverable: string;
-    attachmentUrl: string;
+    attachments: { url: string; title: string | null }[];
   };
 }
 
@@ -54,8 +59,8 @@ export default function TaskFormModal({
   const [deliverable, setDeliverable] = useState(
     initialData?.deliverable || ""
   );
-  const [attachmentUrl, setAttachmentUrl] = useState(
-    initialData?.attachmentUrl || ""
+  const [attachments, setAttachments] = useState<Attachment[]>(
+    initialData?.attachments?.map(a => ({ title: a.title || "", url: a.url })) || [{ title: "", url: "" }]
   );
   const [serverError, setServerError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -76,7 +81,11 @@ export default function TaskFormModal({
         setStatus("Not Yet Started");
         setTargetQuarter("");
         setDeliverable("");
-        setAttachmentUrl("");
+        setAttachments([{ title: "", url: "" }]);
+      } else if (initialData) {
+        setAttachments(
+          initialData.attachments?.map(a => ({ title: a.title || "", url: a.url })) || [{ title: "", url: "" }]
+        );
       }
       setServerError("");
       setSubmitted(false);
@@ -89,7 +98,24 @@ export default function TaskFormModal({
   const taskCodeInvalid = submitted && !taskCode.trim();
   const nameInvalid = submitted && !name.trim();
   const quarterInvalid = submitted && !targetQuarter;
-  const attachmentInvalid = submitted && attachmentUrl !== "" && !/^https?:\/\//.test(attachmentUrl);
+
+  function isUrlValid(url: string): boolean {
+    return url === "" || /^https?:\/\//.test(url);
+  }
+
+  function updateAttachment(index: number, field: "title" | "url", value: string) {
+    setAttachments(prev => prev.map((a, i) => i === index ? { ...a, [field]: value } : a));
+  }
+
+  function addAttachment() {
+    setAttachments(prev => [...prev, { title: "", url: "" }]);
+  }
+
+  function removeAttachment(index: number) {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  }
+
+  const validAttachments = attachments.filter(a => a.url.trim() !== "");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -100,12 +126,19 @@ export default function TaskFormModal({
       return;
     }
 
-    if (attachmentUrl && !/^https?:\/\//.test(attachmentUrl)) {
-      setServerError("Attachment URL must start with http:// or https://");
-      return;
+    for (const att of attachments) {
+      if (att.url && !isUrlValid(att.url)) {
+        setServerError("All attachment URLs must start with http:// or https://");
+        return;
+      }
     }
 
     setLoading(true);
+
+    const attachmentsToSave = validAttachments.map(a => ({
+      url: a.url,
+      title: a.title || null,
+    }));
 
     try {
       const url = isEdit ? `/api/tasks/${initialData?.id}` : "/api/tasks";
@@ -126,7 +159,7 @@ export default function TaskFormModal({
           status,
           targetQuarter,
           deliverable,
-          attachmentUrl: attachmentUrl || null,
+          attachments: attachmentsToSave.length > 0 ? attachmentsToSave : null,
         }),
       });
 
@@ -145,7 +178,35 @@ export default function TaskFormModal({
     }
   }
 
-  const hasOptionalContent = description || dependencies || deliverable || attachmentUrl || notes;
+  const hasOptionalContent = description || dependencies || deliverable || validAttachments.length > 0 || notes;
+
+  const inputStyle = (invalid?: boolean): React.CSSProperties => ({
+    width: "100%",
+    border: `1px solid ${invalid ? "#B91C1C" : "var(--rule-strong)"}`,
+    borderRadius: 3,
+    padding: "6px 10px",
+    fontSize: 12,
+    color: "var(--ink-primary)",
+    background: "var(--surface)",
+    outline: "none",
+  });
+
+  const labelStyle: React.CSSProperties = {
+    display: "block",
+    fontSize: 12,
+    fontWeight: 500,
+    color: "var(--ink-secondary)",
+    marginBottom: 4,
+  };
+
+  const sectionHeaderStyle: React.CSSProperties = {
+    fontSize: 10,
+    fontWeight: 600,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+    color: "var(--ink-tertiary)",
+    marginBottom: 8,
+  };
 
   return (
     <Modal
@@ -157,67 +218,30 @@ export default function TaskFormModal({
       <form onSubmit={handleSubmit}>
         {/* ── Section: Identity ── */}
         <div style={{ marginBottom: 16 }}>
-          <h3 style={{
-            fontSize: 10,
-            fontWeight: 600,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            color: "var(--ink-tertiary)",
-            marginBottom: 8,
-          }}>
+          <h3 style={sectionHeaderStyle}>
             Identity
           </h3>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
-              <label style={{
-                display: "block",
-                fontSize: 12,
-                fontWeight: 500,
-                color: "var(--ink-secondary)",
-                marginBottom: 4,
-              }}>
+              <label style={labelStyle}>
                 Task Code *
               </label>
               <input
                 type="text"
                 value={taskCode}
                 onChange={(e) => setTaskCode(e.target.value)}
-                style={{
-                  width: "100%",
-                  border: `1px solid ${taskCodeInvalid ? "#B91C1C" : "var(--rule-strong)"}`,
-                  borderRadius: 3,
-                  padding: "6px 10px",
-                  fontSize: 12,
-                  color: "var(--ink-primary)",
-                  background: "var(--surface)",
-                  outline: "none",
-                }}
+                style={inputStyle(taskCodeInvalid)}
               />
             </div>
             <div>
-              <label style={{
-                display: "block",
-                fontSize: 12,
-                fontWeight: 500,
-                color: "var(--ink-secondary)",
-                marginBottom: 4,
-              }}>
+              <label style={labelStyle}>
                 Name *
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                style={{
-                  width: "100%",
-                  border: `1px solid ${nameInvalid ? "#B91C1C" : "var(--rule-strong)"}`,
-                  borderRadius: 3,
-                  padding: "6px 10px",
-                  fontSize: 12,
-                  color: "var(--ink-primary)",
-                  background: "var(--surface)",
-                  outline: "none",
-                }}
+                style={inputStyle(nameInvalid)}
               />
             </div>
           </div>
@@ -225,66 +249,29 @@ export default function TaskFormModal({
 
         {/* ── Section: Assignment ── */}
         <div style={{ marginBottom: 16 }}>
-          <h3 style={{
-            fontSize: 10,
-            fontWeight: 600,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            color: "var(--ink-tertiary)",
-            marginBottom: 8,
-          }}>
+          <h3 style={sectionHeaderStyle}>
             Assignment
           </h3>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
-              <label style={{
-                display: "block",
-                fontSize: 12,
-                fontWeight: 500,
-                color: "var(--ink-secondary)",
-                marginBottom: 4,
-              }}>
+              <label style={labelStyle}>
                 Assignee
               </label>
               <input
                 type="text"
                 value={assignee}
                 onChange={(e) => setAssignee(e.target.value)}
-                style={{
-                  width: "100%",
-                  border: "1px solid var(--rule-strong)",
-                  borderRadius: 3,
-                  padding: "6px 10px",
-                  fontSize: 12,
-                  color: "var(--ink-primary)",
-                  background: "var(--surface)",
-                  outline: "none",
-                }}
+                style={inputStyle()}
               />
             </div>
             <div>
-              <label style={{
-                display: "block",
-                fontSize: 12,
-                fontWeight: 500,
-                color: "var(--ink-secondary)",
-                marginBottom: 4,
-              }}>
+              <label style={labelStyle}>
                 Priority
               </label>
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value)}
-                style={{
-                  width: "100%",
-                  border: "1px solid var(--rule-strong)",
-                  borderRadius: 3,
-                  padding: "6px 10px",
-                  fontSize: 12,
-                  color: "var(--ink-primary)",
-                  background: "var(--surface)",
-                  outline: "none",
-                }}
+                style={inputStyle()}
               >
                 {PRIORITY_LABELS.map((p) => (
                   <option key={p} value={p}>
@@ -296,28 +283,13 @@ export default function TaskFormModal({
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
             <div>
-              <label style={{
-                display: "block",
-                fontSize: 12,
-                fontWeight: 500,
-                color: "var(--ink-secondary)",
-                marginBottom: 4,
-              }}>
+              <label style={labelStyle}>
                 Status *
               </label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                style={{
-                  width: "100%",
-                  border: "1px solid var(--rule-strong)",
-                  borderRadius: 3,
-                  padding: "6px 10px",
-                  fontSize: 12,
-                  color: "var(--ink-primary)",
-                  background: "var(--surface)",
-                  outline: "none",
-                }}
+                style={inputStyle()}
               >
                 {STATUS_LABELS.map((s) => (
                   <option key={s} value={s}>
@@ -384,13 +356,7 @@ export default function TaskFormModal({
           {showDetails && (
             <div style={{ paddingTop: 8 }}>
               <div style={{ marginBottom: 12 }}>
-                <label style={{
-                  display: "block",
-                  fontSize: 12,
-                  fontWeight: 500,
-                  color: "var(--ink-secondary)",
-                  marginBottom: 4,
-                }}>
+                <label style={labelStyle}>
                   Description
                 </label>
                 <textarea
@@ -398,69 +364,32 @@ export default function TaskFormModal({
                   onChange={(e) => setDescription(e.target.value)}
                   rows={3}
                   style={{
-                    width: "100%",
-                    border: "1px solid var(--rule-strong)",
-                    borderRadius: 3,
-                    padding: "6px 10px",
-                    fontSize: 12,
-                    color: "var(--ink-primary)",
-                    background: "var(--surface)",
-                    outline: "none",
+                    ...inputStyle(),
                     resize: "vertical",
                   }}
                 />
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label style={{
-                    display: "block",
-                    fontSize: 12,
-                    fontWeight: 500,
-                    color: "var(--ink-secondary)",
-                    marginBottom: 4,
-                  }}>
+                  <label style={labelStyle}>
                     Dependencies
                   </label>
                   <input
                     type="text"
                     value={dependencies}
                     onChange={(e) => setDependencies(e.target.value)}
-                    style={{
-                      width: "100%",
-                      border: "1px solid var(--rule-strong)",
-                      borderRadius: 3,
-                      padding: "6px 10px",
-                      fontSize: 12,
-                      color: "var(--ink-primary)",
-                      background: "var(--surface)",
-                      outline: "none",
-                    }}
+                    style={inputStyle()}
                   />
                 </div>
                 <div>
-                  <label style={{
-                    display: "block",
-                    fontSize: 12,
-                    fontWeight: 500,
-                    color: "var(--ink-secondary)",
-                    marginBottom: 4,
-                  }}>
+                  <label style={labelStyle}>
                     Deliverable
                   </label>
                   <input
                     type="text"
                     value={deliverable}
                     onChange={(e) => setDeliverable(e.target.value)}
-                    style={{
-                      width: "100%",
-                      border: "1px solid var(--rule-strong)",
-                      borderRadius: 3,
-                      padding: "6px 10px",
-                      fontSize: 12,
-                      color: "var(--ink-primary)",
-                      background: "var(--surface)",
-                      outline: "none",
-                    }}
+                    style={inputStyle()}
                   />
                 </div>
               </div>
@@ -506,40 +435,54 @@ export default function TaskFormModal({
           {showAdditional && (
             <div style={{ paddingTop: 8 }}>
               <div style={{ marginBottom: 12 }}>
-                <label style={{
-                  display: "block",
-                  fontSize: 12,
-                  fontWeight: 500,
-                  color: "var(--ink-secondary)",
-                  marginBottom: 4,
-                }}>
-                  Attachment URL
+                <label style={labelStyle}>
+                  Attachments
                 </label>
-                <input
-                  type="url"
-                  value={attachmentUrl}
-                  onChange={(e) => setAttachmentUrl(e.target.value)}
-                  placeholder="https://..."
-                  style={{
-                    width: "100%",
-                    border: `1px solid ${attachmentInvalid ? "#B91C1C" : "var(--rule-strong)"}`,
-                    borderRadius: 3,
-                    padding: "6px 10px",
-                    fontSize: 12,
-                    color: "var(--ink-primary)",
-                    background: "var(--surface)",
-                    outline: "none",
-                  }}
-                />
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {attachments.map((att, index) => (
+                    <div key={index} className="attachment-row">
+                      <input
+                        type="text"
+                        value={att.title}
+                        onChange={(e) => updateAttachment(index, "title", e.target.value)}
+                        placeholder="Display Title (optional)"
+                        style={{
+                          ...inputStyle(),
+                          flex: "0 0 200px",
+                        }}
+                      />
+                      <input
+                        type="url"
+                        value={att.url}
+                        onChange={(e) => updateAttachment(index, "url", e.target.value)}
+                        placeholder="https://..."
+                        style={{
+                          ...inputStyle(att.url !== "" && !isUrlValid(att.url)),
+                          flex: 1,
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(index)}
+                        className="attachment-remove-btn"
+                        disabled={attachments.length === 1}
+                        title="Remove URL"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={addAttachment}
+                  className="attachment-add-btn"
+                >
+                  + Add URL
+                </button>
               </div>
               <div>
-                <label style={{
-                  display: "block",
-                  fontSize: 12,
-                  fontWeight: 500,
-                  color: "var(--ink-secondary)",
-                  marginBottom: 4,
-                }}>
+                <label style={labelStyle}>
                   Notes
                 </label>
                 <textarea
@@ -547,14 +490,7 @@ export default function TaskFormModal({
                   onChange={(e) => setNotes(e.target.value)}
                   rows={2}
                   style={{
-                    width: "100%",
-                    border: "1px solid var(--rule-strong)",
-                    borderRadius: 3,
-                    padding: "6px 10px",
-                    fontSize: 12,
-                    color: "var(--ink-primary)",
-                    background: "var(--surface)",
-                    outline: "none",
+                    ...inputStyle(),
                     resize: "vertical",
                   }}
                 />

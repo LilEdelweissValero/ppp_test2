@@ -36,7 +36,7 @@ export async function GET() {
       status: true,
       targetQuarter: true,
       deliverable: true,
-      attachmentUrl: true,
+      attachments: true,
       archived: true,
       project: {
         select: {
@@ -75,7 +75,9 @@ export async function GET() {
     t.status,
     t.targetQuarter,
     t.deliverable ?? "",
-    t.attachmentUrl ?? "",
+    Array.isArray(t.attachments)
+      ? t.attachments.map((a: { url: string; title?: string | null }) => a.url).join(", ")
+      : "",
     t.archived ? "TRUE" : "FALSE",
   ]);
 

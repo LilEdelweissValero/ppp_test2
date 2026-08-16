@@ -61,7 +61,7 @@ model Task {
   targetQuarter         String   @map("target_quarter")
   adjustedTargetQuarter String   @map("adjusted_target_quarter")
   deliverable           String?
-  attachmentUrl         String?  @map("attachment_url")
+  attachments           Json?    @map("attachments")
   archived              Boolean  @default(false)
 
   @@index([projectId])
