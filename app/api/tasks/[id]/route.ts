@@ -59,7 +59,7 @@ export async function PATCH(
     }
   }
 
-  const updateData: Record<string, string | boolean | null> = {};
+  const updateData: Record<string, string | boolean | null | { url: string; title: string | null }[]> = {};
   if (taskCode !== undefined) updateData.taskCode = taskCode.trim();
   if (name !== undefined) updateData.name = name.trim();
   if (assignee !== undefined) updateData.assignee = assignee || null;
@@ -73,7 +73,7 @@ export async function PATCH(
   if (deliverable !== undefined) updateData.deliverable = deliverable || null;
   if (attachments !== undefined) {
     updateData.attachments = Array.isArray(attachments) && attachments.length > 0
-      ? JSON.stringify(attachments)
+      ? attachments
       : null;
   }
   if (archived !== undefined && typeof archived === "boolean") updateData.archived = archived;
