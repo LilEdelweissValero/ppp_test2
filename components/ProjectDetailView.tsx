@@ -63,6 +63,7 @@ function SortableTaskRow({
   editingCell,
   setEditingCell,
   selectRef,
+  tabTransitioning,
   onMouseEnter,
   onMouseLeave,
 }: {
@@ -71,10 +72,11 @@ function SortableTaskRow({
   onChangeQuarter: () => void;
   onViewHistory: () => void;
   onArchive: () => void;
-  onInlineSave: (taskId: number, field: "status" | "priority", value: string) => void;
+  onInlineSave: (taskId: number, field: "status" | "priority", value: string, nextCell?: { taskId: number; field: "status" | "priority" }) => void;
   editingCell: { taskId: number; field: "status" | "priority" } | null;
   setEditingCell: (cell: { taskId: number; field: "status" | "priority" } | null) => void;
   selectRef: React.RefObject<HTMLSelectElement | null>;
+  tabTransitioning: React.MutableRefObject<boolean>;
   onMouseEnter: (e: React.MouseEvent<HTMLTableRowElement>) => void;
   onMouseLeave: () => void;
 }) {
@@ -121,11 +123,19 @@ function SortableTaskRow({
             ref={selectRef}
             autoFocus
             defaultValue={task.priority}
-            onBlur={(e) => onInlineSave(task.id, "priority", e.target.value)}
+            onBlur={(e) => {
+              if (!tabTransitioning.current) onInlineSave(task.id, "priority", e.target.value);
+              else tabTransitioning.current = false;
+            }}
             onKeyDown={(e) => {
               if (e.key === "Escape") setEditingCell(null);
               if (e.key === "Enter") {
                 onInlineSave(task.id, "priority", (e.target as HTMLSelectElement).value);
+              }
+              if (e.key === "Tab") {
+                e.preventDefault();
+                tabTransitioning.current = true;
+                onInlineSave(task.id, "priority", (e.target as HTMLSelectElement).value, { taskId: task.id, field: "status" });
               }
             }}
             className="detail-inline-select"
@@ -150,11 +160,24 @@ function SortableTaskRow({
             ref={selectRef}
             autoFocus
             defaultValue={task.status}
-            onBlur={(e) => onInlineSave(task.id, "status", e.target.value)}
+            onBlur={(e) => {
+              if (!tabTransitioning.current) onInlineSave(task.id, "status", e.target.value);
+              else tabTransitioning.current = false;
+            }}
             onKeyDown={(e) => {
               if (e.key === "Escape") setEditingCell(null);
               if (e.key === "Enter") {
                 onInlineSave(task.id, "status", (e.target as HTMLSelectElement).value);
+              }
+              if (e.key === "Tab" && !e.shiftKey) {
+                e.preventDefault();
+                tabTransitioning.current = true;
+                onInlineSave(task.id, "status", (e.target as HTMLSelectElement).value);
+              }
+              if (e.key === "Tab" && e.shiftKey) {
+                e.preventDefault();
+                tabTransitioning.current = true;
+                onInlineSave(task.id, "status", (e.target as HTMLSelectElement).value, { taskId: task.id, field: "priority" });
               }
             }}
             className="detail-inline-select"
@@ -246,6 +269,7 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
   const [hoveredTask, setHoveredTask] = useState<Task | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tabTransitioning = useRef(false);
   const [editSpecialTask, setEditSpecialTask] = useState<CachedSpecialTask | null>(null);
   const [changeSpecialTaskQuarter, setChangeSpecialTaskQuarter] = useState<CachedSpecialTask | null>(null);
   const [editingSpecialCell, setEditingSpecialCell] = useState<{
@@ -391,10 +415,11 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
   async function handleInlineSave(
     taskId: number,
     field: "status" | "priority",
-    value: string
+    value: string,
+    nextCell?: { taskId: number; field: "status" | "priority" }
   ) {
     const previousTasks = tasks;
-    setEditingCell(null);
+    setEditingCell(nextCell ?? null);
     updateTasks(tasks.map((t) => (t.id === taskId ? { ...t, [field]: value } : t)));
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
@@ -411,10 +436,11 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
   async function handleSpecialInlineSave(
     taskId: number,
     field: string,
-    value: number | string
+    value: number | string,
+    nextCell?: { taskId: number; field: string }
   ) {
     const previousSpecialTasks = specialTasks;
-    setEditingSpecialCell(null);
+    setEditingSpecialCell(nextCell ?? null);
     updateSpecialTasks(specialTasks.map((st) => (st.id === taskId ? { ...st, [field]: value } : st)));
     try {
       const task = specialTasks.find((st) => st.id === taskId);
@@ -642,6 +668,7 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                           editingCell={editingCell}
                           setEditingCell={setEditingCell}
                           selectRef={selectRef}
+                          tabTransitioning={tabTransitioning}
                           onMouseEnter={(e) => handleTaskMouseEnter(task, e)}
                           onMouseLeave={handleTaskMouseLeave}
                           />
@@ -655,6 +682,7 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
         </section>
 
         {/* ── Special Tasks Section ── */}
+        {specialTasks.length > 0 && (
         <section className="detail-task-panel" aria-labelledby="special-tasks-title">
           <div className="detail-task-header">
             <div>
@@ -665,7 +693,6 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
             </div>
           </div>
 
-          {specialTasks.length > 0 && (
             <div className="overflow-x-auto">
               <table className="detail-task-table">
                 <thead>
@@ -714,10 +741,23 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                               defaultValue={st.nys}
                               autoFocus
                               className="detail-inline-input"
-                              onBlur={(e) => handleSpecialInlineSave(st.id, "nys", parseInt(e.target.value) || 0)}
+                              onBlur={(e) => {
+                                if (!tabTransitioning.current) handleSpecialInlineSave(st.id, "nys", parseInt(e.target.value) || 0);
+                                else tabTransitioning.current = false;
+                              }}
                               onKeyDown={(e) => {
                                 if (e.key === "Escape") setEditingSpecialCell(null);
                                 if (e.key === "Enter") handleSpecialInlineSave(st.id, "nys", parseInt((e.target as HTMLInputElement).value) || 0);
+                                if (e.key === "Tab" && !e.shiftKey) {
+                                  e.preventDefault();
+                                  tabTransitioning.current = true;
+                                  handleSpecialInlineSave(st.id, "nys", parseInt((e.target as HTMLInputElement).value) || 0, { taskId: st.id, field: "plan" });
+                                }
+                                if (e.key === "Tab" && e.shiftKey) {
+                                  e.preventDefault();
+                                  tabTransitioning.current = true;
+                                  handleSpecialInlineSave(st.id, "nys", parseInt((e.target as HTMLInputElement).value) || 0);
+                                }
                               }}
                               style={{ width: 45, fontSize: 11, textAlign: "center" }}
                             />
@@ -737,10 +777,23 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                               defaultValue={st.plan}
                               autoFocus
                               className="detail-inline-input"
-                              onBlur={(e) => handleSpecialInlineSave(st.id, "plan", parseInt(e.target.value) || 0)}
+                              onBlur={(e) => {
+                                if (!tabTransitioning.current) handleSpecialInlineSave(st.id, "plan", parseInt(e.target.value) || 0);
+                                else tabTransitioning.current = false;
+                              }}
                               onKeyDown={(e) => {
                                 if (e.key === "Escape") setEditingSpecialCell(null);
                                 if (e.key === "Enter") handleSpecialInlineSave(st.id, "plan", parseInt((e.target as HTMLInputElement).value) || 0);
+                                if (e.key === "Tab" && !e.shiftKey) {
+                                  e.preventDefault();
+                                  tabTransitioning.current = true;
+                                  handleSpecialInlineSave(st.id, "plan", parseInt((e.target as HTMLInputElement).value) || 0, { taskId: st.id, field: "part" });
+                                }
+                                if (e.key === "Tab" && e.shiftKey) {
+                                  e.preventDefault();
+                                  tabTransitioning.current = true;
+                                  handleSpecialInlineSave(st.id, "plan", parseInt((e.target as HTMLInputElement).value) || 0, { taskId: st.id, field: "nys" });
+                                }
                               }}
                               style={{ width: 45, fontSize: 11, textAlign: "center" }}
                             />
@@ -760,10 +813,23 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                               defaultValue={st.part}
                               autoFocus
                               className="detail-inline-input"
-                              onBlur={(e) => handleSpecialInlineSave(st.id, "part", parseInt(e.target.value) || 0)}
+                              onBlur={(e) => {
+                                if (!tabTransitioning.current) handleSpecialInlineSave(st.id, "part", parseInt(e.target.value) || 0);
+                                else tabTransitioning.current = false;
+                              }}
                               onKeyDown={(e) => {
                                 if (e.key === "Escape") setEditingSpecialCell(null);
                                 if (e.key === "Enter") handleSpecialInlineSave(st.id, "part", parseInt((e.target as HTMLInputElement).value) || 0);
+                                if (e.key === "Tab" && !e.shiftKey) {
+                                  e.preventDefault();
+                                  tabTransitioning.current = true;
+                                  handleSpecialInlineSave(st.id, "part", parseInt((e.target as HTMLInputElement).value) || 0, { taskId: st.id, field: "mostly" });
+                                }
+                                if (e.key === "Tab" && e.shiftKey) {
+                                  e.preventDefault();
+                                  tabTransitioning.current = true;
+                                  handleSpecialInlineSave(st.id, "part", parseInt((e.target as HTMLInputElement).value) || 0, { taskId: st.id, field: "plan" });
+                                }
                               }}
                               style={{ width: 45, fontSize: 11, textAlign: "center" }}
                             />
@@ -783,10 +849,23 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                               defaultValue={st.mostly}
                               autoFocus
                               className="detail-inline-input"
-                              onBlur={(e) => handleSpecialInlineSave(st.id, "mostly", parseInt(e.target.value) || 0)}
+                              onBlur={(e) => {
+                                if (!tabTransitioning.current) handleSpecialInlineSave(st.id, "mostly", parseInt(e.target.value) || 0);
+                                else tabTransitioning.current = false;
+                              }}
                               onKeyDown={(e) => {
                                 if (e.key === "Escape") setEditingSpecialCell(null);
                                 if (e.key === "Enter") handleSpecialInlineSave(st.id, "mostly", parseInt((e.target as HTMLInputElement).value) || 0);
+                                if (e.key === "Tab" && !e.shiftKey) {
+                                  e.preventDefault();
+                                  tabTransitioning.current = true;
+                                  handleSpecialInlineSave(st.id, "mostly", parseInt((e.target as HTMLInputElement).value) || 0, { taskId: st.id, field: "done" });
+                                }
+                                if (e.key === "Tab" && e.shiftKey) {
+                                  e.preventDefault();
+                                  tabTransitioning.current = true;
+                                  handleSpecialInlineSave(st.id, "mostly", parseInt((e.target as HTMLInputElement).value) || 0, { taskId: st.id, field: "part" });
+                                }
                               }}
                               style={{ width: 50, fontSize: 11, textAlign: "center" }}
                             />
@@ -806,10 +885,23 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                               defaultValue={st.done}
                               autoFocus
                               className="detail-inline-input"
-                              onBlur={(e) => handleSpecialInlineSave(st.id, "done", parseInt(e.target.value) || 0)}
+                              onBlur={(e) => {
+                                if (!tabTransitioning.current) handleSpecialInlineSave(st.id, "done", parseInt(e.target.value) || 0);
+                                else tabTransitioning.current = false;
+                              }}
                               onKeyDown={(e) => {
                                 if (e.key === "Escape") setEditingSpecialCell(null);
                                 if (e.key === "Enter") handleSpecialInlineSave(st.id, "done", parseInt((e.target as HTMLInputElement).value) || 0);
+                                if (e.key === "Tab" && !e.shiftKey) {
+                                  e.preventDefault();
+                                  tabTransitioning.current = true;
+                                  handleSpecialInlineSave(st.id, "done", parseInt((e.target as HTMLInputElement).value) || 0);
+                                }
+                                if (e.key === "Tab" && e.shiftKey) {
+                                  e.preventDefault();
+                                  tabTransitioning.current = true;
+                                  handleSpecialInlineSave(st.id, "done", parseInt((e.target as HTMLInputElement).value) || 0, { taskId: st.id, field: "mostly" });
+                                }
                               }}
                               style={{ width: 45, fontSize: 11, textAlign: "center" }}
                             />
@@ -877,8 +969,8 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                 </tbody>
               </table>
             </div>
-          )}
         </section>
+        )}
 
         <ProjectFormModal
           open={showEditProject}
