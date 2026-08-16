@@ -1004,7 +1004,7 @@ function ActionsMenu({
   const items = [
     { label: "Manage Frameworks", action: onManageFrameworks },
     { label: "Manage Programs", action: onManagePrograms },
-    { label: "Import Excel", action: onImportExcel },
+    { label: "Import / Export Excel", action: onImportExcel },
     { label: "History Log", action: onHistoryLog },
     { label: "View Archive", action: onViewArchive },
   ];
@@ -1519,7 +1519,7 @@ export default function DashboardView({
           </p>
           {!search && (
             <p style={{ fontSize: 12, color: "var(--ink-tertiary)" }}>
-              Click &quot;Add Project&quot; or use Manage → Import Excel to get started.
+              Click &quot;Add Project&quot; or use Manage → Import / Export Excel to get started.
             </p>
           )}
         </div>

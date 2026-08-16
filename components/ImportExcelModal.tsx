@@ -22,6 +22,7 @@ interface Props {
 export default function ImportExcelModal({ open, onClose, onSave }: Props) {
   const [result, setResult] = useState<ImportResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -86,58 +87,110 @@ export default function ImportExcelModal({ open, onClose, onSave }: Props) {
     }
   }
 
+  async function handleExport() {
+    setExporting(true);
+    setError("");
+    try {
+      const res = await fetch("/api/export");
+      if (!res.ok) throw new Error("Failed to export");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "ppp_tracker_export.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      setError("Failed to export tasks");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
-    <Modal open={open} onClose={onClose} title="Import Excel">
+    <Modal open={open} onClose={onClose} title="Import / Export Excel">
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <p style={{ fontSize: 12, color: "var(--ink-secondary)", margin: 0 }}>
-          Upload an Excel file (.xlsx) with the following columns:
-        </p>
-        <pre
-          style={{
-            background: "var(--ground)",
-            border: "1px solid var(--rule)",
-            borderRadius: 3,
-            padding: 12,
-            fontSize: 11,
-            overflowX: "auto",
-            maxHeight: 128,
-            overflowY: "auto",
-            margin: 0,
-          }}
-        >
-          {`framework_name, program_name, project_name, project_reference,
-project_owner, project_target_quarter, task_code, task_name,
-task_assignee, task_priority, task_description, task_dependencies,
-task_notes, task_status, task_target_quarter, task_deliverable,
-task_attachment_url, task_archived`}
-        </pre>
+        {/* ── Import section ── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <button
+            onClick={handleDownloadTemplate}
+            style={{
+              fontSize: 12,
+              color: "var(--accent)",
+              textDecoration: "underline",
+              background: "none",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              textAlign: "left",
+              width: "fit-content",
+            }}
+          >
+            Download Excel Template
+          </button>
 
-        <button
-          onClick={handleDownloadTemplate}
-          style={{
-            fontSize: 12,
-            color: "var(--accent)",
-            textDecoration: "underline",
-            background: "none",
-            border: "none",
-            padding: 0,
-            cursor: "pointer",
-            textAlign: "left",
-          }}
-        >
-          Download Excel Template
-        </button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".xlsx,.xls"
+              style={{
+                flex: 1,
+                fontSize: 12,
+                color: "var(--ink-tertiary)",
+              }}
+            />
+            <button
+              onClick={handleUpload}
+              disabled={loading}
+              style={{
+                padding: "7px 14px",
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#FFFFFF",
+                background: "var(--accent)",
+                border: "none",
+                borderRadius: 3,
+                cursor: loading ? "not-allowed" : "pointer",
+                opacity: loading ? 0.5 : 1,
+                flexShrink: 0,
+              }}
+            >
+              {loading ? "Importing..." : "Import"}
+            </button>
+          </div>
+        </div>
 
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".xlsx,.xls"
-          style={{
-            fontSize: 12,
-            color: "var(--ink-tertiary)",
-            width: "100%",
-          }}
-        />
+        {/* ── Divider ── */}
+        <hr style={{ border: "none", borderTop: "1px solid var(--rule)", margin: 0 }} />
+
+        {/* ── Export section ── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <p style={{ fontSize: 12, color: "var(--ink-secondary)", margin: 0 }}>
+            Export all existing tasks (including archived) to an Excel file.
+          </p>
+          <div>
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              style={{
+                padding: "7px 14px",
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#FFFFFF",
+                background: "var(--accent)",
+                border: "none",
+                borderRadius: 3,
+                cursor: exporting ? "not-allowed" : "pointer",
+                opacity: exporting ? 0.5 : 1,
+              }}
+            >
+              {exporting ? "Exporting..." : "Export"}
+            </button>
+          </div>
+        </div>
 
         {error && (
           <p style={{ fontSize: 12, color: "#B91C1C", margin: 0 }}>{error}</p>
@@ -194,8 +247,7 @@ task_attachment_url, task_archived`}
           style={{
             display: "flex",
             justifyContent: "flex-end",
-            gap: 8,
-            paddingTop: 8,
+            paddingTop: 4,
           }}
         >
           <button
@@ -213,25 +265,6 @@ task_attachment_url, task_archived`}
           >
             {result ? "Close" : "Cancel"}
           </button>
-          {!result && (
-            <button
-              onClick={handleUpload}
-              disabled={loading}
-              style={{
-                padding: "7px 12px",
-                fontSize: 12,
-                fontWeight: 600,
-                color: "#FFFFFF",
-                background: "var(--accent)",
-                border: "none",
-                borderRadius: 3,
-                cursor: loading ? "not-allowed" : "pointer",
-                opacity: loading ? 0.5 : 1,
-              }}
-            >
-              {loading ? "Importing..." : "Import"}
-            </button>
-          )}
         </div>
       </div>
     </Modal>
