@@ -3,7 +3,9 @@
 import { useState, useEffect } from "react";
 import Modal from "./Modal";
 import QuarterSelect from "./QuarterSelect";
-import { STATUS_LABELS, PRIORITY_LABELS } from "@/lib/status";
+import { PRIORITY_LABELS, getStatusList } from "@/lib/status";
+import { getDefaultSettings } from "@/lib/computation-settings";
+import type { ComputationSettings } from "@/lib/computation-settings";
 
 interface Attachment {
   title: string;
@@ -52,6 +54,17 @@ export default function TaskFormModal({
   const isSpecialEdit = !!initialSpecialData;
   const isSpecialMode = isSpecialEdit || false;
 
+  const [compSettings, setCompSettings] = useState<ComputationSettings | undefined>(undefined);
+
+  useEffect(() => {
+    fetch("/api/settings/computation")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setCompSettings(data);
+      })
+      .catch(() => {});
+  }, []);
+
   const [taskType, setTaskType] = useState<"normal" | "special">(isSpecialEdit ? "special" : "normal");
   const [taskCode, setTaskCode] = useState(initialData?.taskCode || initialSpecialData?.specialTaskCode || "");
   const [name, setName] = useState(initialData?.name || initialSpecialData?.name || "");
@@ -65,7 +78,7 @@ export default function TaskFormModal({
   );
   const [notes, setNotes] = useState(initialData?.notes || "");
   const [status, setStatus] = useState(
-    initialData?.status || "Not Yet Started"
+    initialData?.status || getDefaultSettings().statuses[0].name
   );
   const [targetQuarter, setTargetQuarter] = useState(
     initialData?.targetQuarter || initialSpecialData?.dueQuarter || ""
@@ -94,7 +107,7 @@ export default function TaskFormModal({
         setDescription("");
         setDependencies("");
         setNotes("");
-        setStatus("Not Yet Started");
+        setStatus(getDefaultSettings().statuses[0].name);
         setDeliverable("");
         setAttachments([{ title: "", url: "" }]);
       } else if (!isEdit) {
@@ -106,7 +119,7 @@ export default function TaskFormModal({
         setDescription("");
         setDependencies("");
         setNotes("");
-        setStatus("Not Yet Started");
+        setStatus(getDefaultSettings().statuses[0].name);
         setTargetQuarter("");
         setDeliverable("");
         setAttachments([{ title: "", url: "" }]);
@@ -379,9 +392,9 @@ export default function TaskFormModal({
                   onChange={(e) => setStatus(e.target.value)}
                   style={inputStyle()}
                 >
-                  {STATUS_LABELS.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
+                  {getStatusList(compSettings).map((s) => (
+                    <option key={s.id} value={s.name}>
+                      {s.name}
                     </option>
                   ))}
                 </select>

@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   computeProjectPercentComplete,
   computeProjectHealth,
-  computeTaskPercentDone,
 } from "@/lib/health";
+import type { ComputationSettings } from "@/lib/computation-settings";
 import HealthBadge from "@/components/HealthBadge";
 
 interface Task {
@@ -58,8 +58,18 @@ interface Props {
 
 export default function ArchivedView({ frameworks: initialFrameworks }: Props) {
   const router = useRouter();
-  const [frameworks, setFrameworks] = useState(initialFrameworks);
+  const [frameworks] = useState(initialFrameworks);
   const [loading, setLoading] = useState<number | null>(null);
+  const [compSettings, setCompSettings] = useState<ComputationSettings | undefined>(undefined);
+
+  useEffect(() => {
+    fetch("/api/settings/computation")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setCompSettings(data);
+      })
+      .catch(() => {});
+  }, []);
 
   const totalPrograms = frameworks.reduce((sum, fw) => sum + fw.programs.length, 0);
   const totalProjects = frameworks.reduce(
@@ -234,10 +244,10 @@ export default function ArchivedView({ frameworks: initialFrameworks }: Props) {
                   {/* Projects */}
                   {prog.projects.map((project) => {
                     const tasks = project.tasks;
-                    const pct = computeProjectPercentComplete(tasks);
+                    const pct = computeProjectPercentComplete(tasks, compSettings);
                     const health =
                       tasks.length > 0
-                        ? computeProjectHealth(pct * 100, project.adjustedTargetQuarter)
+                        ? computeProjectHealth(pct * 100, project.adjustedTargetQuarter, compSettings)
                         : null;
                     return (
                       <div

@@ -49,14 +49,17 @@ import {
   computeProjectHealth,
   computeProjectDerivedStatus,
 } from "@/lib/health";
-import { countTasksByStatus, countTasksByStatusForQuarter, STATUS_SCORES } from "@/lib/status";
+import { countTasksByStatus, getStatusScore } from "@/lib/status";
 import { compareQuarters, quarterRange } from "@/lib/quarters";
+import { getDefaultSettings } from "@/lib/computation-settings";
+import type { ComputationSettings } from "@/lib/computation-settings";
 import HealthBadge from "@/components/HealthBadge";
 import ProjectFormModal from "@/components/ProjectFormModal";
 import ManageFrameworksModal from "@/components/ManageFrameworksModal";
 import ManageProgramsModal from "@/components/ManageProgramsModal";
 import ImportExcelModal from "@/components/ImportExcelModal";
 import HistoryLogModal from "@/components/HistoryLogModal";
+import ComputationSettingsModal from "@/components/ComputationSettingsModal";
 import { usePortfolioCache } from "@/components/PortfolioCacheProvider";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -131,14 +134,24 @@ interface Props {
 
 const ALL_TIME = "all";
 
-// Short column labels (keep scannable in dense header)
-const STATUS_COLS = [
-  { key: "Not Yet Started", label: "NYS", title: "Not Yet Started", color: "#8896A8" },
-  { key: "In Progress, Planning or Initiated", label: "Plan.", title: "Planning / Initiated", color: "#1D4BAA" },
-  { key: "In Progress, Partial", label: "Part.", title: "In Progress, Partial", color: "#8B5200" },
-  { key: "In Progress, Mostly Done or Testing", label: "Mostly", title: "Mostly Done / Testing", color: "#0A5FA8" },
-  { key: "Complete or Verified", label: "Done", title: "Complete or Verified", color: "#1A6B3C" },
-] as const;
+// Short column labels derived from settings at render time
+const STATUS_COL_DEFAULTS = [
+  { id: "nys", label: "NYS", color: "#8896A8" },
+  { id: "plan", label: "Plan.", color: "#1D4BAA" },
+  { id: "part", label: "Part.", color: "#8B5200" },
+  { id: "most", label: "Mostly", color: "#0A5FA8" },
+  { id: "done", label: "Done", color: "#1A6B3C" },
+];
+
+function getStatusCols(settings?: ComputationSettings) {
+  const statuses = settings?.statuses ?? getDefaultSettings().statuses;
+  return statuses.map((s, i) => ({
+    key: s.name,
+    label: STATUS_COL_DEFAULTS[i]?.label ?? s.id,
+    title: s.name,
+    color: STATUS_COL_DEFAULTS[i]?.color ?? "#8896A8",
+  }));
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -147,15 +160,16 @@ function filterTasksByQuarter(tasks: Task[], selectedQuarter: string): Task[] {
   return tasks.filter((t) => t.adjustedTargetQuarter === selectedQuarter);
 }
 
-function expandSpecialTasksToVirtualTasks(specialTasks: SpecialTask[]): Task[] {
+function expandSpecialTasksToVirtualTasks(specialTasks: SpecialTask[], settings?: ComputationSettings): Task[] {
+  const statuses = settings?.statuses ?? getDefaultSettings().statuses;
   const virtuals: Task[] = [];
   for (const st of specialTasks) {
     const counts = [
-      { count: st.nys, status: "Not Yet Started" },
-      { count: st.plan, status: "In Progress, Planning or Initiated" },
-      { count: st.part, status: "In Progress, Partial" },
-      { count: st.mostly, status: "In Progress, Mostly Done or Testing" },
-      { count: st.done, status: "Complete or Verified" },
+      { count: st.nys, status: statuses[0].name },
+      { count: st.plan, status: statuses[1].name },
+      { count: st.part, status: statuses[2].name },
+      { count: st.mostly, status: statuses[3].name },
+      { count: st.done, status: statuses[4].name },
     ];
     for (const { count, status } of counts) {
       for (let i = 0; i < count; i++) {
@@ -185,10 +199,10 @@ function filterSpecialTasksByQuarter(specialTasks: SpecialTask[], selectedQuarte
   return specialTasks.filter((st) => st.dueQuarter === selectedQuarter);
 }
 
-function getAllTasksForProject(project: Project, selectedQuarter: string): Task[] {
+function getAllTasksForProject(project: Project, selectedQuarter: string, settings?: ComputationSettings): Task[] {
   const realTasks = filterTasksByQuarter(project.tasks, selectedQuarter);
   const filteredSpecial = filterSpecialTasksByQuarter(project.specialTasks || [], selectedQuarter);
-  const virtualTasks = expandSpecialTasksToVirtualTasks(filteredSpecial);
+  const virtualTasks = expandSpecialTasksToVirtualTasks(filteredSpecial, settings);
   return [...realTasks, ...virtualTasks];
 }
 
@@ -213,7 +227,8 @@ const PRIORITY_ORDINAL: Record<string, number> = {
 function compareSortValues(
   a: string | number | null,
   b: string | number | null,
-  type: "text" | "numeric" | "quarter" | "status" | "priority" | "health" | "date"
+  type: "text" | "numeric" | "quarter" | "status" | "priority" | "health" | "date",
+  settings?: ComputationSettings
 ): number {
   if (a == null && b == null) return 0;
   if (a == null) return 1;
@@ -226,7 +241,7 @@ function compareSortValues(
     case "quarter":
       return compareQuarters(String(a), String(b));
     case "status":
-      return (STATUS_SCORES[a as keyof typeof STATUS_SCORES] ?? 0) - (STATUS_SCORES[b as keyof typeof STATUS_SCORES] ?? 0);
+      return getStatusScore(String(a), settings) - getStatusScore(String(b), settings);
     case "priority":
       return (PRIORITY_ORDINAL[String(a)] ?? 0) - (PRIORITY_ORDINAL[String(b)] ?? 0);
     case "health":
@@ -241,30 +256,32 @@ function compareSortValues(
 function getSortValue(
   project: Project,
   key: string,
-  selectedQuarter: string
+  selectedQuarter: string,
+  settings?: ComputationSettings
 ): string | number | null {
-  const allTasks = getAllTasksForProject(project, selectedQuarter);
-  const counts = countTasksByStatus(allTasks);
+  const allTasks = getAllTasksForProject(project, selectedQuarter, settings);
+  const counts = countTasksByStatus(allTasks, settings);
+  const statusNames = settings?.statuses ?? getDefaultSettings().statuses;
   switch (key) {
     case "name": return project.name;
     case "programName": return project.programName ?? "";
     case "reference": return project.reference ?? "";
     case "owner": return project.owner ?? "";
     case "taskCount": return allTasks.length;
-    case "count_nys": return counts["Not Yet Started"];
-    case "count_plan": return counts["In Progress, Planning or Initiated"];
-    case "count_part": return counts["In Progress, Partial"];
-    case "count_mostly": return counts["In Progress, Mostly Done or Testing"];
-    case "count_done": return counts["Complete or Verified"];
+    case "count_nys": return counts[statusNames[0].name] ?? 0;
+    case "count_plan": return counts[statusNames[1].name] ?? 0;
+    case "count_part": return counts[statusNames[2].name] ?? 0;
+    case "count_mostly": return counts[statusNames[3].name] ?? 0;
+    case "count_done": return counts[statusNames[4].name] ?? 0;
     case "plannedQ": return project.targetQuarter;
     case "dueQ": return project.adjustedTargetQuarter;
     case "completionDate": return project.actualCompletionDate ?? "";
-    case "status": return computeProjectDerivedStatus(allTasks);
-    case "pct": return Math.round(computeProjectPercentComplete(allTasks) * 100);
+    case "status": return computeProjectDerivedStatus(allTasks, settings);
+    case "pct": return Math.round(computeProjectPercentComplete(allTasks, settings) * 100);
     case "health": {
-      const pct = computeProjectPercentComplete(allTasks) * 100;
+      const pct = computeProjectPercentComplete(allTasks, settings) * 100;
       if (allTasks.length === 0) return "";
-      return computeProjectHealth(pct, project.adjustedTargetQuarter) ?? "";
+      return computeProjectHealth(pct, project.adjustedTargetQuarter, settings) ?? "";
     }
     default: return "";
   }
@@ -304,16 +321,19 @@ function GripIcon() {
 function StatusMiniBar({
   counts,
   total,
+  settings,
 }: {
   counts: Record<string, number>;
   total: number;
+  settings?: ComputationSettings;
 }) {
+  const statusCols = getStatusCols(settings);
   if (total === 0) {
     return <span style={{ fontSize: 11, color: "var(--ink-tertiary)" }}>—</span>;
   }
   return (
     <div style={{ display: "flex", gap: 1, alignItems: "center", height: 8 }}>
-      {STATUS_COLS.map((sc) => {
+      {statusCols.map((sc) => {
         const pct = total > 0 ? (counts[sc.key] ?? 0) / total : 0;
         if (pct === 0) return null;
         return (
@@ -339,10 +359,13 @@ function StatusMiniBar({
 function TableHeader({
   sortConfig,
   onSort,
+  settings,
 }: {
   sortConfig: SortConfig;
   onSort: (key: string) => void;
+  settings?: ComputationSettings;
 }) {
+  const statusCols = getStatusCols(settings);
   const thStyle = (isMetric: boolean): React.CSSProperties => ({
     padding: "7px 10px",
     fontSize: 10,
@@ -404,7 +427,7 @@ function TableHeader({
         {sortableTh("Owner", "owner", thStyle(false), { width: 110, borderRight: "1px solid rgba(255,255,255,0.15)" })}
         {/* metric zone */}
         {sortableTh("#", "taskCount", thCenter(true), { width: 56 })}
-        {STATUS_COLS.map((sc, i) => {
+        {statusCols.map((sc, i) => {
           const keys = ["count_nys", "count_plan", "count_part", "count_mostly", "count_done"];
           return sortableTh(sc.label, keys[i], thCenter(true), { width: 56 });
         })}
@@ -425,27 +448,31 @@ function ProgramSummaryRow({
   program,
   selectedQuarter,
   accentColor,
+  settings,
 }: {
   program: Program;
   selectedQuarter: string;
   accentColor: string;
+  settings?: ComputationSettings;
 }) {
-  const allTasks = program.projects.flatMap((p) => getAllTasksForProject(p, selectedQuarter));
-  const counts = countTasksByStatus(allTasks);
+  const allTasks = program.projects.flatMap((p) => getAllTasksForProject(p, selectedQuarter, settings));
+  const counts = countTasksByStatus(allTasks, settings);
   const total = allTasks.length;
+  const statusNames = settings?.statuses ?? getDefaultSettings().statuses;
+  const statusCols = getStatusCols(settings);
 
   // Aggregate program-level metrics from projects (mean of project %'s)
   const projectPcts = program.projects
     .map((p) => {
-      const ft = getAllTasksForProject(p, selectedQuarter);
-      return ft.length > 0 ? computeProjectPercentComplete(ft) : null;
+      const ft = getAllTasksForProject(p, selectedQuarter, settings);
+      return ft.length > 0 ? computeProjectPercentComplete(ft, settings) : null;
     })
     .filter((p): p is number => p !== null);
   const programPct = projectPcts.length > 0
     ? projectPcts.reduce((a, b) => a + b, 0) / projectPcts.length
     : 0;
   const programPctRounded = Math.round(programPct * 100);
-  const programDerivedStatus = computeProjectDerivedStatus(allTasks);
+  const programDerivedStatus = computeProjectDerivedStatus(allTasks, settings);
 
   // Planned Q: earliest targetQuarter across projects
   const plannedQ = program.projects.length > 0
@@ -464,10 +491,11 @@ function ProgramSummaryRow({
     : "—";
 
   // Completion date: only show if ALL projects are fully complete
+  const doneStatusName = statusNames[4].name;
   const allProjectsComplete = program.projects.length > 0 &&
     program.projects.every((p) => {
-      const allP = getAllTasksForProject(p, selectedQuarter);
-      return allP.length > 0 && allP.every((t) => t.status === "Complete or Verified");
+      const allP = getAllTasksForProject(p, selectedQuarter, settings);
+      return allP.length > 0 && allP.every((t) => t.status === doneStatusName);
     });
   const completionDate = allProjectsComplete
     ? program.projects
@@ -480,7 +508,7 @@ function ProgramSummaryRow({
   // Health: computed from program % and latest due quarter
   const programHealth =
     allTasks.length > 0
-      ? computeProjectHealth(programPctRounded, dueQ)
+      ? computeProjectHealth(programPctRounded, dueQ, settings)
       : null;
 
   const programBg = `color-mix(in srgb, ${accentColor} 75%, white)`;
@@ -525,7 +553,7 @@ function ProgramSummaryRow({
         {total}
       </td>
       {/* status counts */}
-      {STATUS_COLS.map((sc) => (
+      {statusCols.map((sc) => (
         <td
           key={sc.key}
           style={{
@@ -533,12 +561,12 @@ function ProgramSummaryRow({
             textAlign: "center",
             fontSize: 11,
             fontVariantNumeric: "tabular-nums",
-            color: counts[sc.key] > 0 ? sc.color : "var(--ink-tertiary)",
-            fontWeight: counts[sc.key] > 0 ? 600 : 400,
+            color: (counts[sc.key] ?? 0) > 0 ? sc.color : "var(--ink-tertiary)",
+            fontWeight: (counts[sc.key] ?? 0) > 0 ? 600 : 400,
             background: programBg,
           }}
         >
-          {counts[sc.key]}
+          {counts[sc.key] ?? 0}
         </td>
       ))}
       {/* planned quarter */}
@@ -625,15 +653,19 @@ function ProgramSummaryRow({
 function FrameworkSummaryRow({
   framework,
   selectedQuarter,
+  settings,
 }: {
   framework: Framework;
   selectedQuarter: string;
+  settings?: ComputationSettings;
 }) {
   const allTasks = framework.programs.flatMap((prog) =>
-    prog.projects.flatMap((p) => getAllTasksForProject(p, selectedQuarter))
+    prog.projects.flatMap((p) => getAllTasksForProject(p, selectedQuarter, settings))
   );
-  const counts = countTasksByStatus(allTasks);
+  const counts = countTasksByStatus(allTasks, settings);
   const total = allTasks.length;
+  const statusCols = getStatusCols(settings);
+  const statusNames = settings?.statuses ?? getDefaultSettings().statuses;
 
   const allProjects = framework.programs.flatMap((prog) => prog.projects);
   const dueQ = allProjects.length > 0
@@ -643,12 +675,13 @@ function FrameworkSummaryRow({
       )
     : "—";
   const completionDate = (() => {
+    const doneStatusName = statusNames[4].name;
     const completeProgramDates = framework.programs
       .filter((prog) =>
         prog.projects.length > 0 &&
         prog.projects.every((p) => {
-          const allP = getAllTasksForProject(p, selectedQuarter);
-          return allP.length > 0 && allP.every((t) => t.status === "Complete or Verified");
+          const allP = getAllTasksForProject(p, selectedQuarter, settings);
+          return allP.length > 0 && allP.every((t) => t.status === doneStatusName);
         })
       )
       .flatMap((prog) =>
@@ -695,7 +728,7 @@ function FrameworkSummaryRow({
       >
         {total}
       </td>
-      {STATUS_COLS.map((sc) => (
+      {statusCols.map((sc) => (
         <td
           key={sc.key}
           style={{
@@ -703,11 +736,11 @@ function FrameworkSummaryRow({
             textAlign: "center",
             fontSize: 11,
             fontVariantNumeric: "tabular-nums",
-            color: counts[sc.key] > 0 ? sc.color : "var(--ink-tertiary)",
-            fontWeight: counts[sc.key] > 0 ? 600 : 400,
+            color: (counts[sc.key] ?? 0) > 0 ? sc.color : "var(--ink-tertiary)",
+            fontWeight: (counts[sc.key] ?? 0) > 0 ? 600 : 400,
           }}
         >
-          {counts[sc.key]}
+          {counts[sc.key] ?? 0}
         </td>
       ))}
       {/* planned Q — blank */}
@@ -752,6 +785,7 @@ function SortableProjectRow({
   isEven,
   programName,
   onProjectUpdate,
+  settings,
 }: {
   project: Project;
   onPrefetch: () => void;
@@ -760,6 +794,7 @@ function SortableProjectRow({
   isEven: boolean;
   programName: string;
   onProjectUpdate: (fields: Record<string, unknown>) => void;
+  settings?: ComputationSettings;
 }) {
   const [shouldPrefetch, setShouldPrefetch] = useState(false);
   const {
@@ -781,7 +816,7 @@ function SortableProjectRow({
     opacity: isDragging ? 0.4 : 1,
   };
 
-  const filteredTasks = getAllTasksForProject(project, selectedQuarter);
+  const filteredTasks = getAllTasksForProject(project, selectedQuarter, settings);
 
   const rowBg = hovered
     ? "var(--accent-bg)"
@@ -897,13 +932,14 @@ function SortableProjectRow({
       </tr>
     );
   }
-  const pct = computeProjectPercentComplete(filteredTasks);
+  const pct = computeProjectPercentComplete(filteredTasks, settings);
   const health =
     filteredTasks.length > 0
-      ? computeProjectHealth(pct * 100, project.adjustedTargetQuarter)
+      ? computeProjectHealth(pct * 100, project.adjustedTargetQuarter, settings)
       : null;
-  const counts = countTasksByStatus(filteredTasks);
-  const derivedStatus = computeProjectDerivedStatus(filteredTasks);
+  const counts = countTasksByStatus(filteredTasks, settings);
+  const derivedStatus = computeProjectDerivedStatus(filteredTasks, settings);
+  const statusCols = getStatusCols(settings);
   const pctRounded = Math.round(pct * 100);
 
   const metricBg = hovered
@@ -1084,17 +1120,17 @@ function SortableProjectRow({
       </td>
 
       {/* status breakdown */}
-      {STATUS_COLS.map((sc) => (
+      {statusCols.map((sc) => (
         <td
           key={sc.key}
           style={{
             ...tdMetric,
             width: 56,
-            color: counts[sc.key] > 0 ? sc.color : "var(--rule-strong)",
-            fontWeight: counts[sc.key] > 0 ? 600 : 400,
+            color: (counts[sc.key] ?? 0) > 0 ? sc.color : "var(--rule-strong)",
+            fontWeight: (counts[sc.key] ?? 0) > 0 ? 600 : 400,
           }}
         >
-          {counts[sc.key]}
+          {counts[sc.key] ?? 0}
         </td>
       ))}
 
@@ -1262,12 +1298,14 @@ function ActionsMenu({
   onImportExcel,
   onHistoryLog,
   onViewArchive,
+  onSettings,
 }: {
   onManageFrameworks: () => void;
   onManagePrograms: () => void;
   onImportExcel: () => void;
   onHistoryLog: () => void;
   onViewArchive: () => void;
+  onSettings: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -1288,6 +1326,7 @@ function ActionsMenu({
     { label: "Import / Export Excel", action: onImportExcel },
     { label: "History Log", action: onHistoryLog },
     { label: "View Archive", action: onViewArchive },
+    { label: "Settings", action: onSettings },
   ];
 
   return (
@@ -1405,8 +1444,20 @@ export default function DashboardView({
   const [showManagePrograms, setShowManagePrograms] = useState(false);
   const [showImportExcel, setShowImportExcel] = useState(false);
   const [showHistoryLog, setShowHistoryLog] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [compSettings, setCompSettings] = useState<ComputationSettings | undefined>(undefined);
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
   const deferredSearch = useDeferredValue(search);
+
+  // Fetch computation settings
+  useEffect(() => {
+    fetch("/api/settings/computation")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setCompSettings(data);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     setPortfolio(frameworks);
@@ -1776,6 +1827,7 @@ export default function DashboardView({
             onImportExcel={() => setShowImportExcel(true)}
             onHistoryLog={() => setShowHistoryLog(true)}
             onViewArchive={() => router.push("/archived")}
+            onSettings={() => setShowSettings(true)}
           />
         </div>
       </div>
@@ -1933,16 +1985,16 @@ export default function DashboardView({
 
                   {/* Framework aggregate stats */}
                   {hasProjects && hasTasksInQuarter && (() => {
-                    const allTasks = allProjects.flatMap((p) => getAllTasksForProject(p, selectedQuarter));
-                    const counts = countTasksByStatus(allTasks);
+                    const allTasks = allProjects.flatMap((p) => getAllTasksForProject(p, selectedQuarter, compSettings));
+                    const counts = countTasksByStatus(allTasks, compSettings);
                     const total = allTasks.length;
                     // Framework % = mean of programs' % (each program % = mean of its projects' %)
                     const programPcts = fw.programs
                       .map((prog) => {
                         const projPcts = prog.projects
                           .map((p) => {
-                            const ft = getAllTasksForProject(p, selectedQuarter);
-                            return ft.length > 0 ? computeProjectPercentComplete(ft) : null;
+                            const ft = getAllTasksForProject(p, selectedQuarter, compSettings);
+                            return ft.length > 0 ? computeProjectPercentComplete(ft, compSettings) : null;
                           })
                           .filter((p): p is number => p !== null);
                         return projPcts.length > 0
@@ -1959,14 +2011,14 @@ export default function DashboardView({
                         ? computeProjectHealth(fwPctRounded, allProjects.reduce((latest, p) =>
                             p.adjustedTargetQuarter > latest ? p.adjustedTargetQuarter : latest,
                             allProjects[0].adjustedTargetQuarter
-                          ))
+                          ), compSettings)
                         : null;
                     return (
                       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                         <span style={{ fontSize: 11, color: "var(--ink-tertiary)" }}>
                           {total} task{total !== 1 ? "s" : ""}
                         </span>
-                        <StatusMiniBar counts={counts} total={total} />
+                        <StatusMiniBar counts={counts} total={total} settings={compSettings} />
                         <span
                           style={{
                             fontSize: 11,
@@ -2003,9 +2055,10 @@ export default function DashboardView({
                           <FrameworkSummaryRow
                             framework={fw}
                             selectedQuarter={selectedQuarter}
+                            settings={compSettings}
                           />
                         </thead>
-                        <TableHeader sortConfig={sortConfig} onSort={handleSort} />
+                        <TableHeader sortConfig={sortConfig} onSort={handleSort} settings={compSettings} />
                         <tbody>
 
                           {/* Programs + their projects */}
@@ -2037,6 +2090,7 @@ export default function DashboardView({
                                   program={prog}
                                   selectedQuarter={selectedQuarter}
                                   accentColor={fw.color}
+                                  settings={compSettings}
                                 />
                                 {/* Project rows */}
                                 {sortedProjects.map((project, rowIdx) => (
@@ -2054,6 +2108,7 @@ export default function DashboardView({
                                       const cached = getProject(project.id);
                                       if (cached) setProject({ ...cached, ...fields });
                                     }}
+                                    settings={compSettings}
                                   />
                                 ))}
                               </SortableContext>
@@ -2130,6 +2185,10 @@ export default function DashboardView({
           onClose={() => setShowHistoryLog(false)}
         />
       )}
+      <ComputationSettingsModal
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+      />
     </div>
   );
 }

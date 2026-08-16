@@ -1,9 +1,7 @@
 "use client";
 
-import { HealthStatus } from "@/lib/health";
-
 const HEALTH_STYLES: Record<
-  HealthStatus,
+  string,
   { bg: string; ink: string; dot: string; label: string }
 > = {
   Completed: {
@@ -41,7 +39,7 @@ const HEALTH_STYLES: Record<
 export default function HealthBadge({
   health,
 }: {
-  health: HealthStatus | null;
+  health: string | null;
 }) {
   if (!health) {
     return (

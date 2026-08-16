@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import * as XLSX from "xlsx";
 import { touchLastModified } from "@/lib/system-metadata";
 import { logChange } from "@/lib/audit-log";
+import { getSettings } from "@/lib/computation-settings";
 
 const EXCEL_COLUMNS = [
   "framework_name",
@@ -43,14 +44,6 @@ const SPECIAL_TASK_COLUMNS = [
   "due_quarter",
   "last_updated_date",
   "archived",
-];
-
-const VALID_STATUSES = [
-  "Not Yet Started",
-  "In Progress, Planning or Initiated",
-  "In Progress, Partial",
-  "In Progress, Mostly Done or Testing",
-  "Complete or Verified",
 ];
 
 const VALID_PRIORITIES = ["Low", "Moderate", "High"];
@@ -148,6 +141,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const settings = await getSettings();
+  const validStatuses = settings.statuses.map((s) => s.name);
+
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
   if (!file) {
@@ -289,7 +285,7 @@ export async function POST(request: NextRequest) {
             );
             continue;
           }
-          if (!taskStatus || !VALID_STATUSES.includes(taskStatus)) {
+          if (!taskStatus || !validStatuses.includes(taskStatus)) {
             rowsSkipped++;
             errors.push(
               `Row ${rowNum}: invalid task_status "${taskStatus}"`

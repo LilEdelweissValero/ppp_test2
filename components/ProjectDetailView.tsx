@@ -24,7 +24,9 @@ import {
   computeProjectHealth,
   computeTaskPercentDone,
 } from "@/lib/health";
-import { STATUS_LABELS, PRIORITY_LABELS, STATUS_SCORES } from "@/lib/status";
+import { PRIORITY_LABELS, getStatusList, getStatusScore } from "@/lib/status";
+import { getDefaultSettings } from "@/lib/computation-settings";
+import type { ComputationSettings } from "@/lib/computation-settings";
 import { compareQuarters } from "@/lib/quarters";
 import HealthBadge from "@/components/HealthBadge";
 import ProjectFormModal from "@/components/ProjectFormModal";
@@ -37,14 +39,15 @@ import { CachedProject, CachedTask, CachedSpecialTask, usePortfolioCache } from 
 type Task = CachedTask;
 type Project = CachedProject;
 
-function expandSpecialTasksToVirtualTasks(specialTasks: CachedSpecialTask[]): { status: string }[] {
+function expandSpecialTasksToVirtualTasks(specialTasks: CachedSpecialTask[], settings?: ComputationSettings): { status: string }[] {
+  const statuses = settings?.statuses ?? getDefaultSettings().statuses;
   const virtuals: { status: string }[] = [];
   for (const st of specialTasks) {
-    for (let i = 0; i < st.nys; i++) virtuals.push({ status: "Not Yet Started" });
-    for (let i = 0; i < st.plan; i++) virtuals.push({ status: "In Progress, Planning or Initiated" });
-    for (let i = 0; i < st.part; i++) virtuals.push({ status: "In Progress, Partial" });
-    for (let i = 0; i < st.mostly; i++) virtuals.push({ status: "In Progress, Mostly Done or Testing" });
-    for (let i = 0; i < st.done; i++) virtuals.push({ status: "Complete or Verified" });
+    for (let i = 0; i < st.nys; i++) virtuals.push({ status: statuses[0].name });
+    for (let i = 0; i < st.plan; i++) virtuals.push({ status: statuses[1].name });
+    for (let i = 0; i < st.part; i++) virtuals.push({ status: statuses[2].name });
+    for (let i = 0; i < st.mostly; i++) virtuals.push({ status: statuses[3].name });
+    for (let i = 0; i < st.done; i++) virtuals.push({ status: statuses[4].name });
   }
   return virtuals;
 }
@@ -66,6 +69,7 @@ function SortableTaskRow({
   tabTransitioning,
   onMouseEnter,
   onMouseLeave,
+  settings,
 }: {
   task: Task;
   onEdit: () => void;
@@ -79,6 +83,7 @@ function SortableTaskRow({
   tabTransitioning: React.MutableRefObject<boolean>;
   onMouseEnter: (e: React.MouseEvent<HTMLTableRowElement>) => void;
   onMouseLeave: () => void;
+  settings?: ComputationSettings;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: task.id });
@@ -89,7 +94,7 @@ function SortableTaskRow({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const pct = computeTaskPercentDone(task.status);
+  const pct = computeTaskPercentDone(task.status, settings);
 
   return (
     <tr
@@ -182,9 +187,9 @@ function SortableTaskRow({
             }}
             className="detail-inline-select"
           >
-            {STATUS_LABELS.map((s) => (
-              <option key={s} value={s}>
-                {s}
+            {getStatusList(settings).map((s) => (
+              <option key={s.id} value={s.name}>
+                {s.name}
               </option>
             ))}
           </select>
@@ -259,6 +264,16 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
   const selectRef = useRef<HTMLSelectElement>(null);
   const [tasks, setTasks] = useState<Task[]>(initialProject.tasks);
   const [specialTasks, setSpecialTasks] = useState<CachedSpecialTask[]>(initialProject.specialTasks || []);
+  const [compSettings, setCompSettings] = useState<ComputationSettings | undefined>(undefined);
+
+  useEffect(() => {
+    fetch("/api/settings/computation")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setCompSettings(data);
+      })
+      .catch(() => {});
+  }, []);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<{
     entityType: "Project" | "Task" | "SpecialTask";
@@ -317,12 +332,12 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
     setProject(nextProject);
   }
 
-  const virtualTasks = expandSpecialTasksToVirtualTasks(specialTasks);
+  const virtualTasks = expandSpecialTasksToVirtualTasks(specialTasks, compSettings);
   const allTasksForPct = [...tasks, ...virtualTasks];
-  const pct = computeProjectPercentComplete(allTasksForPct);
+  const pct = computeProjectPercentComplete(allTasksForPct, compSettings);
   const health =
     allTasksForPct.length > 0
-      ? computeProjectHealth(pct * 100, project.adjustedTargetQuarter)
+      ? computeProjectHealth(pct * 100, project.adjustedTargetQuarter, compSettings)
       : null;
 
   const sensors = useSensors(
@@ -389,9 +404,9 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
       case "name": return task.name;
       case "assignee": return task.assignee ?? "";
       case "priority": return PRIORITY_ORDINAL[task.priority] ?? 0;
-      case "status": return STATUS_SCORES[task.status as keyof typeof STATUS_SCORES] ?? 0;
+      case "status": return getStatusScore(task.status, compSettings);
       case "adjustedTargetQuarter": return task.adjustedTargetQuarter;
-      case "pct": return Math.round(computeTaskPercentDone(task.status) * 100);
+      case "pct": return Math.round(computeTaskPercentDone(task.status, compSettings) * 100);
       default: return "";
     }
   }
@@ -671,6 +686,7 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                           tabTransitioning={tabTransitioning}
                           onMouseEnter={(e) => handleTaskMouseEnter(task, e)}
                           onMouseLeave={handleTaskMouseLeave}
+                          settings={compSettings}
                           />
                       ))}
                     </tbody>

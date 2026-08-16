@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { touchLastModified } from "@/lib/system-metadata";
 import { logChange, diffFields } from "@/lib/audit-log";
+import { getSettings } from "@/lib/computation-settings";
 
 export async function GET(
   _request: NextRequest,
@@ -115,11 +116,13 @@ export async function PATCH(
   }
 
   // Auto-set project completion date when all tasks are "Complete or Verified"
+  const settings = await getSettings();
+  const doneStatusName = settings.statuses[4].name;
   const allSiblings = await prisma.task.findMany({
     where: { projectId: existingTask.projectId },
   });
   const allComplete = allSiblings.every(
-    (t) => t.status === "Complete or Verified"
+    (t) => t.status === doneStatusName
   );
   const today = new Date().toISOString().slice(0, 10);
 
