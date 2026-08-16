@@ -20,9 +20,9 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const body = await request.json();
-  const { name, color } = body;
+  const { name, color, archived } = body;
 
-  const updateData: Record<string, string> = {};
+  const updateData: Record<string, string | boolean> = {};
   if (name !== undefined) {
     if (!name || typeof name !== "string" || !name.trim()) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -49,6 +49,52 @@ export async function PATCH(
   }
 
   const oldFramework = await prisma.framework.findUnique({ where: { id: parseInt(id) } });
+
+  if (archived !== undefined && typeof archived === "boolean" && oldFramework) {
+    await prisma.$transaction(async (tx) => {
+      await tx.framework.update({
+        where: { id: parseInt(id) },
+        data: { archived },
+      });
+      const programs = await tx.program.findMany({
+        where: { frameworkId: parseInt(id) },
+        select: { id: true },
+      });
+      const programIds = programs.map((p) => p.id);
+      if (programIds.length > 0) {
+        await tx.program.updateMany({
+          where: { id: { in: programIds } },
+          data: { archived },
+        });
+        const projects = await tx.project.findMany({
+          where: { programId: { in: programIds } },
+          select: { id: true },
+        });
+        const projectIds = projects.map((p) => p.id);
+        if (projectIds.length > 0) {
+          await tx.project.updateMany({
+            where: { id: { in: projectIds } },
+            data: { archived },
+          });
+          await tx.task.updateMany({
+            where: { projectId: { in: projectIds } },
+            data: { archived },
+          });
+        }
+      }
+    });
+    await touchLastModified();
+    const framework = await prisma.framework.findUnique({ where: { id: parseInt(id) } });
+    await logChange({
+      entityType: "Framework",
+      entityId: parseInt(id),
+      entityName: framework?.name || "",
+      changeType: archived ? "archive" : "unarchive",
+      details: archived ? "Archived framework and all child items" : "Unarchived framework and all child items",
+    });
+    return NextResponse.json(framework);
+  }
+
   const framework = await prisma.framework.update({
     where: { id: parseInt(id) },
     data: updateData,

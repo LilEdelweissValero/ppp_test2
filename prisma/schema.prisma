@@ -12,6 +12,7 @@ model Framework {
   name      String    @unique
   color     String
   sortOrder Int       @default(0) @map("sort_order")
+  archived  Boolean   @default(false)
   programs  Program[]
 }
 
@@ -21,6 +22,7 @@ model Program {
   frameworkId Int
   framework   Framework @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
   sortOrder   Int       @default(0) @map("sort_order")
+  archived    Boolean   @default(false)
   projects    Project[]
 
   @@index([frameworkId])
@@ -37,6 +39,7 @@ model Project {
   targetQuarter         String  @map("target_quarter")
   adjustedTargetQuarter String  @map("adjusted_target_quarter")
   actualCompletionDate  String? @map("actual_completion_date")
+  archived              Boolean @default(false)
   tasks                 Task[]
 
   @@index([programId])
@@ -59,6 +62,7 @@ model Task {
   adjustedTargetQuarter String   @map("adjusted_target_quarter")
   deliverable           String?
   attachmentUrl         String?  @map("attachment_url")
+  archived              Boolean  @default(false)
 
   @@index([projectId])
 }

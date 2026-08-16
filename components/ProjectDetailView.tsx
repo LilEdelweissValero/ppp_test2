@@ -31,6 +31,7 @@ import ProjectFormModal from "@/components/ProjectFormModal";
 import TaskFormModal from "@/components/TaskFormModal";
 import ChangeDueQuarterModal from "@/components/ChangeDueQuarterModal";
 import ChangeHistoryModal from "@/components/ChangeHistoryModal";
+import ArchiveConfirmModal from "@/components/ArchiveConfirmModal";
 import { CachedProject, CachedTask, usePortfolioCache } from "@/components/PortfolioCacheProvider";
 
 type Task = CachedTask;
@@ -45,6 +46,7 @@ function SortableTaskRow({
   onEdit,
   onChangeQuarter,
   onViewHistory,
+  onArchive,
   onInlineSave,
   editingCell,
   setEditingCell,
@@ -54,6 +56,7 @@ function SortableTaskRow({
   onEdit: () => void;
   onChangeQuarter: () => void;
   onViewHistory: () => void;
+  onArchive: () => void;
   onInlineSave: (taskId: number, field: "status" | "priority", value: string) => void;
   editingCell: { taskId: number; field: "status" | "priority" } | null;
   setEditingCell: (cell: { taskId: number; field: "status" | "priority" } | null) => void;
@@ -172,6 +175,12 @@ function SortableTaskRow({
           >
             History
           </button>
+          <button
+            onClick={onArchive}
+            className="detail-task-action"
+          >
+            Archive
+          </button>
         </div>
       </td>
     </tr>
@@ -198,6 +207,12 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
   const selectRef = useRef<HTMLSelectElement>(null);
   const [tasks, setTasks] = useState<Task[]>(initialProject.tasks);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<{
+    entityType: "Project" | "Task";
+    entityId: number;
+    entityName: string;
+  } | null>(null);
+  const [archiveLoading, setArchiveLoading] = useState(false);
 
   useEffect(() => {
     setCurrentProject(initialProject);
@@ -236,6 +251,32 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
       return;
     }
     router.push("/");
+  }
+
+  async function handleArchiveConfirm() {
+    if (!archiveTarget) return;
+    setArchiveLoading(true);
+    try {
+      const endpoint =
+        archiveTarget.entityType === "Project"
+          ? `/api/projects/${archiveTarget.entityId}`
+          : `/api/tasks/${archiveTarget.entityId}`;
+      const res = await fetch(endpoint, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archived: true }),
+      });
+      if (res.ok) {
+        if (archiveTarget.entityType === "Project") {
+          router.push("/");
+        } else {
+          setTasks(tasks.filter((t) => t.id !== archiveTarget.entityId));
+          setArchiveTarget(null);
+        }
+      }
+    } finally {
+      setArchiveLoading(false);
+    }
   }
 
   function handleSort(key: string) {
@@ -398,6 +439,18 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
             >
               View History
             </button>
+            <button
+              onClick={() =>
+                setArchiveTarget({
+                  entityType: "Project",
+                  entityId: project.id,
+                  entityName: project.name,
+                })
+              }
+              className="detail-button"
+            >
+              Archive
+            </button>
           </div>
         </section>
 
@@ -476,6 +529,13 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                           onChangeQuarter={() => setChangeTaskQuarter(task)}
                           onViewHistory={() =>
                             setViewHistory({ type: "Task", id: task.id })
+                          }
+                          onArchive={() =>
+                            setArchiveTarget({
+                              entityType: "Task",
+                              entityId: task.id,
+                              entityName: `${task.taskCode}: ${task.name}`,
+                            })
                           }
                           onInlineSave={handleInlineSave}
                           editingCell={editingCell}
@@ -585,6 +645,18 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
             onClose={() => setViewHistory(null)}
             entityType={viewHistory.type}
             entityId={viewHistory.id}
+          />
+        )}
+
+        {archiveTarget && (
+          <ArchiveConfirmModal
+            open={!!archiveTarget}
+            onClose={() => setArchiveTarget(null)}
+            onConfirm={handleArchiveConfirm}
+            entityType={archiveTarget.entityType}
+            entityName={archiveTarget.entityName}
+            entityId={archiveTarget.entityId}
+            loading={archiveLoading}
           />
         )}
       </div>

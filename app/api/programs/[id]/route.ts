@@ -9,7 +9,44 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const body = await request.json();
-  const { name, frameworkId } = body;
+  const { name, frameworkId, archived } = body;
+
+  const oldProgram = await prisma.program.findUnique({ where: { id: parseInt(id) } });
+
+  if (archived !== undefined && typeof archived === "boolean" && oldProgram) {
+    await prisma.$transaction(async (tx) => {
+      await tx.program.update({
+        where: { id: parseInt(id) },
+        data: { archived },
+      });
+      const projects = await tx.project.findMany({
+        where: { programId: parseInt(id) },
+        select: { id: true },
+      });
+      const projectIds = projects.map((p) => p.id);
+      if (projectIds.length > 0) {
+        await tx.project.updateMany({
+          where: { id: { in: projectIds } },
+          data: { archived },
+        });
+        await tx.task.updateMany({
+          where: { projectId: { in: projectIds } },
+          data: { archived },
+        });
+      }
+    });
+    await touchLastModified();
+    const program = await prisma.program.findUnique({ where: { id: parseInt(id) } });
+    await logChange({
+      entityType: "Program",
+      entityId: parseInt(id),
+      entityName: program?.name || "",
+      changeType: archived ? "archive" : "unarchive",
+      details: archived ? "Archived program and all child items" : "Unarchived program and all child items",
+    });
+    return NextResponse.json(program);
+  }
+
   if (!name || typeof name !== "string" || !name.trim()) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
@@ -23,7 +60,6 @@ export async function PATCH(
   if (frameworkId) {
     updateData.frameworkId = parseInt(frameworkId);
   }
-  const oldProgram = await prisma.program.findUnique({ where: { id: parseInt(id) } });
   const program = await prisma.program.update({
     where: { id: parseInt(id) },
     data: updateData,

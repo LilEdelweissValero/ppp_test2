@@ -34,6 +34,7 @@ export async function PATCH(
     adjustedTargetQuarter,
     deliverable,
     attachmentUrl,
+    archived,
   } = body;
 
   const existingTask = await prisma.task.findUnique({ where: { id: parseInt(id) } });
@@ -58,7 +59,7 @@ export async function PATCH(
     }
   }
 
-  const updateData: Record<string, string | null> = {};
+  const updateData: Record<string, string | boolean | null> = {};
   if (taskCode !== undefined) updateData.taskCode = taskCode.trim();
   if (name !== undefined) updateData.name = name.trim();
   if (assignee !== undefined) updateData.assignee = assignee || null;
@@ -71,6 +72,7 @@ export async function PATCH(
   if (adjustedTargetQuarter !== undefined) updateData.adjustedTargetQuarter = adjustedTargetQuarter;
   if (deliverable !== undefined) updateData.deliverable = deliverable || null;
   if (attachmentUrl !== undefined) updateData.attachmentUrl = attachmentUrl || null;
+  if (archived !== undefined && typeof archived === "boolean") updateData.archived = archived;
 
   const task = await prisma.task.update({
     where: { id: parseInt(id) },
@@ -79,7 +81,7 @@ export async function PATCH(
 
   if (updateData.taskCode && updateData.taskCode !== existingTask.taskCode) {
     const oldCode = existingTask.taskCode;
-    const newCode = updateData.taskCode;
+    const newCode = String(updateData.taskCode);
     const siblings = await prisma.task.findMany({
       where: { projectId: existingTask.projectId, id: { not: task.id } },
     });

@@ -7,6 +7,7 @@ export const getDashboardData = unstable_cache(
   async () => {
     const [frameworks, lastModified] = await Promise.all([
       prisma.framework.findMany({
+        where: { archived: false },
         select: {
           id: true,
           name: true,
@@ -42,12 +43,15 @@ export const getDashboardData = unstable_cache(
                       dependencies: true,
                       adjustedTargetQuarter: true,
                     },
+                    where: { archived: false },
                     orderBy: { sortOrder: "asc" },
                   },
                 },
+                where: { archived: false },
                 orderBy: { sortOrder: "asc" },
               },
             },
+            where: { archived: false },
             orderBy: { sortOrder: "asc" },
           },
         },
@@ -102,3 +106,54 @@ export const getProjectData = unstable_cache(
   ["project-data"],
   { tags: [PORTFOLIO_CACHE_TAG], revalidate: 60 }
 );
+
+export async function getArchivedData() {
+  return prisma.framework.findMany({
+    where: { archived: true },
+    select: {
+      id: true,
+      name: true,
+      color: true,
+      programs: {
+        select: {
+          id: true,
+          name: true,
+          frameworkId: true,
+          projects: {
+            select: {
+              id: true,
+              name: true,
+              programId: true,
+              reference: true,
+              owner: true,
+              targetQuarter: true,
+              adjustedTargetQuarter: true,
+              actualCompletionDate: true,
+              tasks: {
+                select: {
+                  id: true,
+                  taskCode: true,
+                  name: true,
+                  assignee: true,
+                  priority: true,
+                  status: true,
+                  description: true,
+                  targetQuarter: true,
+                  adjustedTargetQuarter: true,
+                  deliverable: true,
+                  attachmentUrl: true,
+                  dependencies: true,
+                  notes: true,
+                },
+                orderBy: { sortOrder: "asc" },
+              },
+            },
+            orderBy: { sortOrder: "asc" },
+          },
+        },
+        orderBy: { sortOrder: "asc" },
+      },
+    },
+    orderBy: { sortOrder: "asc" },
+  });
+}

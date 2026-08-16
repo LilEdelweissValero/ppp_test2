@@ -27,7 +27,32 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const body = await request.json();
-  const { name, programId, reference, owner, targetQuarter, adjustedTargetQuarter, actualCompletionDate } = body;
+  const { name, programId, reference, owner, targetQuarter, adjustedTargetQuarter, actualCompletionDate, archived } = body;
+
+  const oldProject = await prisma.project.findUnique({ where: { id: parseInt(id) } });
+
+  if (archived !== undefined && typeof archived === "boolean" && oldProject) {
+    await prisma.$transaction(async (tx) => {
+      await tx.project.update({
+        where: { id: parseInt(id) },
+        data: { archived },
+      });
+      await tx.task.updateMany({
+        where: { projectId: parseInt(id) },
+        data: { archived },
+      });
+    });
+    await touchLastModified();
+    const project = await prisma.project.findUnique({ where: { id: parseInt(id) } });
+    await logChange({
+      entityType: "Project",
+      entityId: parseInt(id),
+      entityName: project?.name || "",
+      changeType: archived ? "archive" : "unarchive",
+      details: archived ? "Archived project and all tasks" : "Unarchived project and all tasks",
+    });
+    return NextResponse.json(project);
+  }
 
   const updateData: Record<string, string | number | null> = {};
   if (name !== undefined) updateData.name = name.trim();
@@ -38,7 +63,6 @@ export async function PATCH(
   if (actualCompletionDate !== undefined) updateData.actualCompletionDate = actualCompletionDate || null;
   if (programId !== undefined) updateData.programId = parseInt(programId);
 
-  const oldProject = await prisma.project.findUnique({ where: { id: parseInt(id) } });
   const project = await prisma.project.update({
     where: { id: parseInt(id) },
     data: updateData,

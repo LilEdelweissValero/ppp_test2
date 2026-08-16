@@ -19,6 +19,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import Modal from "./Modal";
+import ArchiveConfirmModal from "./ArchiveConfirmModal";
 
 interface Framework {
   id: number;
@@ -48,6 +49,7 @@ function SortableProgram({
   setEditName,
   handleRename,
   handleDelete,
+  handleArchive,
   loading,
 }: {
   program: Program;
@@ -57,6 +59,7 @@ function SortableProgram({
   setEditName: (name: string) => void;
   handleRename: (id: number) => void;
   handleDelete: (id: number) => void;
+  handleArchive: (id: number, name: string) => void;
   loading: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
@@ -155,6 +158,12 @@ function SortableProgram({
               Rename
             </button>
             <button
+              onClick={() => handleArchive(program.id, program.name)}
+              style={{ fontSize: 12, color: "var(--ink-tertiary)" }}
+            >
+              Archive
+            </button>
+            <button
               onClick={() => handleDelete(program.id)}
               style={{ fontSize: 12, color: "#B91C1C" }}
             >
@@ -181,6 +190,11 @@ export default function ManageProgramsModal({
   const [editName, setEditName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState<{
+    entityId: number;
+    entityName: string;
+  } | null>(null);
+  const [archiveLoading, setArchiveLoading] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -267,6 +281,30 @@ export default function ManageProgramsModal({
     } else {
       const data = await res.json();
       setError(data.error || "Failed to delete program");
+    }
+  }
+
+  function handleArchiveClick(id: number, name: string) {
+    setArchiveTarget({ entityId: id, entityName: name });
+  }
+
+  async function handleArchiveConfirm() {
+    if (!archiveTarget) return;
+    setArchiveLoading(true);
+    try {
+      const res = await fetch(`/api/programs/${archiveTarget.entityId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archived: true }),
+      });
+      if (res.ok) {
+        const next = programs.filter((p) => p.id !== archiveTarget.entityId);
+        setPrograms(next);
+        onChange(next);
+        setArchiveTarget(null);
+      }
+    } finally {
+      setArchiveLoading(false);
     }
   }
 
@@ -372,6 +410,7 @@ export default function ManageProgramsModal({
                   setEditName={setEditName}
                   handleRename={handleRename}
                   handleDelete={handleDelete}
+                  handleArchive={handleArchiveClick}
                   loading={loading}
                 />
               ))}
@@ -379,6 +418,17 @@ export default function ManageProgramsModal({
           </SortableContext>
         </DndContext>
       </div>
+      {archiveTarget && (
+        <ArchiveConfirmModal
+          open={!!archiveTarget}
+          onClose={() => setArchiveTarget(null)}
+          onConfirm={handleArchiveConfirm}
+          entityType="Program"
+          entityName={archiveTarget.entityName}
+          entityId={archiveTarget.entityId}
+          loading={archiveLoading}
+        />
+      )}
     </Modal>
   );
 }
