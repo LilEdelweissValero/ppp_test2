@@ -14,6 +14,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onSave: (task: { id: number; taskCode: string; name: string; assignee: string | null; priority: string; status: string; description: string | null; dependencies: string | null; notes: string | null; targetQuarter: string; adjustedTargetQuarter: string; deliverable: string | null; attachments: { url: string; title: string | null }[] | null; projectId: number; sortOrder: number }) => void;
+  onSaveSpecial?: (specialTask: { id: number; specialTaskCode: string; name: string; total: number; nys: number; plan: number; part: number; mostly: number; done: number; dueQuarter: string; lastUpdatedDate: string | null; projectId: number; sortOrder: number }) => void;
   projectId: number;
   initialData?: {
     id: number;
@@ -29,18 +30,31 @@ interface Props {
     deliverable: string;
     attachments: { url: string; title: string | null }[];
   };
+  initialSpecialData?: {
+    id: number;
+    specialTaskCode: string;
+    name: string;
+    dueQuarter: string;
+    lastUpdatedDate: string | null;
+  };
 }
 
 export default function TaskFormModal({
   open,
   onClose,
   onSave,
+  onSaveSpecial,
   projectId,
   initialData,
+  initialSpecialData,
 }: Props) {
   const isEdit = !!initialData;
-  const [taskCode, setTaskCode] = useState(initialData?.taskCode || "");
-  const [name, setName] = useState(initialData?.name || "");
+  const isSpecialEdit = !!initialSpecialData;
+  const isSpecialMode = isSpecialEdit || false;
+
+  const [taskType, setTaskType] = useState<"normal" | "special">(isSpecialEdit ? "special" : "normal");
+  const [taskCode, setTaskCode] = useState(initialData?.taskCode || initialSpecialData?.specialTaskCode || "");
+  const [name, setName] = useState(initialData?.name || initialSpecialData?.name || "");
   const [assignee, setAssignee] = useState(initialData?.assignee || "");
   const [priority, setPriority] = useState(initialData?.priority || "Low");
   const [description, setDescription] = useState(
@@ -54,7 +68,7 @@ export default function TaskFormModal({
     initialData?.status || "Not Yet Started"
   );
   const [targetQuarter, setTargetQuarter] = useState(
-    initialData?.targetQuarter || ""
+    initialData?.targetQuarter || initialSpecialData?.dueQuarter || ""
   );
   const [deliverable, setDeliverable] = useState(
     initialData?.deliverable || ""
@@ -70,7 +84,21 @@ export default function TaskFormModal({
 
   useEffect(() => {
     if (open) {
-      if (!isEdit) {
+      if (isSpecialEdit && initialSpecialData) {
+        setTaskType("special");
+        setTaskCode(initialSpecialData.specialTaskCode);
+        setName(initialSpecialData.name);
+        setTargetQuarter(initialSpecialData.dueQuarter);
+        setAssignee("");
+        setPriority("Low");
+        setDescription("");
+        setDependencies("");
+        setNotes("");
+        setStatus("Not Yet Started");
+        setDeliverable("");
+        setAttachments([{ title: "", url: "" }]);
+      } else if (!isEdit) {
+        setTaskType("normal");
         setTaskCode("");
         setName("");
         setAssignee("");
@@ -83,6 +111,7 @@ export default function TaskFormModal({
         setDeliverable("");
         setAttachments([{ title: "", url: "" }]);
       } else if (initialData) {
+        setTaskType("normal");
         setAttachments(
           initialData.attachments?.map(a => ({ title: a.title || "", url: a.url })) || [{ title: "", url: "" }]
         );
@@ -123,6 +152,39 @@ export default function TaskFormModal({
     setServerError("");
 
     if (!taskCode.trim() || !name.trim() || !targetQuarter) {
+      return;
+    }
+
+    if (taskType === "special") {
+      setLoading(true);
+      try {
+        const url = isSpecialEdit ? `/api/special-tasks/${initialSpecialData?.id}` : "/api/special-tasks";
+        const method = isSpecialEdit ? "PATCH" : "POST";
+
+        const res = await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId,
+            specialTaskCode: taskCode,
+            name,
+            dueQuarter: targetQuarter,
+          }),
+        });
+
+        if (res.ok) {
+          const specialTask = await res.json();
+          if (onSaveSpecial) onSaveSpecial(specialTask);
+          onClose();
+        } else {
+          const data = await res.json();
+          setServerError(data.error || "Failed to save special task");
+        }
+      } catch {
+        setServerError("Failed to save special task");
+      } finally {
+        setLoading(false);
+      }
       return;
     }
 
@@ -179,6 +241,7 @@ export default function TaskFormModal({
   }
 
   const hasOptionalContent = description || dependencies || deliverable || validAttachments.length > 0 || notes;
+  const showTypeSelector = !isEdit && !isSpecialEdit;
 
   const inputStyle = (invalid?: boolean): React.CSSProperties => ({
     width: "100%",
@@ -212,10 +275,34 @@ export default function TaskFormModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={isEdit ? "Edit Task" : "Add Task"}
+      title={isEdit ? "Edit Task" : isSpecialEdit ? "Edit Special Task" : "Add Task"}
       wide
     >
       <form onSubmit={handleSubmit}>
+        {/* ── Section: Type (only on add) ── */}
+        {showTypeSelector && (
+          <div style={{ marginBottom: 16 }}>
+            <h3 style={sectionHeaderStyle}>
+              Type
+            </h3>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={labelStyle}>
+                  Task Type
+                </label>
+                <select
+                  value={taskType}
+                  onChange={(e) => setTaskType(e.target.value as "normal" | "special")}
+                  style={inputStyle()}
+                >
+                  <option value="normal">Normal</option>
+                  <option value="special">Special</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── Section: Identity ── */}
         <div style={{ marginBottom: 16 }}>
           <h3 style={sectionHeaderStyle}>
@@ -224,7 +311,7 @@ export default function TaskFormModal({
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
               <label style={labelStyle}>
-                Task Code *
+                {taskType === "special" ? "Special Task Code *" : "Task Code *"}
               </label>
               <input
                 type="text"
@@ -247,257 +334,280 @@ export default function TaskFormModal({
           </div>
         </div>
 
-        {/* ── Section: Assignment ── */}
-        <div style={{ marginBottom: 16 }}>
-          <h3 style={sectionHeaderStyle}>
-            Assignment
-          </h3>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div>
-              <label style={labelStyle}>
-                Assignee
-              </label>
-              <input
-                type="text"
-                value={assignee}
-                onChange={(e) => setAssignee(e.target.value)}
-                style={inputStyle()}
-              />
-            </div>
-            <div>
-              <label style={labelStyle}>
-                Priority
-              </label>
-              <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value)}
-                style={inputStyle()}
-              >
-                {PRIORITY_LABELS.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
-            <div>
-              <label style={labelStyle}>
-                Status *
-              </label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                style={inputStyle()}
-              >
-                {STATUS_LABELS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <QuarterSelect
-              label="Planned Quarter *"
-              value={targetQuarter}
-              onChange={setTargetQuarter}
-              invalid={quarterInvalid}
-            />
-          </div>
-        </div>
-
-        {/* ── Section: Details (collapsible) ── */}
-        <div style={{ marginBottom: 12 }}>
-          <button
-            type="button"
-            onClick={() => setShowDetails(!showDetails)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "6px 0",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              fontSize: 10,
-              fontWeight: 600,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              color: "var(--ink-tertiary)",
-            }}
-          >
-            <svg
-              width="8"
-              height="8"
-              viewBox="0 0 8 8"
-              fill="none"
-              style={{
-                transform: showDetails ? "rotate(90deg)" : "none",
-                transition: "transform 0.15s",
-              }}
-            >
-              <path d="M2 1l4 3-4 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Details
-            {hasOptionalContent && !showDetails && (
-              <span style={{
-                fontSize: 9,
-                fontWeight: 400,
-                letterSpacing: "normal",
-                textTransform: "none",
-                color: "var(--ink-tertiary)",
-              }}>
-                (has content)
-              </span>
-            )}
-          </button>
-
-          {showDetails && (
-            <div style={{ paddingTop: 8 }}>
-              <div style={{ marginBottom: 12 }}>
+        {/* ── Section: Assignment (normal tasks only) ── */}
+        {taskType === "normal" && (
+          <div style={{ marginBottom: 16 }}>
+            <h3 style={sectionHeaderStyle}>
+              Assignment
+            </h3>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
                 <label style={labelStyle}>
-                  Description
+                  Assignee
                 </label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={3}
-                  style={{
-                    ...inputStyle(),
-                    resize: "vertical",
-                  }}
+                <input
+                  type="text"
+                  value={assignee}
+                  onChange={(e) => setAssignee(e.target.value)}
+                  style={inputStyle()}
                 />
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div>
-                  <label style={labelStyle}>
-                    Dependencies
-                  </label>
-                  <input
-                    type="text"
-                    value={dependencies}
-                    onChange={(e) => setDependencies(e.target.value)}
-                    style={inputStyle()}
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>
-                    Deliverable
-                  </label>
-                  <input
-                    type="text"
-                    value={deliverable}
-                    onChange={(e) => setDeliverable(e.target.value)}
-                    style={inputStyle()}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ── Section: Additional (collapsible) ── */}
-        <div style={{ marginBottom: 16 }}>
-          <button
-            type="button"
-            onClick={() => setShowAdditional(!showAdditional)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "6px 0",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              fontSize: 10,
-              fontWeight: 600,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              color: "var(--ink-tertiary)",
-            }}
-          >
-            <svg
-              width="8"
-              height="8"
-              viewBox="0 0 8 8"
-              fill="none"
-              style={{
-                transform: showAdditional ? "rotate(90deg)" : "none",
-                transition: "transform 0.15s",
-              }}
-            >
-              <path d="M2 1l4 3-4 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Additional
-          </button>
-
-          {showAdditional && (
-            <div style={{ paddingTop: 8 }}>
-              <div style={{ marginBottom: 12 }}>
-                <label style={labelStyle}>
-                  Attachments
-                </label>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {attachments.map((att, index) => (
-                    <div key={index} className="attachment-row">
-                      <input
-                        type="text"
-                        value={att.title}
-                        onChange={(e) => updateAttachment(index, "title", e.target.value)}
-                        placeholder="Display Title (optional)"
-                        style={{
-                          ...inputStyle(),
-                          flex: "0 0 200px",
-                        }}
-                      />
-                      <input
-                        type="url"
-                        value={att.url}
-                        onChange={(e) => updateAttachment(index, "url", e.target.value)}
-                        placeholder="https://..."
-                        style={{
-                          ...inputStyle(att.url !== "" && !isUrlValid(att.url)),
-                          flex: 1,
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeAttachment(index)}
-                        className="attachment-remove-btn"
-                        disabled={attachments.length === 1}
-                        title="Remove URL"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={addAttachment}
-                  className="attachment-add-btn"
-                >
-                  + Add URL
-                </button>
               </div>
               <div>
                 <label style={labelStyle}>
-                  Notes
+                  Priority
                 </label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={2}
-                  style={{
-                    ...inputStyle(),
-                    resize: "vertical",
-                  }}
-                />
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value)}
+                  style={inputStyle()}
+                >
+                  {PRIORITY_LABELS.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
-          )}
-        </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+              <div>
+                <label style={labelStyle}>
+                  Status *
+                </label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  style={inputStyle()}
+                >
+                  {STATUS_LABELS.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <QuarterSelect
+                label="Planned Quarter *"
+                value={targetQuarter}
+                onChange={setTargetQuarter}
+                invalid={quarterInvalid}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ── Section: Due Quarter (special tasks only) ── */}
+        {taskType === "special" && (
+          <div style={{ marginBottom: 16 }}>
+            <h3 style={sectionHeaderStyle}>
+              Schedule
+            </h3>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <QuarterSelect
+                label="Due Quarter *"
+                value={targetQuarter}
+                onChange={setTargetQuarter}
+                invalid={quarterInvalid}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ── Section: Details (collapsible, normal tasks only) ── */}
+        {taskType === "normal" && (
+          <div style={{ marginBottom: 12 }}>
+            <button
+              type="button"
+              onClick={() => setShowDetails(!showDetails)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 0",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: "var(--ink-tertiary)",
+              }}
+            >
+              <svg
+                width="8"
+                height="8"
+                viewBox="0 0 8 8"
+                fill="none"
+                style={{
+                  transform: showDetails ? "rotate(90deg)" : "none",
+                  transition: "transform 0.15s",
+                }}
+              >
+                <path d="M2 1l4 3-4 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Details
+              {hasOptionalContent && !showDetails && (
+                <span style={{
+                  fontSize: 9,
+                  fontWeight: 400,
+                  letterSpacing: "normal",
+                  textTransform: "none",
+                  color: "var(--ink-tertiary)",
+                }}>
+                  (has content)
+                </span>
+              )}
+            </button>
+
+            {showDetails && (
+              <div style={{ paddingTop: 8 }}>
+                <div style={{ marginBottom: 12 }}>
+                  <label style={labelStyle}>
+                    Description
+                  </label>
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={3}
+                    style={{
+                      ...inputStyle(),
+                      resize: "vertical",
+                    }}
+                  />
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div>
+                    <label style={labelStyle}>
+                      Dependencies
+                    </label>
+                    <input
+                      type="text"
+                      value={dependencies}
+                      onChange={(e) => setDependencies(e.target.value)}
+                      style={inputStyle()}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>
+                      Deliverable
+                    </label>
+                    <input
+                      type="text"
+                      value={deliverable}
+                      onChange={(e) => setDeliverable(e.target.value)}
+                      style={inputStyle()}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Section: Additional (collapsible, normal tasks only) ── */}
+        {taskType === "normal" && (
+          <div style={{ marginBottom: 16 }}>
+            <button
+              type="button"
+              onClick={() => setShowAdditional(!showAdditional)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 0",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: "var(--ink-tertiary)",
+              }}
+            >
+              <svg
+                width="8"
+                height="8"
+                viewBox="0 0 8 8"
+                fill="none"
+                style={{
+                  transform: showAdditional ? "rotate(90deg)" : "none",
+                  transition: "transform 0.15s",
+                }}
+              >
+                <path d="M2 1l4 3-4 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Additional
+            </button>
+
+            {showAdditional && (
+              <div style={{ paddingTop: 8 }}>
+                <div style={{ marginBottom: 12 }}>
+                  <label style={labelStyle}>
+                    Attachments
+                  </label>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {attachments.map((att, index) => (
+                      <div key={index} className="attachment-row">
+                        <input
+                          type="text"
+                          value={att.title}
+                          onChange={(e) => updateAttachment(index, "title", e.target.value)}
+                          placeholder="Display Title (optional)"
+                          style={{
+                            ...inputStyle(),
+                            flex: "0 0 200px",
+                          }}
+                        />
+                        <input
+                          type="url"
+                          value={att.url}
+                          onChange={(e) => updateAttachment(index, "url", e.target.value)}
+                          placeholder="https://..."
+                          style={{
+                            ...inputStyle(att.url !== "" && !isUrlValid(att.url)),
+                            flex: 1,
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeAttachment(index)}
+                          className="attachment-remove-btn"
+                          disabled={attachments.length === 1}
+                          title="Remove URL"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addAttachment}
+                    className="attachment-add-btn"
+                  >
+                    + Add URL
+                  </button>
+                </div>
+                <div>
+                  <label style={labelStyle}>
+                    Notes
+                  </label>
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    rows={2}
+                    style={{
+                      ...inputStyle(),
+                      resize: "vertical",
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Error ── */}
         {serverError && (

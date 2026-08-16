@@ -13,9 +13,24 @@ export interface CachedTask {
   targetQuarter: string;
   adjustedTargetQuarter: string;
   deliverable: string | null;
-  attachments: { url: string; title: string | null }[] | null;
+  attachments: unknown;
   dependencies: string | null;
   notes: string | null;
+}
+
+export interface CachedSpecialTask {
+  id: number;
+  specialTaskCode: string;
+  name: string;
+  sortOrder: number;
+  total: number;
+  nys: number;
+  plan: number;
+  part: number;
+  mostly: number;
+  done: number;
+  dueQuarter: string;
+  lastUpdatedDate: string | null;
 }
 
 export interface CachedProject {
@@ -29,6 +44,7 @@ export interface CachedProject {
   actualCompletionDate: string | null;
   program: { id: number; name: string };
   tasks: CachedTask[];
+  specialTasks: CachedSpecialTask[];
 }
 
 interface PortfolioSeed {

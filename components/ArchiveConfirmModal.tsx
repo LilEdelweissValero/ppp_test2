@@ -7,13 +7,14 @@ interface Counts {
   programs: number;
   projects: number;
   tasks: number;
+  specialTasks: number;
 }
 
 interface Props {
   open: boolean;
   onClose: () => void;
   onConfirm: () => void;
-  entityType: "Framework" | "Program" | "Project" | "Task";
+  entityType: "Framework" | "Program" | "Project" | "Task" | "SpecialTask";
   entityName: string;
   entityId: number;
   loading?: boolean;
@@ -49,7 +50,7 @@ export default function ArchiveConfirmModal({
   }, [open, entityType, entityId]);
 
   const totalChildren =
-    (counts?.programs ?? 0) + (counts?.projects ?? 0) + (counts?.tasks ?? 0);
+    (counts?.programs ?? 0) + (counts?.projects ?? 0) + (counts?.tasks ?? 0) + (counts?.specialTasks ?? 0);
   const hasChildren = totalChildren > 0;
 
   return (
@@ -120,6 +121,11 @@ export default function ArchiveConfirmModal({
                 {counts && counts.tasks > 0 && (
                   <li>
                     <span style={{ fontWeight: 600 }}>{counts.tasks}</span> task{counts.tasks !== 1 ? "s" : ""}
+                  </li>
+                )}
+                {counts && counts.specialTasks > 0 && (
+                  <li>
+                    <span style={{ fontWeight: 600 }}>{counts.specialTasks}</span> special task{counts.specialTasks !== 1 ? "s" : ""}
                   </li>
                 )}
                 {!loadingCounts && !hasChildren && (

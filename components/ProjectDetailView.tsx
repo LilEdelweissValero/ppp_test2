@@ -32,10 +32,22 @@ import TaskFormModal from "@/components/TaskFormModal";
 import ChangeDueQuarterModal from "@/components/ChangeDueQuarterModal";
 import ChangeHistoryModal from "@/components/ChangeHistoryModal";
 import ArchiveConfirmModal from "@/components/ArchiveConfirmModal";
-import { CachedProject, CachedTask, usePortfolioCache } from "@/components/PortfolioCacheProvider";
+import { CachedProject, CachedTask, CachedSpecialTask, usePortfolioCache } from "@/components/PortfolioCacheProvider";
 
 type Task = CachedTask;
 type Project = CachedProject;
+
+function expandSpecialTasksToVirtualTasks(specialTasks: CachedSpecialTask[]): { status: string }[] {
+  const virtuals: { status: string }[] = [];
+  for (const st of specialTasks) {
+    for (let i = 0; i < st.nys; i++) virtuals.push({ status: "Not Yet Started" });
+    for (let i = 0; i < st.plan; i++) virtuals.push({ status: "In Progress, Planning or Initiated" });
+    for (let i = 0; i < st.part; i++) virtuals.push({ status: "In Progress, Partial" });
+    for (let i = 0; i < st.mostly; i++) virtuals.push({ status: "In Progress, Mostly Done or Testing" });
+    for (let i = 0; i < st.done; i++) virtuals.push({ status: "Complete or Verified" });
+  }
+  return virtuals;
+}
 
 interface Props {
   project: Project;
@@ -214,7 +226,7 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
   const [changeProjectQuarter, setChangeProjectQuarter] = useState(false);
   const [changeTaskQuarter, setChangeTaskQuarter] = useState<Task | null>(null);
   const [viewHistory, setViewHistory] = useState<{
-    type: "Project" | "Task";
+    type: "Project" | "Task" | "SpecialTask";
     id: number;
   } | null>(null);
   const [editingCell, setEditingCell] = useState<{
@@ -223,9 +235,10 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
   } | null>(null);
   const selectRef = useRef<HTMLSelectElement>(null);
   const [tasks, setTasks] = useState<Task[]>(initialProject.tasks);
+  const [specialTasks, setSpecialTasks] = useState<CachedSpecialTask[]>(initialProject.specialTasks || []);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<{
-    entityType: "Project" | "Task";
+    entityType: "Project" | "Task" | "SpecialTask";
     entityId: number;
     entityName: string;
   } | null>(null);
@@ -233,10 +246,18 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
   const [hoveredTask, setHoveredTask] = useState<Task | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [editSpecialTask, setEditSpecialTask] = useState<CachedSpecialTask | null>(null);
+  const [changeSpecialTaskQuarter, setChangeSpecialTaskQuarter] = useState<CachedSpecialTask | null>(null);
+  const [editingSpecialCell, setEditingSpecialCell] = useState<{
+    taskId: number;
+    field: string;
+  } | null>(null);
+  const specialSelectRef = useRef<HTMLSelectElement>(null);
 
   useEffect(() => {
     setCurrentProject(initialProject);
     setTasks(initialProject.tasks);
+    setSpecialTasks(initialProject.specialTasks || []);
   }, [initialProject]);
 
   function handleTaskMouseEnter(task: Task, e: React.MouseEvent<HTMLTableRowElement>) {
@@ -254,6 +275,7 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
   function updateProject(next: Project) {
     setCurrentProject(next);
     setTasks(next.tasks);
+    setSpecialTasks(next.specialTasks || []);
     setProject(next);
   }
 
@@ -264,9 +286,18 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
     setProject(nextProject);
   }
 
-  const pct = computeProjectPercentComplete(tasks);
+  function updateSpecialTasks(nextSpecialTasks: CachedSpecialTask[]) {
+    setSpecialTasks(nextSpecialTasks);
+    const nextProject = { ...project, specialTasks: nextSpecialTasks };
+    setCurrentProject(nextProject);
+    setProject(nextProject);
+  }
+
+  const virtualTasks = expandSpecialTasksToVirtualTasks(specialTasks);
+  const allTasksForPct = [...tasks, ...virtualTasks];
+  const pct = computeProjectPercentComplete(allTasksForPct);
   const health =
-    tasks.length > 0
+    allTasksForPct.length > 0
       ? computeProjectHealth(pct * 100, project.adjustedTargetQuarter)
       : null;
 
@@ -292,6 +323,8 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
       const endpoint =
         archiveTarget.entityType === "Project"
           ? `/api/projects/${archiveTarget.entityId}`
+          : archiveTarget.entityType === "SpecialTask"
+          ? `/api/special-tasks/${archiveTarget.entityId}`
           : `/api/tasks/${archiveTarget.entityId}`;
       const res = await fetch(endpoint, {
         method: "PATCH",
@@ -301,6 +334,9 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
       if (res.ok) {
         if (archiveTarget.entityType === "Project") {
           router.push("/");
+        } else if (archiveTarget.entityType === "SpecialTask") {
+          updateSpecialTasks(specialTasks.filter((st) => st.id !== archiveTarget.entityId));
+          setArchiveTarget(null);
         } else {
           setTasks(tasks.filter((t) => t.id !== archiveTarget.entityId));
           setArchiveTarget(null);
@@ -369,6 +405,28 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
       if (!response.ok) throw new Error("Update failed");
     } catch {
       updateTasks(previousTasks);
+    }
+  }
+
+  async function handleSpecialInlineSave(
+    taskId: number,
+    field: string,
+    value: number | string
+  ) {
+    const previousSpecialTasks = specialTasks;
+    setEditingSpecialCell(null);
+    updateSpecialTasks(specialTasks.map((st) => (st.id === taskId ? { ...st, [field]: value } : st)));
+    try {
+      const response = await fetch(`/api/special-tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: value }),
+      });
+      if (!response.ok) throw new Error("Update failed");
+      const updated = await response.json();
+      updateSpecialTasks(specialTasks.map((st) => (st.id === taskId ? { ...st, ...updated } : st)));
+    } catch {
+      updateSpecialTasks(previousSpecialTasks);
     }
   }
 
@@ -590,6 +648,255 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
           )}
         </section>
 
+        {/* ── Special Tasks Section ── */}
+        <section className="detail-task-panel" aria-labelledby="special-tasks-title">
+          <div className="detail-task-header">
+            <div>
+              <h2 id="special-tasks-title" className="detail-task-heading">Special Tasks</h2>
+              <p className="detail-task-subtitle">
+                {specialTasks.length} special task{specialTasks.length === 1 ? "" : "s"} · Click cells to edit inline
+              </p>
+            </div>
+          </div>
+
+          {specialTasks.length === 0 ? (
+            <div className="detail-empty">
+              <p>No special tasks yet.</p>
+              <p>Use Add Task and select &quot;Special&quot; type to create one.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="detail-task-table">
+                <thead>
+                  <tr>
+                    {[
+                      { label: "Code", key: "specialTaskCode", width: 100 },
+                      { label: "Name", key: "name", width: 180 },
+                      { label: "#", key: "total", width: 50 },
+                      { label: "NYS", key: "nys", width: 50 },
+                      { label: "PLAN.", key: "plan", width: 55 },
+                      { label: "PART.", key: "part", width: 55 },
+                      { label: "MOSTLY", key: "mostly", width: 65 },
+                      { label: "DONE", key: "done", width: 55 },
+                      { label: "DUE Q", key: "dueQuarter", width: 80 },
+                      { label: "LAST UPDATED", key: "lastUpdatedDate", width: 100 },
+                      { label: "%", key: "pct", width: 50 },
+                    ].map(({ label, key, width }) => (
+                      <th key={key} style={{ width, userSelect: "none" }}>
+                        {label}
+                      </th>
+                    ))}
+                    <th style={{ width: 120 }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {specialTasks.map((st) => {
+                    const pctVal = st.total > 0 ? Math.round((st.done / st.total) * 100) : 0;
+                    return (
+                      <tr key={st.id} className="detail-task-row">
+                        <td className="detail-task-code" style={{ width: 100 }}>{st.specialTaskCode}</td>
+                        <td style={{ width: 180 }}>{st.name}</td>
+                        {/* # */}
+                        <td
+                          className="detail-inline-cell"
+                          style={{ width: 50, textAlign: "center" }}
+                          onClick={() => setEditingSpecialCell({ taskId: st.id, field: "total" })}
+                        >
+                          {editingSpecialCell?.taskId === st.id && editingSpecialCell.field === "total" ? (
+                            <input
+                              type="number"
+                              defaultValue={st.total}
+                              autoFocus
+                              className="detail-inline-input"
+                              onBlur={(e) => handleSpecialInlineSave(st.id, "total", parseInt(e.target.value) || 0)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Escape") setEditingSpecialCell(null);
+                                if (e.key === "Enter") handleSpecialInlineSave(st.id, "total", parseInt((e.target as HTMLInputElement).value) || 0);
+                              }}
+                              style={{ width: 45, fontSize: 11, textAlign: "center" }}
+                            />
+                          ) : (
+                            st.total
+                          )}
+                        </td>
+                        {/* NYS */}
+                        <td
+                          className="detail-inline-cell"
+                          style={{ width: 50, textAlign: "center" }}
+                          onClick={() => setEditingSpecialCell({ taskId: st.id, field: "nys" })}
+                        >
+                          {editingSpecialCell?.taskId === st.id && editingSpecialCell.field === "nys" ? (
+                            <input
+                              type="number"
+                              defaultValue={st.nys}
+                              autoFocus
+                              className="detail-inline-input"
+                              onBlur={(e) => handleSpecialInlineSave(st.id, "nys", parseInt(e.target.value) || 0)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Escape") setEditingSpecialCell(null);
+                                if (e.key === "Enter") handleSpecialInlineSave(st.id, "nys", parseInt((e.target as HTMLInputElement).value) || 0);
+                              }}
+                              style={{ width: 45, fontSize: 11, textAlign: "center" }}
+                            />
+                          ) : (
+                            st.nys
+                          )}
+                        </td>
+                        {/* PLAN */}
+                        <td
+                          className="detail-inline-cell"
+                          style={{ width: 55, textAlign: "center" }}
+                          onClick={() => setEditingSpecialCell({ taskId: st.id, field: "plan" })}
+                        >
+                          {editingSpecialCell?.taskId === st.id && editingSpecialCell.field === "plan" ? (
+                            <input
+                              type="number"
+                              defaultValue={st.plan}
+                              autoFocus
+                              className="detail-inline-input"
+                              onBlur={(e) => handleSpecialInlineSave(st.id, "plan", parseInt(e.target.value) || 0)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Escape") setEditingSpecialCell(null);
+                                if (e.key === "Enter") handleSpecialInlineSave(st.id, "plan", parseInt((e.target as HTMLInputElement).value) || 0);
+                              }}
+                              style={{ width: 45, fontSize: 11, textAlign: "center" }}
+                            />
+                          ) : (
+                            st.plan
+                          )}
+                        </td>
+                        {/* PART */}
+                        <td
+                          className="detail-inline-cell"
+                          style={{ width: 55, textAlign: "center" }}
+                          onClick={() => setEditingSpecialCell({ taskId: st.id, field: "part" })}
+                        >
+                          {editingSpecialCell?.taskId === st.id && editingSpecialCell.field === "part" ? (
+                            <input
+                              type="number"
+                              defaultValue={st.part}
+                              autoFocus
+                              className="detail-inline-input"
+                              onBlur={(e) => handleSpecialInlineSave(st.id, "part", parseInt(e.target.value) || 0)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Escape") setEditingSpecialCell(null);
+                                if (e.key === "Enter") handleSpecialInlineSave(st.id, "part", parseInt((e.target as HTMLInputElement).value) || 0);
+                              }}
+                              style={{ width: 45, fontSize: 11, textAlign: "center" }}
+                            />
+                          ) : (
+                            st.part
+                          )}
+                        </td>
+                        {/* MOSTLY */}
+                        <td
+                          className="detail-inline-cell"
+                          style={{ width: 65, textAlign: "center" }}
+                          onClick={() => setEditingSpecialCell({ taskId: st.id, field: "mostly" })}
+                        >
+                          {editingSpecialCell?.taskId === st.id && editingSpecialCell.field === "mostly" ? (
+                            <input
+                              type="number"
+                              defaultValue={st.mostly}
+                              autoFocus
+                              className="detail-inline-input"
+                              onBlur={(e) => handleSpecialInlineSave(st.id, "mostly", parseInt(e.target.value) || 0)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Escape") setEditingSpecialCell(null);
+                                if (e.key === "Enter") handleSpecialInlineSave(st.id, "mostly", parseInt((e.target as HTMLInputElement).value) || 0);
+                              }}
+                              style={{ width: 50, fontSize: 11, textAlign: "center" }}
+                            />
+                          ) : (
+                            st.mostly
+                          )}
+                        </td>
+                        {/* DONE */}
+                        <td
+                          className="detail-inline-cell"
+                          style={{ width: 55, textAlign: "center" }}
+                          onClick={() => setEditingSpecialCell({ taskId: st.id, field: "done" })}
+                        >
+                          {editingSpecialCell?.taskId === st.id && editingSpecialCell.field === "done" ? (
+                            <input
+                              type="number"
+                              defaultValue={st.done}
+                              autoFocus
+                              className="detail-inline-input"
+                              onBlur={(e) => handleSpecialInlineSave(st.id, "done", parseInt(e.target.value) || 0)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Escape") setEditingSpecialCell(null);
+                                if (e.key === "Enter") handleSpecialInlineSave(st.id, "done", parseInt((e.target as HTMLInputElement).value) || 0);
+                              }}
+                              style={{ width: 45, fontSize: 11, textAlign: "center" }}
+                            />
+                          ) : (
+                            st.done
+                          )}
+                        </td>
+                        <td className="detail-muted" style={{ width: 80 }}>{st.dueQuarter}</td>
+                        <td className="detail-muted" style={{ width: 100, fontSize: 11 }}>
+                          {st.lastUpdatedDate || "—"}
+                        </td>
+                        <td style={{ textAlign: "center", width: 50 }}>
+                          <span style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: pctVal === 100 ? "var(--health-completed-ink)" : "var(--ink-primary)",
+                          }}>
+                            {pctVal}%
+                          </span>
+                        </td>
+                        <td style={{ width: 120 }}>
+                          <div className="detail-task-actions">
+                            <button
+                              onClick={() => setEditSpecialTask(st)}
+                              className="detail-task-action"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => setChangeSpecialTaskQuarter(st)}
+                              className="detail-task-action"
+                            >
+                              Qtr
+                            </button>
+                            <button
+                              onClick={() =>
+                                setViewHistory({ type: "SpecialTask", id: st.id })
+                              }
+                              className="detail-task-action"
+                            >
+                              History
+                            </button>
+                            <button
+                              onClick={() =>
+                                setArchiveTarget({
+                                  entityType: "SpecialTask",
+                                  entityId: st.id,
+                                  entityName: `${st.specialTaskCode}: ${st.name}`,
+                                })
+                              }
+                              title="Archive special task"
+                              className="detail-task-action"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M21 8v13H3V8" />
+                                <path d="M1 3h22v5H1z" />
+                                <path d="M10 12h4" />
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
         <ProjectFormModal
           open={showEditProject}
           onClose={() => setShowEditProject(false)}
@@ -618,6 +925,9 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
           onSave={(newTask) => {
             updateTasks([...tasks, newTask]);
           }}
+          onSaveSpecial={(newSpecialTask) => {
+            updateSpecialTasks([...specialTasks, newSpecialTask]);
+          }}
           projectId={project.id}
         />
 
@@ -644,7 +954,7 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
               status: editTask.status,
               targetQuarter: editTask.targetQuarter,
               deliverable: editTask.deliverable || "",
-              attachments: editTask.attachments || [],
+              attachments: Array.isArray(editTask.attachments) ? editTask.attachments as { url: string; title: string | null }[] : [],
             }}
           />
         )}
@@ -675,6 +985,46 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
             entityType="Task"
             entityId={changeTaskQuarter.id}
             currentQuarter={changeTaskQuarter.adjustedTargetQuarter}
+          />
+        )}
+
+        {editSpecialTask && (
+          <TaskFormModal
+            open={!!editSpecialTask}
+            onClose={() => setEditSpecialTask(null)}
+            onSave={() => {}}
+            onSaveSpecial={(savedSpecialTask) => {
+              updateSpecialTasks(specialTasks.map((st) =>
+                st.id === savedSpecialTask.id ? savedSpecialTask : st
+              ));
+              setEditSpecialTask(null);
+            }}
+            projectId={project.id}
+            initialSpecialData={{
+              id: editSpecialTask.id,
+              specialTaskCode: editSpecialTask.specialTaskCode,
+              name: editSpecialTask.name,
+              dueQuarter: editSpecialTask.dueQuarter,
+              lastUpdatedDate: editSpecialTask.lastUpdatedDate,
+            }}
+          />
+        )}
+
+        {changeSpecialTaskQuarter && (
+          <ChangeDueQuarterModal
+            open={!!changeSpecialTaskQuarter}
+            onClose={() => setChangeSpecialTaskQuarter(null)}
+            onSave={({ newQuarter }) => {
+              updateSpecialTasks(specialTasks.map((st) =>
+                st.id === changeSpecialTaskQuarter.id
+                  ? { ...st, dueQuarter: newQuarter }
+                  : st
+              ));
+              setChangeSpecialTaskQuarter(null);
+            }}
+            entityType="SpecialTask"
+            entityId={changeSpecialTaskQuarter.id}
+            currentQuarter={changeSpecialTaskQuarter.dueQuarter}
           />
         )}
 

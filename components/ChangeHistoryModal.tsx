@@ -17,7 +17,7 @@ interface LogEntry {
 interface Props {
   open: boolean;
   onClose: () => void;
-  entityType: "Project" | "Task";
+  entityType: "Project" | "Task" | "SpecialTask";
   entityId: number;
 }
 
@@ -61,9 +61,11 @@ export default function ChangeHistoryModal({
   const changeTypeLabel: Record<string, { bg: string; ink: string; label: string }> = {
     status: { bg: "#F3E8FF", ink: "#7C3AED", label: "Status" },
     quarter: { bg: "#FFF3E0", ink: "#8B5200", label: "Quarter" },
+    quarter_change: { bg: "#FFF3E0", ink: "#8B5200", label: "Quarter" },
     create: { bg: "#E6F4EE", ink: "#1A6B3C", label: "Created" },
     update: { bg: "var(--accent-bg)", ink: "var(--accent)", label: "Updated" },
     delete: { bg: "#FFF0EE", ink: "#B91C1C", label: "Deleted" },
+    import: { bg: "#E0F2FE", ink: "#0369A1", label: "Import" },
   };
 
   const badgeStyle = (bg: string, ink: string): React.CSSProperties => ({

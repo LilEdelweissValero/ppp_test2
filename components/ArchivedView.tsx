@@ -20,7 +20,7 @@ interface Task {
   targetQuarter: string;
   adjustedTargetQuarter: string;
   deliverable: string | null;
-  attachments: { url: string; title: string | null }[] | null;
+  attachments: unknown;
   dependencies: string | null;
   notes: string | null;
 }
@@ -35,6 +35,7 @@ interface Project {
   adjustedTargetQuarter: string;
   actualCompletionDate: string | null;
   tasks: Task[];
+  specialTasks?: { id: number; specialTaskCode: string; name: string }[];
 }
 
 interface Program {

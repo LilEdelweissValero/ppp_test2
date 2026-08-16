@@ -7,8 +7,8 @@ import QuarterSelect from "./QuarterSelect";
 interface Props {
   open: boolean;
   onClose: () => void;
-  onSave: (data: { entityType: "Project" | "Task"; entityId: number; newQuarter: string }) => void;
-  entityType: "Project" | "Task";
+  onSave: (data: { entityType: "Project" | "Task" | "SpecialTask"; entityId: number; newQuarter: string }) => void;
+  entityType: "Project" | "Task" | "SpecialTask";
   entityId: number;
   currentQuarter: string;
 }
@@ -51,6 +51,8 @@ export default function ChangeDueQuarterModal({
       const url =
         entityType === "Project"
           ? `/api/projects/${entityId}/change-quarter`
+          : entityType === "SpecialTask"
+          ? `/api/special-tasks/${entityId}/change-quarter`
           : `/api/tasks/${entityId}/change-quarter`;
 
       const res = await fetch(url, {

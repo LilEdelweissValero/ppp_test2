@@ -72,9 +72,24 @@ interface Task {
   targetQuarter: string;
   notes: string | null;
   deliverable: string | null;
-  attachments: { url: string; title: string | null }[] | null;
+  attachments: unknown;
   dependencies: string | null;
   adjustedTargetQuarter: string;
+}
+
+interface SpecialTask {
+  id: number;
+  specialTaskCode: string;
+  name: string;
+  sortOrder: number;
+  total: number;
+  nys: number;
+  plan: number;
+  part: number;
+  mostly: number;
+  done: number;
+  dueQuarter: string;
+  lastUpdatedDate: string | null;
 }
 
 interface Project {
@@ -87,6 +102,7 @@ interface Project {
   adjustedTargetQuarter: string;
   actualCompletionDate: string | null;
   tasks: Task[];
+  specialTasks: SpecialTask[];
   // Populated at render time from parent program
   programName?: string;
 }
@@ -129,6 +145,51 @@ const STATUS_COLS = [
 function filterTasksByQuarter(tasks: Task[], selectedQuarter: string): Task[] {
   if (selectedQuarter === ALL_TIME) return tasks;
   return tasks.filter((t) => t.adjustedTargetQuarter === selectedQuarter);
+}
+
+function expandSpecialTasksToVirtualTasks(specialTasks: SpecialTask[]): Task[] {
+  const virtuals: Task[] = [];
+  for (const st of specialTasks) {
+    const counts = [
+      { count: st.nys, status: "Not Yet Started" },
+      { count: st.plan, status: "In Progress, Planning or Initiated" },
+      { count: st.part, status: "In Progress, Partial" },
+      { count: st.mostly, status: "In Progress, Mostly Done or Testing" },
+      { count: st.done, status: "Complete or Verified" },
+    ];
+    for (const { count, status } of counts) {
+      for (let i = 0; i < count; i++) {
+        virtuals.push({
+          id: -(st.id * 100 + virtuals.length),
+          taskCode: st.specialTaskCode,
+          name: st.name,
+          assignee: null,
+          priority: "Low",
+          status,
+          description: null,
+          targetQuarter: st.dueQuarter,
+          notes: null,
+          deliverable: null,
+          attachments: null,
+          dependencies: null,
+          adjustedTargetQuarter: st.dueQuarter,
+        });
+      }
+    }
+  }
+  return virtuals;
+}
+
+function filterSpecialTasksByQuarter(specialTasks: SpecialTask[], selectedQuarter: string): SpecialTask[] {
+  if (selectedQuarter === ALL_TIME) return specialTasks;
+  return specialTasks.filter((st) => st.dueQuarter === selectedQuarter);
+}
+
+function getAllTasksForProject(project: Project, selectedQuarter: string): Task[] {
+  const realTasks = filterTasksByQuarter(project.tasks, selectedQuarter);
+  const filteredSpecial = filterSpecialTasksByQuarter(project.specialTasks || [], selectedQuarter);
+  const virtualTasks = expandSpecialTasksToVirtualTasks(filteredSpecial);
+  return [...realTasks, ...virtualTasks];
 }
 
 // ── Sort helpers ───────────────────────────────────────────────────────────
@@ -182,18 +243,14 @@ function getSortValue(
   key: string,
   selectedQuarter: string
 ): string | number | null {
-  const allTasks = project.tasks;
-  const filteredTasks = filterTasksByQuarter(allTasks, selectedQuarter);
-  const counts =
-    selectedQuarter === ALL_TIME
-      ? countTasksByStatus(allTasks)
-      : countTasksByStatusForQuarter(allTasks, selectedQuarter);
+  const allTasks = getAllTasksForProject(project, selectedQuarter);
+  const counts = countTasksByStatus(allTasks);
   switch (key) {
     case "name": return project.name;
     case "programName": return project.programName ?? "";
     case "reference": return project.reference ?? "";
     case "owner": return project.owner ?? "";
-    case "taskCount": return filteredTasks.length;
+    case "taskCount": return allTasks.length;
     case "count_nys": return counts["Not Yet Started"];
     case "count_plan": return counts["In Progress, Planning or Initiated"];
     case "count_part": return counts["In Progress, Partial"];
@@ -202,11 +259,11 @@ function getSortValue(
     case "plannedQ": return project.targetQuarter;
     case "dueQ": return project.adjustedTargetQuarter;
     case "completionDate": return project.actualCompletionDate ?? "";
-    case "status": return computeProjectDerivedStatus(filteredTasks);
-    case "pct": return Math.round(computeProjectPercentComplete(filteredTasks) * 100);
+    case "status": return computeProjectDerivedStatus(allTasks);
+    case "pct": return Math.round(computeProjectPercentComplete(allTasks) * 100);
     case "health": {
-      const pct = computeProjectPercentComplete(filteredTasks) * 100;
-      if (filteredTasks.length === 0) return "";
+      const pct = computeProjectPercentComplete(allTasks) * 100;
+      if (allTasks.length === 0) return "";
       return computeProjectHealth(pct, project.adjustedTargetQuarter) ?? "";
     }
     default: return "";
@@ -373,18 +430,14 @@ function ProgramSummaryRow({
   selectedQuarter: string;
   accentColor: string;
 }) {
-  const allTasks = program.projects.flatMap((p) => p.tasks);
-  const filteredTasks = filterTasksByQuarter(allTasks, selectedQuarter);
-  const counts =
-    selectedQuarter === ALL_TIME
-      ? countTasksByStatus(allTasks)
-      : countTasksByStatusForQuarter(allTasks, selectedQuarter);
-  const total = filteredTasks.length;
+  const allTasks = program.projects.flatMap((p) => getAllTasksForProject(p, selectedQuarter));
+  const counts = countTasksByStatus(allTasks);
+  const total = allTasks.length;
 
   // Aggregate program-level metrics from projects (mean of project %'s)
   const projectPcts = program.projects
     .map((p) => {
-      const ft = filterTasksByQuarter(p.tasks, selectedQuarter);
+      const ft = getAllTasksForProject(p, selectedQuarter);
       return ft.length > 0 ? computeProjectPercentComplete(ft) : null;
     })
     .filter((p): p is number => p !== null);
@@ -392,7 +445,7 @@ function ProgramSummaryRow({
     ? projectPcts.reduce((a, b) => a + b, 0) / projectPcts.length
     : 0;
   const programPctRounded = Math.round(programPct * 100);
-  const programDerivedStatus = computeProjectDerivedStatus(filteredTasks);
+  const programDerivedStatus = computeProjectDerivedStatus(allTasks);
 
   // Planned Q: earliest targetQuarter across projects
   const plannedQ = program.projects.length > 0
@@ -412,9 +465,10 @@ function ProgramSummaryRow({
 
   // Completion date: only show if ALL projects are fully complete
   const allProjectsComplete = program.projects.length > 0 &&
-    program.projects.every((p) =>
-      p.tasks.length > 0 && p.tasks.every((t) => t.status === "Complete or Verified")
-    );
+    program.projects.every((p) => {
+      const allP = getAllTasksForProject(p, selectedQuarter);
+      return allP.length > 0 && allP.every((t) => t.status === "Complete or Verified");
+    });
   const completionDate = allProjectsComplete
     ? program.projects
         .map((p) => p.actualCompletionDate)
@@ -425,7 +479,7 @@ function ProgramSummaryRow({
 
   // Health: computed from program % and latest due quarter
   const programHealth =
-    filteredTasks.length > 0
+    allTasks.length > 0
       ? computeProjectHealth(programPctRounded, dueQ)
       : null;
 
@@ -576,14 +630,10 @@ function FrameworkSummaryRow({
   selectedQuarter: string;
 }) {
   const allTasks = framework.programs.flatMap((prog) =>
-    prog.projects.flatMap((p) => p.tasks)
+    prog.projects.flatMap((p) => getAllTasksForProject(p, selectedQuarter))
   );
-  const filteredTasks = filterTasksByQuarter(allTasks, selectedQuarter);
-  const counts =
-    selectedQuarter === ALL_TIME
-      ? countTasksByStatus(allTasks)
-      : countTasksByStatusForQuarter(allTasks, selectedQuarter);
-  const total = filteredTasks.length;
+  const counts = countTasksByStatus(allTasks);
+  const total = allTasks.length;
 
   const allProjects = framework.programs.flatMap((prog) => prog.projects);
   const dueQ = allProjects.length > 0
@@ -596,9 +646,10 @@ function FrameworkSummaryRow({
     const completeProgramDates = framework.programs
       .filter((prog) =>
         prog.projects.length > 0 &&
-        prog.projects.every((p) =>
-          p.tasks.length > 0 && p.tasks.every((t) => t.status === "Complete or Verified")
-        )
+        prog.projects.every((p) => {
+          const allP = getAllTasksForProject(p, selectedQuarter);
+          return allP.length > 0 && allP.every((t) => t.status === "Complete or Verified");
+        })
       )
       .flatMap((prog) =>
         prog.projects
@@ -730,7 +781,7 @@ function SortableProjectRow({
     opacity: isDragging ? 0.4 : 1,
   };
 
-  const filteredTasks = filterTasksByQuarter(project.tasks, selectedQuarter);
+  const filteredTasks = getAllTasksForProject(project, selectedQuarter);
 
   const rowBg = hovered
     ? "var(--accent-bg)"
@@ -851,10 +902,7 @@ function SortableProjectRow({
     filteredTasks.length > 0
       ? computeProjectHealth(pct * 100, project.adjustedTargetQuarter)
       : null;
-  const counts =
-    selectedQuarter === ALL_TIME
-      ? countTasksByStatus(project.tasks)
-      : countTasksByStatusForQuarter(project.tasks, selectedQuarter);
+  const counts = countTasksByStatus(filteredTasks);
   const derivedStatus = computeProjectDerivedStatus(filteredTasks);
   const pctRounded = Math.round(pct * 100);
 
@@ -1512,7 +1560,11 @@ export default function DashboardView({
                 (p.owner ?? "").toLowerCase().includes(q) ||
                 prog.name.toLowerCase().includes(q) ||
                 fw.name.toLowerCase().includes(q) ||
-                p.tasks.some((t) => taskMatches(t, q))
+                p.tasks.some((t) => taskMatches(t, q)) ||
+                (p.specialTasks || []).some((st) =>
+                  st.specialTaskCode.toLowerCase().includes(q) ||
+                  st.name.toLowerCase().includes(q)
+                )
             ),
           }))
           .filter((prog) => prog.projects.length > 0),
@@ -1795,8 +1847,11 @@ export default function DashboardView({
           const allProjects = fw.programs.flatMap((p) => p.projects);
           const hasProjects = allProjects.length > 0;
           const hasTasksInQuarter = selectedQuarter === ALL_TIME
-            ? allProjects.some((p) => p.tasks.length > 0)
-            : allProjects.some((p) => p.tasks.some((t) => t.adjustedTargetQuarter === selectedQuarter));
+            ? allProjects.some((p) => p.tasks.length > 0 || (p.specialTasks || []).length > 0)
+            : allProjects.some((p) =>
+                p.tasks.some((t) => t.adjustedTargetQuarter === selectedQuarter) ||
+                (p.specialTasks || []).some((st) => st.dueQuarter === selectedQuarter)
+              );
           return (
             <div
               key={fw.id}
@@ -1878,19 +1933,15 @@ export default function DashboardView({
 
                   {/* Framework aggregate stats */}
                   {hasProjects && hasTasksInQuarter && (() => {
-                    const allTasks = allProjects.flatMap((p) => p.tasks);
-                    const filteredTasks = filterTasksByQuarter(allTasks, selectedQuarter);
-                    const counts =
-                      selectedQuarter === ALL_TIME
-                        ? countTasksByStatus(allTasks)
-                        : countTasksByStatusForQuarter(allTasks, selectedQuarter);
-                    const total = filteredTasks.length;
+                    const allTasks = allProjects.flatMap((p) => getAllTasksForProject(p, selectedQuarter));
+                    const counts = countTasksByStatus(allTasks);
+                    const total = allTasks.length;
                     // Framework % = mean of programs' % (each program % = mean of its projects' %)
                     const programPcts = fw.programs
                       .map((prog) => {
                         const projPcts = prog.projects
                           .map((p) => {
-                            const ft = filterTasksByQuarter(p.tasks, selectedQuarter);
+                            const ft = getAllTasksForProject(p, selectedQuarter);
                             return ft.length > 0 ? computeProjectPercentComplete(ft) : null;
                           })
                           .filter((p): p is number => p !== null);
@@ -1961,8 +2012,11 @@ export default function DashboardView({
                           {fw.programs.map((prog) => {
                             if (prog.projects.length === 0) return null;
                             const hasTasksInProgram = selectedQuarter === ALL_TIME
-                              ? prog.projects.some((p) => p.tasks.length > 0)
-                              : prog.projects.some((p) => p.tasks.some((t) => t.adjustedTargetQuarter === selectedQuarter));
+                              ? prog.projects.some((p) => p.tasks.length > 0 || (p.specialTasks || []).length > 0)
+                              : prog.projects.some((p) =>
+                                  p.tasks.some((t) => t.adjustedTargetQuarter === selectedQuarter) ||
+                                  (p.specialTasks || []).some((st) => st.dueQuarter === selectedQuarter)
+                                );
                             if (!hasTasksInProgram) return null;
                             const sortedProjects = sortConfig
                               ? [...prog.projects].sort((a, b) => {

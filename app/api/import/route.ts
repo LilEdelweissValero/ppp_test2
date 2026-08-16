@@ -25,6 +25,26 @@ const EXCEL_COLUMNS = [
   "task_archived",
 ];
 
+const SPECIAL_TASK_COLUMNS = [
+  "framework_name",
+  "program_name",
+  "project_name",
+  "project_reference",
+  "project_owner",
+  "project_target_quarter",
+  "special_task_code",
+  "special_task_name",
+  "total",
+  "nys",
+  "plan",
+  "part",
+  "mostly",
+  "done",
+  "due_quarter",
+  "last_updated_date",
+  "archived",
+];
+
 const VALID_STATUSES = [
   "Not Yet Started",
   "In Progress, Planning or Initiated",
@@ -40,7 +60,7 @@ function parseQuarter(q: string): boolean {
 }
 
 export async function GET() {
-  const sampleRows = [
+  const sampleTaskRows = [
     [
       "Infrastructure",
       "Network Upgrade",
@@ -81,38 +101,39 @@ export async function GET() {
       "",
       "FALSE",
     ],
+  ];
+
+  const sampleSpecialTaskRows = [
     [
-      "Security",
-      "Access Control",
-      "Badge System Upgrade",
-      "",
-      "Alice Lee",
-      "Q4 2026",
-      "T-003",
-      "Install badge readers",
-      "Bob Chen",
-      "High",
-      "Install readers at all entry points",
-      "None",
-      "Vendor confirmed delivery",
-      "In Progress, Planning or Initiated",
-      "Q4 2026",
-      "All readers installed",
+      "Infrastructure",
+      "Network Upgrade",
+      "Core Router Replacement",
+      "REF-001",
+      "John Doe",
+      "Q3 2026",
+      "SPEC-001",
+      "Server Migration",
+      10,
+      2,
+      3,
+      1,
+      2,
+      2,
+      "Q3 2026",
       "",
       "FALSE",
     ],
   ];
 
-  const headerRow = [...EXCEL_COLUMNS];
-
-  const ws = XLSX.utils.aoa_to_sheet([headerRow, ...sampleRows]);
-
-  ws["!cols"] = EXCEL_COLUMNS.map((c) => ({
-    wch: Math.max(c.length + 2, 16),
-  }));
-
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Import Template");
+
+  const ws1 = XLSX.utils.aoa_to_sheet([EXCEL_COLUMNS, ...sampleTaskRows]);
+  ws1["!cols"] = EXCEL_COLUMNS.map((c) => ({ wch: Math.max(c.length + 2, 16) }));
+  XLSX.utils.book_append_sheet(wb, ws1, "Export");
+
+  const ws2 = XLSX.utils.aoa_to_sheet([SPECIAL_TASK_COLUMNS, ...sampleSpecialTaskRows]);
+  ws2["!cols"] = SPECIAL_TASK_COLUMNS.map((c) => ({ wch: Math.max(c.length + 2, 16) }));
+  XLSX.utils.book_append_sheet(wb, ws2, "Special Tasks");
 
   const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
 
@@ -134,21 +155,9 @@ export async function POST(request: NextRequest) {
   }
 
   const arrayBuffer = await file.arrayBuffer();
-  let records: Record<string, string>[];
+  let workbook: XLSX.WorkBook;
   try {
-    const workbook = XLSX.read(arrayBuffer, { type: "array" });
-    const sheetName = workbook.SheetNames[0];
-    if (!sheetName) {
-      return NextResponse.json(
-        { error: "Excel file contains no sheets" },
-        { status: 400 }
-      );
-    }
-    const sheet = workbook.Sheets[sheetName];
-    records = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, {
-      defval: "",
-      raw: false,
-    });
+    workbook = XLSX.read(arrayBuffer, { type: "array" });
   } catch {
     return NextResponse.json(
       { error: "Failed to parse Excel file" },
@@ -156,93 +165,32 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (records.length === 0) {
+  if (workbook.SheetNames.length === 0) {
     return NextResponse.json(
-      { error: "Excel file contains no data rows" },
+      { error: "Excel file contains no sheets" },
       { status: 400 }
     );
   }
-
-  const headers = Object.keys(records[0]);
-  const actualSet = new Set(headers.map((h) => h.toLowerCase().trim()));
-  const missing = EXCEL_COLUMNS.filter(
-    (c) => !actualSet.has(c.toLowerCase())
-  );
-  if (missing.length > 0) {
-    return NextResponse.json(
-      { error: `Missing columns: ${missing.join(", ")}` },
-      { status: 400 }
-    );
-  }
-
-  // Normalize keys to snake_case for consistent access
-  const normalizedRecords = records.map((row) => {
-    const out: Record<string, string> = {};
-    for (const [key, val] of Object.entries(row)) {
-      const normalized = key.toLowerCase().trim().replace(/\s+/g, "_");
-      out[normalized] = String(val ?? "").trim();
-    }
-    return out;
-  });
 
   let frameworksCreated = 0;
   let programsCreated = 0;
   let projectsCreated = 0;
   let tasksCreated = 0;
+  let specialTasksCreated = 0;
   let tasksSkipped = 0;
+  let specialTasksSkipped = 0;
   let rowsSkipped = 0;
   const errors: string[] = [];
 
-  for (let i = 0; i < normalizedRecords.length; i++) {
-    const row = normalizedRecords[i];
-    const rowNum = i + 2;
-    const frameworkName = row.framework_name || "";
-    const programName = row.program_name || "";
-    const projectName = row.project_name || "";
-    const taskCode = row.task_code || "";
-    const taskName = row.task_name || "";
-    const taskStatus = row.task_status || "";
-    const taskPriority = row.task_priority || "";
-    const projectTargetQuarter = row.project_target_quarter || "";
-    const taskTargetQuarter = row.task_target_quarter || "";
-    const taskArchived = row.task_archived?.toUpperCase() === "TRUE";
-
-    if (!frameworkName || !projectName || !taskCode || !taskName) {
-      rowsSkipped++;
-      errors.push(
-        `Row ${rowNum}: missing required fields (framework_name, project_name, task_code, or task_name)`
-      );
-      continue;
-    }
-    if (!taskStatus || !VALID_STATUSES.includes(taskStatus)) {
-      rowsSkipped++;
-      errors.push(
-        `Row ${rowNum}: invalid task_status "${taskStatus}"`
-      );
-      continue;
-    }
-    if (taskPriority && !VALID_PRIORITIES.includes(taskPriority)) {
-      rowsSkipped++;
-      errors.push(
-        `Row ${rowNum}: invalid task_priority "${taskPriority}"`
-      );
-      continue;
-    }
-    if (taskTargetQuarter && !parseQuarter(taskTargetQuarter)) {
-      rowsSkipped++;
-      errors.push(
-        `Row ${rowNum}: invalid task_target_quarter "${taskTargetQuarter}"`
-      );
-      continue;
-    }
-    if (projectTargetQuarter && !parseQuarter(projectTargetQuarter)) {
-      rowsSkipped++;
-      errors.push(
-        `Row ${rowNum}: invalid project_target_quarter "${projectTargetQuarter}"`
-      );
-      continue;
-    }
-
+  // Helper to find or create framework/program/project
+  async function findOrCreateProject(
+    frameworkName: string,
+    programName: string,
+    projectName: string,
+    projectRef: string | null,
+    projectOwner: string | null,
+    projectTargetQuarter: string
+  ) {
     let framework = await prisma.framework.findFirst({
       where: { name: frameworkName },
     });
@@ -280,8 +228,8 @@ export async function POST(request: NextRequest) {
         data: {
           name: projectName,
           programId: program.id,
-          reference: row.project_reference || null,
-          owner: row.project_owner || null,
+          reference: projectRef || null,
+          owner: projectOwner || null,
           targetQuarter: projectTargetQuarter || "Q1 2026",
           adjustedTargetQuarter: projectTargetQuarter || "Q1 2026",
           sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
@@ -290,56 +238,251 @@ export async function POST(request: NextRequest) {
       projectsCreated++;
     }
 
-    const existingTask = await prisma.task.findFirst({
-      where: { taskCode },
-    });
-    if (existingTask) {
-      tasksSkipped++;
-      continue;
-    }
-
-    const maxTaskOrder = await prisma.task.aggregate({ _max: { sortOrder: true }, where: { projectId: project.id } });
-    await prisma.task.create({
-      data: {
-        taskCode,
-        projectId: project.id,
-        name: taskName,
-        assignee: row.task_assignee || null,
-        priority: taskPriority || "Low",
-        sortOrder: (maxTaskOrder._max.sortOrder ?? -1) + 1,
-        description: row.task_description || null,
-        dependencies: row.task_dependencies || null,
-        notes: row.task_notes || null,
-        status: taskStatus,
-        targetQuarter: taskTargetQuarter || "Q1 2026",
-        adjustedTargetQuarter: taskTargetQuarter || "Q1 2026",
-        deliverable: row.task_deliverable || null,
-        attachments: (() => {
-          const raw = row.task_attachment_url || "";
-          if (!raw) return null;
-          if (raw.trimStart().startsWith("[")) {
-            try {
-              const parsed = JSON.parse(raw);
-              if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-            } catch {}
-          }
-          return raw.split(",").map((u: string) => ({ url: u.trim(), title: null })).filter((a: { url: string; title: null }) => a.url);
-        })(),
-        archived: taskArchived,
-      },
-    });
-    tasksCreated++;
+    return project;
   }
 
-  if (frameworksCreated > 0 || programsCreated > 0 || projectsCreated > 0 || tasksCreated > 0) {
+  // Process normal tasks sheet (first sheet or named "Export")
+  const taskSheetName = workbook.SheetNames.find((n) => n === "Export") || workbook.SheetNames[0];
+  if (taskSheetName) {
+    const sheet = workbook.Sheets[taskSheetName];
+    const records: Record<string, string>[] = XLSX.utils.sheet_to_json(sheet, {
+      defval: "",
+      raw: false,
+    });
+
+    if (records.length > 0) {
+      const headers = Object.keys(records[0]);
+      const actualSet = new Set(headers.map((h) => h.toLowerCase().trim()));
+      const missing = EXCEL_COLUMNS.filter(
+        (c) => !actualSet.has(c.toLowerCase())
+      );
+      if (missing.length > 0) {
+        errors.push(`Sheet "${taskSheetName}": Missing columns: ${missing.join(", ")}`);
+      } else {
+        const normalizedRecords = records.map((row) => {
+          const out: Record<string, string> = {};
+          for (const [key, val] of Object.entries(row)) {
+            const normalized = key.toLowerCase().trim().replace(/\s+/g, "_");
+            out[normalized] = String(val ?? "").trim();
+          }
+          return out;
+        });
+
+        for (let i = 0; i < normalizedRecords.length; i++) {
+          const row = normalizedRecords[i];
+          const rowNum = i + 2;
+          const frameworkName = row.framework_name || "";
+          const programName = row.program_name || "";
+          const projectName = row.project_name || "";
+          const taskCode = row.task_code || "";
+          const taskName = row.task_name || "";
+          const taskStatus = row.task_status || "";
+          const taskPriority = row.task_priority || "";
+          const projectTargetQuarter = row.project_target_quarter || "";
+          const taskTargetQuarter = row.task_target_quarter || "";
+          const taskArchived = row.task_archived?.toUpperCase() === "TRUE";
+
+          if (!frameworkName || !projectName || !taskCode || !taskName) {
+            rowsSkipped++;
+            errors.push(
+              `Row ${rowNum}: missing required fields (framework_name, project_name, task_code, or task_name)`
+            );
+            continue;
+          }
+          if (!taskStatus || !VALID_STATUSES.includes(taskStatus)) {
+            rowsSkipped++;
+            errors.push(
+              `Row ${rowNum}: invalid task_status "${taskStatus}"`
+            );
+            continue;
+          }
+          if (taskPriority && !VALID_PRIORITIES.includes(taskPriority)) {
+            rowsSkipped++;
+            errors.push(
+              `Row ${rowNum}: invalid task_priority "${taskPriority}"`
+            );
+            continue;
+          }
+          if (taskTargetQuarter && !parseQuarter(taskTargetQuarter)) {
+            rowsSkipped++;
+            errors.push(
+              `Row ${rowNum}: invalid task_target_quarter "${taskTargetQuarter}"`
+            );
+            continue;
+          }
+          if (projectTargetQuarter && !parseQuarter(projectTargetQuarter)) {
+            rowsSkipped++;
+            errors.push(
+              `Row ${rowNum}: invalid project_target_quarter "${projectTargetQuarter}"`
+            );
+            continue;
+          }
+
+          const project = await findOrCreateProject(
+            frameworkName,
+            programName,
+            projectName,
+            row.project_reference || null,
+            row.project_owner || null,
+            projectTargetQuarter
+          );
+
+          const existingTask = await prisma.task.findFirst({
+            where: { taskCode },
+          });
+          if (existingTask) {
+            tasksSkipped++;
+            continue;
+          }
+
+          const maxTaskOrder = await prisma.task.aggregate({ _max: { sortOrder: true }, where: { projectId: project.id } });
+          await prisma.task.create({
+            data: {
+              taskCode,
+              projectId: project.id,
+              name: taskName,
+              assignee: row.task_assignee || null,
+              priority: taskPriority || "Low",
+              sortOrder: (maxTaskOrder._max.sortOrder ?? -1) + 1,
+              description: row.task_description || null,
+              dependencies: row.task_dependencies || null,
+              notes: row.task_notes || null,
+              status: taskStatus,
+              targetQuarter: taskTargetQuarter || "Q1 2026",
+              adjustedTargetQuarter: taskTargetQuarter || "Q1 2026",
+              deliverable: row.task_deliverable || null,
+              attachments: (() => {
+                const raw = row.task_attachment_url || "";
+                if (!raw) return undefined;
+                if (raw.trimStart().startsWith("[")) {
+                  try {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+                  } catch {}
+                }
+                return raw.split(",").map((u: string) => ({ url: u.trim(), title: null })).filter((a: { url: string; title: null }) => a.url);
+              })(),
+              archived: taskArchived,
+            },
+          });
+          tasksCreated++;
+        }
+      }
+    }
+  }
+
+  // Process special tasks sheet if it exists
+  const specialSheetName = workbook.SheetNames.find((n) => n === "Special Tasks");
+  if (specialSheetName) {
+    const sheet = workbook.Sheets[specialSheetName];
+    const records: Record<string, string>[] = XLSX.utils.sheet_to_json(sheet, {
+      defval: "",
+      raw: false,
+    });
+
+    if (records.length > 0) {
+      const headers = Object.keys(records[0]);
+      const actualSet = new Set(headers.map((h) => h.toLowerCase().trim()));
+      const missing = SPECIAL_TASK_COLUMNS.filter(
+        (c) => !actualSet.has(c.toLowerCase())
+      );
+      if (missing.length > 0) {
+        errors.push(`Sheet "${specialSheetName}": Missing columns: ${missing.join(", ")}`);
+      } else {
+        const normalizedRecords = records.map((row) => {
+          const out: Record<string, string> = {};
+          for (const [key, val] of Object.entries(row)) {
+            const normalized = key.toLowerCase().trim().replace(/\s+/g, "_");
+            out[normalized] = String(val ?? "").trim();
+          }
+          return out;
+        });
+
+        for (let i = 0; i < normalizedRecords.length; i++) {
+          const row = normalizedRecords[i];
+          const rowNum = i + 2;
+          const frameworkName = row.framework_name || "";
+          const programName = row.program_name || "";
+          const projectName = row.project_name || "";
+          const specialTaskCode = row.special_task_code || "";
+          const specialTaskName = row.special_task_name || "";
+          const dueQuarter = row.due_quarter || "";
+          const projectTargetQuarter = row.project_target_quarter || "";
+          const specialTaskArchived = row.archived?.toUpperCase() === "TRUE";
+
+          if (!frameworkName || !projectName || !specialTaskCode || !specialTaskName) {
+            rowsSkipped++;
+            errors.push(
+              `Row ${rowNum} (Special Tasks): missing required fields (framework_name, project_name, special_task_code, or special_task_name)`
+            );
+            continue;
+          }
+          if (!dueQuarter || !parseQuarter(dueQuarter)) {
+            rowsSkipped++;
+            errors.push(
+              `Row ${rowNum} (Special Tasks): invalid due_quarter "${dueQuarter}"`
+            );
+            continue;
+          }
+          if (projectTargetQuarter && !parseQuarter(projectTargetQuarter)) {
+            rowsSkipped++;
+            errors.push(
+              `Row ${rowNum} (Special Tasks): invalid project_target_quarter "${projectTargetQuarter}"`
+            );
+            continue;
+          }
+
+          const project = await findOrCreateProject(
+            frameworkName,
+            programName,
+            projectName,
+            row.project_reference || null,
+            row.project_owner || null,
+            projectTargetQuarter
+          );
+
+          const existingSpecialTask = await prisma.specialTask.findFirst({
+            where: { specialTaskCode },
+          });
+          if (existingSpecialTask) {
+            specialTasksSkipped++;
+            continue;
+          }
+
+          const maxOrder = await prisma.specialTask.aggregate({ _max: { sortOrder: true }, where: { projectId: project.id } });
+          await prisma.specialTask.create({
+            data: {
+              specialTaskCode,
+              projectId: project.id,
+              name: specialTaskName,
+              sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
+              total: parseInt(row.total) || 0,
+              nys: parseInt(row.nys) || 0,
+              plan: parseInt(row.plan) || 0,
+              part: parseInt(row.part) || 0,
+              mostly: parseInt(row.mostly) || 0,
+              done: parseInt(row.done) || 0,
+              dueQuarter,
+              lastUpdatedDate: row.last_updated_date || null,
+              archived: specialTaskArchived,
+            },
+          });
+          specialTasksCreated++;
+        }
+      }
+    }
+  }
+
+  const totalCreated = tasksCreated + specialTasksCreated;
+  if (frameworksCreated > 0 || programsCreated > 0 || projectsCreated > 0 || totalCreated > 0) {
     await touchLastModified();
     await logChange({
       entityType: "Import",
       entityId: 0,
       entityName: "Excel Import",
       changeType: "import",
-      newValue: `${tasksCreated} tasks, ${projectsCreated} projects, ${programsCreated} programs, ${frameworksCreated} frameworks`,
-      details: `Tasks skipped: ${tasksSkipped}, Rows skipped: ${rowsSkipped}`,
+      newValue: `${tasksCreated} tasks, ${specialTasksCreated} special tasks, ${projectsCreated} projects, ${programsCreated} programs, ${frameworksCreated} frameworks`,
+      details: `Tasks skipped: ${tasksSkipped}, Special tasks skipped: ${specialTasksSkipped}, Rows skipped: ${rowsSkipped}`,
     });
   }
 
@@ -348,7 +491,9 @@ export async function POST(request: NextRequest) {
     programsCreated,
     projectsCreated,
     tasksCreated,
+    specialTasksCreated,
     tasksSkipped,
+    specialTasksSkipped,
     rowsSkipped,
     errors,
   });

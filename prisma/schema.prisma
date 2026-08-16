@@ -41,6 +41,7 @@ model Project {
   actualCompletionDate  String? @map("actual_completion_date")
   archived              Boolean @default(false)
   tasks                 Task[]
+  specialTasks          SpecialTask[]
 
   @@index([programId])
 }
@@ -63,6 +64,26 @@ model Task {
   deliverable           String?
   attachments           Json?    @map("attachments")
   archived              Boolean  @default(false)
+
+  @@index([projectId])
+}
+
+model SpecialTask {
+  id                Int     @id @default(autoincrement())
+  specialTaskCode   String  @map("special_task_code")
+  projectId         Int
+  project           Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name              String
+  sortOrder         Int     @default(0) @map("sort_order")
+  total             Int     @default(0)
+  nys               Int     @default(0)
+  plan              Int     @default(0)
+  part              Int     @default(0)
+  mostly            Int     @default(0)
+  done              Int     @default(0)
+  dueQuarter        String  @map("due_quarter")
+  lastUpdatedDate   String? @map("last_updated_date")
+  archived          Boolean @default(false)
 
   @@index([projectId])
 }

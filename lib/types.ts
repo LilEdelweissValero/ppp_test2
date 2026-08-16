@@ -12,6 +12,23 @@ export interface ProgramWithProjects {
   projects: ProjectWithTasks[];
 }
 
+export interface SpecialTask {
+  id: number;
+  specialTaskCode: string;
+  projectId: number;
+  name: string;
+  sortOrder: number;
+  total: number;
+  nys: number;
+  plan: number;
+  part: number;
+  mostly: number;
+  done: number;
+  dueQuarter: string;
+  lastUpdatedDate: string | null;
+  archived: boolean;
+}
+
 export interface ProjectWithTasks {
   id: number;
   name: string;
@@ -22,6 +39,7 @@ export interface ProjectWithTasks {
   adjustedTargetQuarter: string;
   actualCompletionDate: string | null;
   tasks: Task[];
+  specialTasks: SpecialTask[];
 }
 
 export interface Task {

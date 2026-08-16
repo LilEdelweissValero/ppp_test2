@@ -12,6 +12,7 @@ export async function POST(request: NextRequest) {
   let programs = 0;
   let projects = 0;
   let tasks = 0;
+  let specialTasks = 0;
 
   if (entityType === "Framework") {
     const frameworkPrograms = await prisma.program.findMany({
@@ -28,9 +29,14 @@ export async function POST(request: NextRequest) {
       projects = frameworkProjects.length;
       const projectIds = frameworkProjects.map((p) => p.id);
       if (projectIds.length > 0) {
-        tasks = await prisma.task.count({
-          where: { projectId: { in: projectIds }, archived: false },
-        });
+        [tasks, specialTasks] = await Promise.all([
+          prisma.task.count({
+            where: { projectId: { in: projectIds }, archived: false },
+          }),
+          prisma.specialTask.count({
+            where: { projectId: { in: projectIds }, archived: false },
+          }),
+        ]);
       }
     }
   } else if (entityType === "Program") {
@@ -41,15 +47,25 @@ export async function POST(request: NextRequest) {
     projects = programProjects.length;
     const projectIds = programProjects.map((p) => p.id);
     if (projectIds.length > 0) {
-      tasks = await prisma.task.count({
-        where: { projectId: { in: projectIds }, archived: false },
-      });
+      [tasks, specialTasks] = await Promise.all([
+        prisma.task.count({
+          where: { projectId: { in: projectIds }, archived: false },
+        }),
+        prisma.specialTask.count({
+          where: { projectId: { in: projectIds }, archived: false },
+        }),
+      ]);
     }
   } else if (entityType === "Project") {
-    tasks = await prisma.task.count({
-      where: { projectId: entityId, archived: false },
-    });
+    [tasks, specialTasks] = await Promise.all([
+      prisma.task.count({
+        where: { projectId: entityId, archived: false },
+      }),
+      prisma.specialTask.count({
+        where: { projectId: entityId, archived: false },
+      }),
+    ]);
   }
 
-  return NextResponse.json({ programs, projects, tasks });
+  return NextResponse.json({ programs, projects, tasks, specialTasks });
 }

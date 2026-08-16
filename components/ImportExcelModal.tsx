@@ -8,7 +8,9 @@ interface ImportResult {
   programsCreated: number;
   projectsCreated: number;
   tasksCreated: number;
+  specialTasksCreated: number;
   tasksSkipped: number;
+  specialTasksSkipped: number;
   rowsSkipped: number;
   errors: string[];
 }
@@ -214,7 +216,9 @@ export default function ImportExcelModal({ open, onClose, onSave }: Props) {
             <p style={{ margin: 0 }}>Programs created: {result.programsCreated}</p>
             <p style={{ margin: 0 }}>Projects created: {result.projectsCreated}</p>
             <p style={{ margin: 0 }}>Tasks created: {result.tasksCreated}</p>
+            <p style={{ margin: 0 }}>Special tasks created: {result.specialTasksCreated}</p>
             <p style={{ margin: 0 }}>Tasks skipped (duplicates): {result.tasksSkipped}</p>
+            <p style={{ margin: 0 }}>Special tasks skipped (duplicates): {result.specialTasksSkipped}</p>
             <p style={{ margin: 0 }}>Rows skipped (errors): {result.rowsSkipped}</p>
             {result.errors.length > 0 && (
               <div style={{ marginTop: 8 }}>
