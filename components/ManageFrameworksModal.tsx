@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   DndContext,
   closestCenter,
@@ -19,6 +19,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import Modal from "./Modal";
+import ArchiveConfirmModal from "./ArchiveConfirmModal";
 
 const PRESET_COLORS = [
   { value: "#DBEAFE", label: "Blue" },
@@ -53,7 +54,7 @@ function SortableFramework({
   setEditName,
   setEditColor,
   handleRename,
-  handleDelete,
+  handleArchive,
   loading,
 }: {
   fw: Framework;
@@ -64,7 +65,7 @@ function SortableFramework({
   setEditName: (name: string) => void;
   setEditColor: (color: string) => void;
   handleRename: (id: number) => void;
-  handleDelete: (id: number) => void;
+  handleArchive: (id: number, name: string) => void;
   loading: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
@@ -168,10 +169,15 @@ function SortableFramework({
               Rename
             </button>
             <button
-              onClick={() => handleDelete(fw.id)}
-              style={{ fontSize: 12, color: "#B91C1C" }}
+              onClick={() => handleArchive(fw.id, fw.name)}
+              title="Archive framework"
+              style={{ color: "var(--ink-tertiary)", background: "none", border: "none", cursor: "pointer", padding: "2px 4px", display: "flex", alignItems: "center" }}
             >
-              Delete
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 8v13H3V8" />
+                <path d="M1 3h22v5H1z" />
+                <path d="M10 12h4" />
+              </svg>
             </button>
           </div>
         </>
@@ -215,6 +221,7 @@ export default function ManageFrameworksModal({
   onChange,
 }: Props) {
   const [frameworks, setFrameworks] = useState<Framework[]>(initialFrameworks);
+  const initialRef = useRef(initialFrameworks);
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState(PRESET_COLORS[0].value);
   const [editId, setEditId] = useState<number | null>(null);
@@ -222,6 +229,11 @@ export default function ManageFrameworksModal({
   const [editColor, setEditColor] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState<{
+    entityId: number;
+    entityName: string;
+  } | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -233,81 +245,45 @@ export default function ManageFrameworksModal({
   useEffect(() => {
     if (open) {
       setFrameworks(initialFrameworks);
+      initialRef.current = initialFrameworks;
       setNewName("");
       setNewColor(PRESET_COLORS[0].value);
       setEditId(null);
       setEditName("");
       setEditColor("");
       setError("");
+      setIsDirty(false);
     }
   }, [open, initialFrameworks]);
 
-  async function handleAdd() {
+  const handleClose = useCallback(() => {
+    if (isDirty && !confirm("You have unsaved changes. Discard?")) return;
+    onClose();
+  }, [isDirty, onClose]);
+
+  function handleAdd() {
     if (!newName.trim()) return;
-    setLoading(true);
-    setError("");
-    const res = await fetch("/api/frameworks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newName, color: newColor }),
-    });
-    setLoading(false);
-    if (res.ok) {
-      const framework = await res.json();
-      const next = [...frameworks, framework];
-      setFrameworks(next);
-      onChange(next);
-      setNewName("");
-      setNewColor(PRESET_COLORS[0].value);
-    } else {
-      const data = await res.json();
-      setError(data.error || "Failed to create framework");
-    }
+    const tempId = Date.now();
+    const next = [...frameworks, { id: tempId, name: newName, color: newColor }];
+    setFrameworks(next);
+    setIsDirty(true);
+    setNewName("");
+    setNewColor(PRESET_COLORS[0].value);
   }
 
-  async function handleRename(id: number) {
+  function handleRenameLocal(id: number) {
     if (!editName.trim()) return;
-    setLoading(true);
-    setError("");
-    const res = await fetch(`/api/frameworks/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: editName, color: editColor }),
-    });
-    setLoading(false);
-    if (res.ok) {
-      const framework = await res.json();
-      const next = frameworks.map((item) =>
-        item.id === id ? framework : item
-      );
-      setFrameworks(next);
-      onChange(next);
-      setEditId(null);
-      setEditName("");
-      setEditColor("");
-    } else {
-      const data = await res.json();
-      setError(data.error || "Failed to rename framework");
-    }
+    const next = frameworks.map((item) =>
+      item.id === id ? { ...item, name: editName, color: editColor } : item
+    );
+    setFrameworks(next);
+    setIsDirty(true);
+    setEditId(null);
+    setEditName("");
+    setEditColor("");
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm("Delete this framework?")) return;
-    setLoading(true);
-    setError("");
-    const res = await fetch(`/api/frameworks/${id}`, { method: "DELETE" });
-    setLoading(false);
-    if (res.ok) {
-      const next = frameworks.filter((framework) => framework.id !== id);
-      setFrameworks(next);
-      onChange(next);
-    } else {
-      const data = await res.json();
-      setError(data.error || "Failed to delete framework");
-    }
-  }
-
-  async function handleDragEnd(event: DragEndEvent) {
+  function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
@@ -315,59 +291,171 @@ export default function ManageFrameworksModal({
     const newIndex = frameworks.findIndex((f) => f.id === over.id);
     const reordered = arrayMove(frameworks, oldIndex, newIndex);
     setFrameworks(reordered);
+    setIsDirty(true);
+  }
+
+  function handleArchiveClick(id: number, name: string) {
+    setArchiveTarget({ entityId: id, entityName: name });
+  }
+
+  function handleArchiveConfirm() {
+    if (!archiveTarget) return;
+    const next = frameworks.map((item) =>
+      item.id === archiveTarget.entityId
+        ? { ...item, archived: true as unknown as string }
+        : item
+    );
+    setFrameworks(next.filter((item) => (item as unknown as { archived?: boolean }).archived !== true));
+    setIsDirty(true);
+    setArchiveTarget(null);
+  }
+
+  async function handleSave() {
+    setLoading(true);
+    setError("");
 
     try {
-      const response = await fetch("/api/reorder", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          entityType: "framework",
-          orderedIds: reordered.map((f) => f.id),
-        }),
+      const initialIds = new Set(initialRef.current.map((f) => f.id));
+
+      const adds = frameworks.filter((f) => !initialIds.has(f.id));
+      const renames = frameworks.filter((f) => {
+        if (initialIds.has(f.id)) {
+          const orig = initialRef.current.find((o) => o.id === f.id);
+          return orig && (orig.name !== f.name || orig.color !== f.color);
+        }
+        return false;
       });
-      if (!response.ok) throw new Error("Reorder failed");
-      onChange(reordered);
+      const reorderedIds = frameworks.map((f) => f.id);
+      const initialOrder = initialRef.current.map((f) => f.id);
+      const orderChanged =
+        reorderedIds.length === initialOrder.length &&
+        reorderedIds.some((id, i) => id !== initialOrder[i]);
+      const archivedIds = frameworks
+        .filter((f) => (f as unknown as { archived?: boolean }).archived === true)
+        .map((f) => f.id);
+
+      const idMap = new Map<number, number>();
+
+      for (const item of adds) {
+        const res = await fetch("/api/frameworks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: item.name, color: item.color }),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          setError(data.error || `Failed to create "${item.name}"`);
+          setLoading(false);
+          return;
+        }
+        const created = await res.json();
+        idMap.set(item.id, created.id);
+      }
+
+      for (const item of renames) {
+        const realId = idMap.get(item.id) ?? item.id;
+        const res = await fetch(`/api/frameworks/${realId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: item.name, color: item.color }),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          setError(data.error || `Failed to rename "${item.name}"`);
+          setLoading(false);
+          return;
+        }
+      }
+
+      if (orderChanged) {
+        const realIds = reorderedIds.map((id) => idMap.get(id) ?? id);
+        await fetch("/api/reorder", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ entityType: "framework", orderedIds: realIds }),
+        });
+      }
+
+      for (const realId of archivedIds) {
+        const mappedId = idMap.get(realId) ?? realId;
+        await fetch(`/api/frameworks/${mappedId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ archived: true }),
+        });
+      }
+
+      const finalFrameworks = frameworks
+        .filter((f) => !(f as unknown as { archived?: boolean }).archived)
+        .map((f) => ({
+          id: idMap.get(f.id) ?? f.id,
+          name: f.name,
+          color: f.color,
+        }));
+
+      onChange(finalFrameworks);
+      setIsDirty(false);
     } catch {
-      setFrameworks(initialFrameworks);
+      setError("Save failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Manage Frameworks" wide>
+    <Modal open={open} onClose={handleClose} title="Manage Frameworks" wide>
       <div>
-        <div style={{ marginBottom: 16 }}>
-          <input
-            type="text"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="New framework name"
-            style={{
-              width: "100%",
-              border: "1px solid var(--rule-strong)",
-              borderRadius: 3,
-              padding: "8px 12px",
-              fontSize: 12,
-              outline: "none",
-              boxSizing: "border-box",
-            }}
-          />
-          <div style={{ marginTop: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
+            <input
+              type="text"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="New framework name"
+              onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+              style={{
+                flex: 1,
+                border: "1px solid var(--rule-strong)",
+                borderRadius: 3,
+                padding: "8px 12px",
+                fontSize: 12,
+                outline: "none",
+              }}
+            />
             <ColorPicker value={newColor} onChange={setNewColor} />
+            <button
+              onClick={handleAdd}
+              disabled={loading || !newName.trim()}
+              style={{
+                padding: "8px 16px",
+                fontSize: 12,
+                color: "#FFFFFF",
+                background: "var(--accent)",
+                borderRadius: 3,
+                opacity: loading || !newName.trim() ? 0.5 : 1,
+                cursor: loading || !newName.trim() ? "not-allowed" : "pointer",
+              }}
+            >
+              Add
+            </button>
           </div>
           <button
-            onClick={handleAdd}
-            disabled={loading || !newName.trim()}
+            onClick={handleSave}
+            disabled={loading || !isDirty}
             style={{
-              marginTop: 8,
+              marginLeft: 12,
               padding: "8px 16px",
               fontSize: 12,
+              fontWeight: 600,
               color: "#FFFFFF",
-              background: "var(--accent)",
+              background: isDirty ? "var(--accent)" : "var(--rule)",
               borderRadius: 3,
-              opacity: loading || !newName.trim() ? 0.5 : 1,
+              opacity: loading || !isDirty ? 0.5 : 1,
+              cursor: loading || !isDirty ? "not-allowed" : "pointer",
+              flexShrink: 0,
             }}
           >
-            Add
+            {loading ? "Saving..." : "Save"}
           </button>
         </div>
 
@@ -396,8 +484,8 @@ export default function ManageFrameworksModal({
                   setEditId={setEditId}
                   setEditName={setEditName}
                   setEditColor={setEditColor}
-                  handleRename={handleRename}
-                  handleDelete={handleDelete}
+                  handleRename={handleRenameLocal}
+                  handleArchive={handleArchiveClick}
                   loading={loading}
                 />
               ))}
@@ -405,6 +493,16 @@ export default function ManageFrameworksModal({
           </SortableContext>
         </DndContext>
       </div>
+      {archiveTarget && (
+        <ArchiveConfirmModal
+          open={!!archiveTarget}
+          onClose={() => setArchiveTarget(null)}
+          onConfirm={handleArchiveConfirm}
+          entityType="Framework"
+          entityName={archiveTarget.entityName}
+          entityId={archiveTarget.entityId}
+        />
+      )}
     </Modal>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   DndContext,
   closestCenter,
@@ -48,7 +48,6 @@ function SortableProgram({
   setEditId,
   setEditName,
   handleRename,
-  handleDelete,
   handleArchive,
   loading,
 }: {
@@ -58,7 +57,6 @@ function SortableProgram({
   setEditId: (id: number | null) => void;
   setEditName: (name: string) => void;
   handleRename: (id: number) => void;
-  handleDelete: (id: number) => void;
   handleArchive: (id: number, name: string) => void;
   loading: boolean;
 }) {
@@ -168,12 +166,6 @@ function SortableProgram({
                 <path d="M10 12h4" />
               </svg>
             </button>
-            <button
-              onClick={() => handleDelete(program.id)}
-              style={{ fontSize: 12, color: "#B91C1C" }}
-            >
-              Delete
-            </button>
           </div>
         </>
       )}
@@ -189,17 +181,18 @@ export default function ManageProgramsModal({
   onChange,
 }: Props) {
   const [programs, setPrograms] = useState<Program[]>(initialPrograms);
+  const initialRef = useRef(initialPrograms);
   const [newName, setNewName] = useState("");
   const [newFrameworkId, setNewFrameworkId] = useState<number>(0);
   const [editId, setEditId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
   const [archiveTarget, setArchiveTarget] = useState<{
     entityId: number;
     entityName: string;
   } | null>(null);
-  const [archiveLoading, setArchiveLoading] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -211,109 +204,49 @@ export default function ManageProgramsModal({
   useEffect(() => {
     if (open) {
       setPrograms(initialPrograms);
+      initialRef.current = initialPrograms;
       setNewName("");
       setNewFrameworkId(0);
       setEditId(null);
       setEditName("");
       setError("");
+      setIsDirty(false);
     }
     // Only reset when modal opens/closes, not on prop changes while open
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  async function handleAdd() {
+  const handleClose = useCallback(() => {
+    if (isDirty && !confirm("You have unsaved changes. Discard?")) return;
+    onClose();
+  }, [isDirty, onClose]);
+
+  function handleAdd() {
     if (!newName.trim() || !newFrameworkId) return;
-    setLoading(true);
-    setError("");
-    const res = await fetch("/api/programs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newName, frameworkId: newFrameworkId }),
-    });
-    setLoading(false);
-    if (res.ok) {
-      const program = await res.json();
-      const framework = frameworks.find((item) => item.id === program.frameworkId);
-      const next = [
-        ...programs,
-        { ...program, framework: { name: framework?.name || "" } },
-      ];
-      setPrograms(next);
-      onChange(next);
-      setNewName("");
-      setNewFrameworkId(0);
-    } else {
-      const data = await res.json();
-      setError(data.error || "Failed to create program");
-    }
+    const tempId = Date.now();
+    const framework = frameworks.find((item) => item.id === newFrameworkId);
+    const next = [
+      ...programs,
+      { id: tempId, name: newName, frameworkId: newFrameworkId, framework: { name: framework?.name || "" } },
+    ];
+    setPrograms(next);
+    setIsDirty(true);
+    setNewName("");
+    setNewFrameworkId(0);
   }
 
-  async function handleRename(id: number) {
+  function handleRenameLocal(id: number) {
     if (!editName.trim()) return;
-    setLoading(true);
-    setError("");
-    const res = await fetch(`/api/programs/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: editName }),
-    });
-    setLoading(false);
-    if (res.ok) {
-      const program = await res.json();
-      const next = programs.map((item) =>
-        item.id === id ? { ...item, ...program } : item
-      );
-      setPrograms(next);
-      onChange(next);
-      setEditId(null);
-      setEditName("");
-    } else {
-      const data = await res.json();
-      setError(data.error || "Failed to rename program");
-    }
+    const next = programs.map((item) =>
+      item.id === id ? { ...item, name: editName } : item
+    );
+    setPrograms(next);
+    setIsDirty(true);
+    setEditId(null);
+    setEditName("");
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm("Delete this program?")) return;
-    setLoading(true);
-    setError("");
-    const res = await fetch(`/api/programs/${id}`, { method: "DELETE" });
-    setLoading(false);
-    if (res.ok) {
-      const next = programs.filter((program) => program.id !== id);
-      setPrograms(next);
-      onChange(next);
-    } else {
-      const data = await res.json();
-      setError(data.error || "Failed to delete program");
-    }
-  }
-
-  function handleArchiveClick(id: number, name: string) {
-    setArchiveTarget({ entityId: id, entityName: name });
-  }
-
-  async function handleArchiveConfirm() {
-    if (!archiveTarget) return;
-    setArchiveLoading(true);
-    try {
-      const res = await fetch(`/api/programs/${archiveTarget.entityId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ archived: true }),
-      });
-      if (res.ok) {
-        const next = programs.filter((p) => p.id !== archiveTarget.entityId);
-        setPrograms(next);
-        onChange(next);
-        setArchiveTarget(null);
-      }
-    } finally {
-      setArchiveLoading(false);
-    }
-  }
-
-  async function handleDragEnd(event: DragEndEvent) {
+  function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
@@ -321,73 +254,178 @@ export default function ManageProgramsModal({
     const newIndex = programs.findIndex((p) => p.id === over.id);
     const reordered = arrayMove(programs, oldIndex, newIndex);
     setPrograms(reordered);
+    setIsDirty(true);
+  }
+
+  function handleArchiveClick(id: number, name: string) {
+    setArchiveTarget({ entityId: id, entityName: name });
+  }
+
+  function handleArchiveConfirmLocal() {
+    if (!archiveTarget) return;
+    setPrograms(programs.filter((p) => p.id !== archiveTarget.entityId));
+    setIsDirty(true);
+    setArchiveTarget(null);
+  }
+
+  async function handleSave() {
+    setLoading(true);
+    setError("");
 
     try {
-      const response = await fetch("/api/reorder", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          entityType: "program",
-          orderedIds: reordered.map((p) => p.id),
-        }),
+      const initialIds = new Set(initialRef.current.map((p) => p.id));
+
+      const adds = programs.filter((p) => !initialIds.has(p.id));
+      const renames = programs.filter((p) => {
+        if (initialIds.has(p.id)) {
+          const orig = initialRef.current.find((o) => o.id === p.id);
+          return orig && orig.name !== p.name;
+        }
+        return false;
       });
-      if (!response.ok) throw new Error("Reorder failed");
-      onChange(reordered);
+      const reorderedIds = programs.map((p) => p.id);
+      const initialOrder = initialRef.current.map((p) => p.id);
+      const orderChanged =
+        reorderedIds.length === initialOrder.length &&
+        reorderedIds.some((id, i) => id !== initialOrder[i]);
+      const archivedIds = initialRef.current
+        .filter((p) => !programs.some((curr) => curr.id === p.id))
+        .map((p) => p.id);
+
+      const idMap = new Map<number, number>();
+
+      for (const item of adds) {
+        const res = await fetch("/api/programs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: item.name, frameworkId: item.frameworkId }),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          setError(data.error || `Failed to create "${item.name}"`);
+          setLoading(false);
+          return;
+        }
+        const created = await res.json();
+        idMap.set(item.id, created.id);
+      }
+
+      for (const item of renames) {
+        const realId = idMap.get(item.id) ?? item.id;
+        const res = await fetch(`/api/programs/${realId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: item.name }),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          setError(data.error || `Failed to rename "${item.name}"`);
+          setLoading(false);
+          return;
+        }
+      }
+
+      if (orderChanged) {
+        const realIds = reorderedIds.map((id) => idMap.get(id) ?? id);
+        await fetch("/api/reorder", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ entityType: "program", orderedIds: realIds }),
+        });
+      }
+
+      for (const realId of archivedIds) {
+        const mappedId = idMap.get(realId) ?? realId;
+        await fetch(`/api/programs/${mappedId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ archived: true }),
+        });
+      }
+
+      const finalPrograms = programs.map((p) => ({
+        id: idMap.get(p.id) ?? p.id,
+        name: p.name,
+        frameworkId: p.frameworkId,
+        framework: p.framework,
+      }));
+
+      onChange(finalPrograms);
+      setIsDirty(false);
     } catch {
-      setPrograms(initialPrograms);
+      setError("Save failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Manage Programs" wide>
+    <Modal open={open} onClose={handleClose} title="Manage Programs" wide>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ display: "flex", gap: 8 }}>
-            <select
-              value={newFrameworkId}
-              onChange={(e) => setNewFrameworkId(parseInt(e.target.value))}
-              style={{
-                border: "1px solid var(--rule-strong)",
-                borderRadius: 3,
-                padding: "8px 12px",
-                fontSize: 12,
-              }}
-            >
-              <option value={0}>Select framework</option>
-              {frameworks.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
-            <input
-              type="text"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="New program name"
-              style={{
-                flex: 1,
-                border: "1px solid var(--rule-strong)",
-                borderRadius: 3,
-                padding: "8px 12px",
-                fontSize: 12,
-              }}
-            />
-            <button
-              onClick={handleAdd}
-              disabled={loading || !newName.trim() || !newFrameworkId}
-              style={{
-                padding: "8px 16px",
-                fontSize: 12,
-                color: "#FFFFFF",
-                background: "var(--accent)",
-                borderRadius: 3,
-                opacity: loading || !newName.trim() || !newFrameworkId ? 0.5 : 1,
-              }}
-            >
-              Add
-            </button>
-          </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <select
+            value={newFrameworkId}
+            onChange={(e) => setNewFrameworkId(parseInt(e.target.value))}
+            style={{
+              border: "1px solid var(--rule-strong)",
+              borderRadius: 3,
+              padding: "8px 12px",
+              fontSize: 12,
+            }}
+          >
+            <option value={0}>Select framework</option>
+            {frameworks.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+          </select>
+          <input
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="New program name"
+            onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+            style={{
+              flex: 1,
+              border: "1px solid var(--rule-strong)",
+              borderRadius: 3,
+              padding: "8px 12px",
+              fontSize: 12,
+            }}
+          />
+          <button
+            onClick={handleAdd}
+            disabled={loading || !newName.trim() || !newFrameworkId}
+            style={{
+              padding: "8px 16px",
+              fontSize: 12,
+              color: "#FFFFFF",
+              background: "var(--accent)",
+              borderRadius: 3,
+              opacity: loading || !newName.trim() || !newFrameworkId ? 0.5 : 1,
+              cursor: loading || !newName.trim() || !newFrameworkId ? "not-allowed" : "pointer",
+            }}
+          >
+            Add
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={loading || !isDirty}
+            style={{
+              padding: "8px 16px",
+              fontSize: 12,
+              fontWeight: 600,
+              color: "#FFFFFF",
+              background: isDirty ? "var(--accent)" : "var(--rule)",
+              borderRadius: 3,
+              opacity: loading || !isDirty ? 0.5 : 1,
+              cursor: loading || !isDirty ? "not-allowed" : "pointer",
+              flexShrink: 0,
+            }}
+          >
+            {loading ? "Saving..." : "Save"}
+          </button>
         </div>
 
         {error && (
@@ -413,8 +451,7 @@ export default function ManageProgramsModal({
                   editName={editName}
                   setEditId={setEditId}
                   setEditName={setEditName}
-                  handleRename={handleRename}
-                  handleDelete={handleDelete}
+                  handleRename={handleRenameLocal}
                   handleArchive={handleArchiveClick}
                   loading={loading}
                 />
@@ -427,11 +464,10 @@ export default function ManageProgramsModal({
         <ArchiveConfirmModal
           open={!!archiveTarget}
           onClose={() => setArchiveTarget(null)}
-          onConfirm={handleArchiveConfirm}
+          onConfirm={handleArchiveConfirmLocal}
           entityType="Program"
           entityName={archiveTarget.entityName}
           entityId={archiveTarget.entityId}
-          loading={archiveLoading}
         />
       )}
     </Modal>

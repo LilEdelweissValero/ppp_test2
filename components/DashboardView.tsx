@@ -57,7 +57,6 @@ import ManageFrameworksModal from "@/components/ManageFrameworksModal";
 import ManageProgramsModal from "@/components/ManageProgramsModal";
 import ImportExcelModal from "@/components/ImportExcelModal";
 import HistoryLogModal from "@/components/HistoryLogModal";
-import ArchiveConfirmModal from "@/components/ArchiveConfirmModal";
 import { usePortfolioCache } from "@/components/PortfolioCacheProvider";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -1127,12 +1126,6 @@ export default function DashboardView({
   const [showHistoryLog, setShowHistoryLog] = useState(false);
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
   const deferredSearch = useDeferredValue(search);
-  const [archiveTarget, setArchiveTarget] = useState<{
-    entityType: "Framework" | "Program" | "Project" | "Task";
-    entityId: number;
-    entityName: string;
-  } | null>(null);
-  const [archiveLoading, setArchiveLoading] = useState(false);
 
   useEffect(() => {
     setPortfolio(frameworks);
@@ -1314,30 +1307,6 @@ export default function DashboardView({
 
   function handleRefresh() {
     router.refresh();
-  }
-
-  async function handleArchiveConfirm() {
-    if (!archiveTarget) return;
-    setArchiveLoading(true);
-    try {
-      const endpoint =
-        archiveTarget.entityType === "Framework"
-          ? `/api/frameworks/${archiveTarget.entityId}`
-          : archiveTarget.entityType === "Program"
-          ? `/api/programs/${archiveTarget.entityId}`
-          : `/api/projects/${archiveTarget.entityId}`;
-      const res = await fetch(endpoint, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ archived: true }),
-      });
-      if (res.ok) {
-        setArchiveTarget(null);
-        router.refresh();
-      }
-    } finally {
-      setArchiveLoading(false);
-    }
   }
 
   function handleSort(key: string) {
@@ -1730,64 +1699,9 @@ export default function DashboardView({
                         <span style={{ fontSize: 11, color: "var(--ink-tertiary)" }}>
                           {completedCount}/{allProjects.length} done
                         </span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setArchiveTarget({
-                              entityType: "Framework",
-                              entityId: fw.id,
-                              entityName: fw.name,
-                            });
-                          }}
-                          title="Archive framework"
-                          style={{
-                            color: "var(--ink-tertiary)",
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            padding: "2px 4px",
-                            marginLeft: 4,
-                            display: "flex",
-                            alignItems: "center",
-                          }}
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M21 8v13H3V8" />
-                            <path d="M1 3h22v5H1z" />
-                            <path d="M10 12h4" />
-                          </svg>
-                        </button>
                       </div>
                     );
                   })()}
-                  {(!hasProjects || !hasTasksInQuarter) && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setArchiveTarget({
-                          entityType: "Framework",
-                          entityId: fw.id,
-                          entityName: fw.name,
-                        });
-                      }}
-                      title="Archive framework"
-                      style={{
-                        color: "var(--ink-tertiary)",
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        padding: "2px 4px",
-                        display: "flex",
-                        alignItems: "center",
-                      }}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21 8v13H3V8" />
-                        <path d="M1 3h22v5H1z" />
-                        <path d="M10 12h4" />
-                      </svg>
-                    </button>
-                  )}
                 </div>
 
               {/* ── Framework table ── */}
@@ -1929,17 +1843,6 @@ export default function DashboardView({
         <HistoryLogModal
           open
           onClose={() => setShowHistoryLog(false)}
-        />
-      )}
-      {archiveTarget && (
-        <ArchiveConfirmModal
-          open={!!archiveTarget}
-          onClose={() => setArchiveTarget(null)}
-          onConfirm={handleArchiveConfirm}
-          entityType={archiveTarget.entityType}
-          entityName={archiveTarget.entityName}
-          entityId={archiveTarget.entityId}
-          loading={archiveLoading}
         />
       )}
     </div>
