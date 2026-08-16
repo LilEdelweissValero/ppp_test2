@@ -160,18 +160,6 @@ export default function ImportExcelModal({ open, onClose, onSave }: Props) {
             >
               {loading ? "Importing..." : "Import"}
             </button>
-          </div>
-        </div>
-
-        {/* ── Divider ── */}
-        <hr style={{ border: "none", borderTop: "1px solid var(--rule)", margin: 0 }} />
-
-        {/* ── Export section ── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <p style={{ fontSize: 12, color: "var(--ink-secondary)", margin: 0 }}>
-            Export all existing tasks (including archived) to an Excel file.
-          </p>
-          <div>
             <button
               onClick={handleExport}
               disabled={exporting}
@@ -185,12 +173,21 @@ export default function ImportExcelModal({ open, onClose, onSave }: Props) {
                 borderRadius: 3,
                 cursor: exporting ? "not-allowed" : "pointer",
                 opacity: exporting ? 0.5 : 1,
+                flexShrink: 0,
+                marginLeft: "auto",
               }}
             >
               {exporting ? "Exporting..." : "Export"}
             </button>
           </div>
         </div>
+
+        {/* ── Divider ── */}
+        <hr style={{ border: "none", borderTop: "1px solid var(--rule)", margin: 0 }} />
+
+        <p style={{ fontSize: 12, color: "var(--ink-secondary)", margin: 0 }}>
+          Export all existing tasks (including archived) to an Excel file.
+        </p>
 
         {error && (
           <p style={{ fontSize: 12, color: "#B91C1C", margin: 0 }}>{error}</p>
