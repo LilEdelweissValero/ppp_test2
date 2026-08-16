@@ -22,6 +22,7 @@ const EXCEL_COLUMNS = [
   "task_target_quarter",
   "task_deliverable",
   "task_attachment_url",
+  "task_archived",
 ];
 
 const VALID_STATUSES = [
@@ -58,6 +59,7 @@ export async function GET() {
       "Q3 2026",
       "Routers deployed",
       "",
+      "FALSE",
     ],
     [
       "Infrastructure",
@@ -77,6 +79,7 @@ export async function GET() {
       "Q4 2026",
       "VLAN config complete",
       "",
+      "FALSE",
     ],
     [
       "Security",
@@ -96,6 +99,7 @@ export async function GET() {
       "Q4 2026",
       "All readers installed",
       "",
+      "FALSE",
     ],
   ];
 
@@ -201,6 +205,7 @@ export async function POST(request: NextRequest) {
     const taskPriority = row.task_priority || "";
     const projectTargetQuarter = row.project_target_quarter || "";
     const taskTargetQuarter = row.task_target_quarter || "";
+    const taskArchived = row.task_archived?.toUpperCase() === "TRUE";
 
     if (!frameworkName || !projectName || !taskCode || !taskName) {
       rowsSkipped++;
@@ -310,6 +315,7 @@ export async function POST(request: NextRequest) {
         adjustedTargetQuarter: taskTargetQuarter || "Q1 2026",
         deliverable: row.task_deliverable || null,
         attachmentUrl: row.task_attachment_url || null,
+        archived: taskArchived,
       },
     });
     tasksCreated++;

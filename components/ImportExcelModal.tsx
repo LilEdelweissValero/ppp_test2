@@ -109,7 +109,7 @@ export default function ImportExcelModal({ open, onClose, onSave }: Props) {
 project_owner, project_target_quarter, task_code, task_name,
 task_assignee, task_priority, task_description, task_dependencies,
 task_notes, task_status, task_target_quarter, task_deliverable,
-task_attachment_url`}
+task_attachment_url, task_archived`}
         </pre>
 
         <button
