@@ -49,6 +49,7 @@ interface Framework {
   id: number;
   name: string;
   color: string;
+  archived: boolean;
   programs: Program[];
 }
 
@@ -184,23 +185,25 @@ export default function ArchivedView({ frameworks: initialFrameworks }: Props) {
                     {fw.programs.reduce((s, p) => s + p.projects.length, 0) !== 1 ? "s" : ""}
                   </span>
                 </div>
-                <button
-                  onClick={() => handleUnarchive("framework", fw.id)}
-                  disabled={loading === fw.id}
-                  style={{
-                    padding: "4px 12px",
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: "var(--accent)",
-                    background: "var(--surface)",
-                    border: "1px solid var(--accent)",
-                    borderRadius: 3,
-                    cursor: "pointer",
-                    opacity: loading === fw.id ? 0.5 : 1,
-                  }}
-                >
-                  {loading === fw.id ? "Restoring..." : "Unarchive"}
-                </button>
+                 {fw.archived && (
+                    <button
+                      onClick={() => handleUnarchive("framework", fw.id)}
+                      disabled={loading === fw.id}
+                      style={{
+                        padding: "4px 12px",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: "var(--accent)",
+                        background: "var(--surface)",
+                        border: "1px solid var(--accent)",
+                        borderRadius: 3,
+                        cursor: "pointer",
+                        opacity: loading === fw.id ? 0.5 : 1,
+                      }}
+                    >
+                      {loading === fw.id ? "Restoring..." : "Unarchive"}
+                    </button>
+                 )}
               </div>
 
               {/* Programs */}

@@ -145,17 +145,22 @@ export const getProjectData = unstable_cache(
 
 export async function getArchivedData() {
   return prisma.framework.findMany({
-    where: { archived: true },
+    where: {
+      OR: [{ archived: true }, { programs: { some: { archived: true } } }],
+    },
     select: {
       id: true,
       name: true,
       color: true,
+      archived: true,
       programs: {
+        where: { archived: true },
         select: {
           id: true,
           name: true,
           frameworkId: true,
           projects: {
+            where: { archived: true },
             select: {
               id: true,
               name: true,
@@ -166,6 +171,7 @@ export async function getArchivedData() {
               adjustedTargetQuarter: true,
               actualCompletionDate: true,
               tasks: {
+                where: { archived: true },
                 select: {
                   id: true,
                   taskCode: true,
