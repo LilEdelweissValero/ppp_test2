@@ -159,9 +159,14 @@ function SortableProgram({
             </button>
             <button
               onClick={() => handleArchive(program.id, program.name)}
-              style={{ fontSize: 12, color: "var(--ink-tertiary)" }}
+              title="Archive program"
+              style={{ color: "var(--ink-tertiary)", background: "none", border: "none", cursor: "pointer", padding: "2px 4px", display: "flex", alignItems: "center" }}
             >
-              Archive
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 8v13H3V8" />
+                <path d="M1 3h22v5H1z" />
+                <path d="M10 12h4" />
+              </svg>
             </button>
             <button
               onClick={() => handleDelete(program.id)}

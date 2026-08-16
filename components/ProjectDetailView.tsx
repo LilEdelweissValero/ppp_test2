@@ -178,8 +178,13 @@ function SortableTaskRow({
           <button
             onClick={onArchive}
             className="detail-task-action"
+            title="Archive task"
           >
-            Archive
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 8v13H3V8" />
+              <path d="M1 3h22v5H1z" />
+              <path d="M10 12h4" />
+            </svg>
           </button>
         </div>
       </td>
@@ -448,8 +453,13 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                 })
               }
               className="detail-button"
+              title="Archive project"
             >
-              Archive
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: "middle" }}>
+                <path d="M21 8v13H3V8" />
+                <path d="M1 3h22v5H1z" />
+                <path d="M10 12h4" />
+              </svg>
             </button>
           </div>
         </section>
