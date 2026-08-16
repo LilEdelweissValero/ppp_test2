@@ -1796,7 +1796,7 @@ export default function DashboardView({
                     color: "var(--ink-tertiary)",
                   }}
                 >
-                  No tasks in {selectedQuarter === ALL_TIME ? "any quarter" : selectedQuarter}.
+                  No tasks due in {selectedQuarter === ALL_TIME ? "any quarter" : selectedQuarter}.
                 </p>
               )}
             </div>
