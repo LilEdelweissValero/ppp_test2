@@ -253,6 +253,7 @@ export default function ArchivedView({ frameworks: initialFrameworks }: Props) {
                         ? computeProjectHealth(pct * 100, project.adjustedTargetQuarter, compSettings)
                         : null;
                     return (
+                      <>
                       <div
                         key={project.id}
                         style={{
@@ -264,17 +265,15 @@ export default function ArchivedView({ frameworks: initialFrameworks }: Props) {
                         }}
                       >
                         <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
-                          <Link
-                            href={`/projects/${project.id}`}
+                          <span
                             style={{
                               fontSize: 12,
                               fontWeight: 600,
-                              color: "var(--accent)",
-                              textDecoration: "none",
+                              color: "var(--ink-primary)",
                             }}
                           >
                             {project.name}
-                          </Link>
+                          </span>
                           <span style={{ fontSize: 11, color: "var(--ink-tertiary)" }}>
                             {tasks.length} task{tasks.length !== 1 ? "s" : ""}
                           </span>
@@ -300,6 +299,71 @@ export default function ArchivedView({ frameworks: initialFrameworks }: Props) {
                           {loading === project.id ? "..." : "Unarchive"}
                         </button>
                       </div>
+
+                      {/* Tasks */}
+                      {project.tasks.length > 0 &&
+                        project.tasks.map((task) => (
+                          <div
+                            key={task.id}
+                            style={{
+                              padding: "6px 14px 6px 64px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              borderBottom: "1px solid var(--rule)",
+                              background: "var(--ground)",
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                flex: 1,
+                                minWidth: 0,
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  color: "var(--ink-tertiary)",
+                                  minWidth: 70,
+                                  display: "inline-block",
+                                }}
+                              >
+                                {task.taskCode}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  color: "var(--ink-primary)",
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  minWidth: 0,
+                                  flex: 1,
+                                }}
+                              >
+                                {task.name}
+                              </span>
+                              {task.assignee && (
+                                <span
+                                  style={{
+                                    fontSize: 11,
+                                    color: "var(--ink-tertiary)",
+                                    whiteSpace: "nowrap",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                  }}
+                                >
+                                  {task.assignee}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          ))}
+                      </>
                     );
                   })}
                 </div>
