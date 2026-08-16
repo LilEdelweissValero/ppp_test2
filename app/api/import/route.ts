@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import * as XLSX from "xlsx";
 import { touchLastModified } from "@/lib/system-metadata";
 import { logChange } from "@/lib/audit-log";
-import { getSettings } from "@/lib/computation-settings";
+import { getSettings } from "@/lib/computation-settings-server";
 
 const EXCEL_COLUMNS = [
   "framework_name",

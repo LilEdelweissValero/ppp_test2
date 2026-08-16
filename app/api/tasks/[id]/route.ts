@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { touchLastModified } from "@/lib/system-metadata";
 import { logChange, diffFields } from "@/lib/audit-log";
-import { getSettings } from "@/lib/computation-settings";
+import { getSettings } from "@/lib/computation-settings-server";
 
 export async function GET(
   _request: NextRequest,

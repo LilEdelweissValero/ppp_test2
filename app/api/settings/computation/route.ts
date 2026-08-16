@@ -3,8 +3,8 @@ import {
   getSettings,
   saveSettings,
   migrateStatuses,
-  validateHealthRules,
-} from "@/lib/computation-settings";
+} from "@/lib/computation-settings-server";
+import { validateHealthRules } from "@/lib/computation-settings";
 import type { ComputationSettings } from "@/lib/computation-settings";
 
 export async function GET() {
