@@ -48,6 +48,7 @@ export function diffFields(
 ): string | null {
   const changes: string[] = [];
   for (const field of fields) {
+    if (!(field in newObj)) continue;
     const oldVal = oldObj[field];
     const newVal = newObj[field];
     if (String(oldVal ?? "") !== String(newVal ?? "")) {
