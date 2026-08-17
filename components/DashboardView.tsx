@@ -1439,6 +1439,7 @@ export default function DashboardView({
   }, [selectedQuarter, router]);
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
+  const [programsCollapsed, setProgramsCollapsed] = useState(false);
   const [showAddProject, setShowAddProject] = useState(false);
   const [showManageFrameworks, setShowManageFrameworks] = useState(false);
   const [showManagePrograms, setShowManagePrograms] = useState(false);
@@ -1639,6 +1640,10 @@ export default function DashboardView({
     } else {
       setCollapsed(new Set(allIds));
     }
+  }
+
+  function toggleProgramsCollapse() {
+    setProgramsCollapsed((prev) => !prev);
   }
 
   function handleRefresh() {
@@ -1884,7 +1889,21 @@ export default function DashboardView({
               letterSpacing: "0.03em",
             }}
           >
-            {allCollapsed ? "Expand all" : "Collapse all"}
+            {allCollapsed ? "Expand Frameworks" : "Collapse Frameworks"}
+          </button>
+          <button
+            onClick={toggleProgramsCollapse}
+            style={{
+              fontSize: 11,
+              color: "var(--ink-tertiary)",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: 0,
+              letterSpacing: "0.03em",
+            }}
+          >
+            {programsCollapsed ? "Expand Programs" : "Collapse Programs"}
           </button>
           <span style={{ fontSize: 11, color: "var(--ink-tertiary)" }}>
             {totalFrameworks} framework{totalFrameworks !== 1 ? "s" : ""}
@@ -2035,7 +2054,7 @@ export default function DashboardView({
                 </div>
 
               {/* ── Framework table ── */}
-              {!isCollapsed && hasProjects && hasTasksInQuarter && (
+              {!isCollapsed && !programsCollapsed && hasProjects && hasTasksInQuarter && (
                 <div style={{ flex: 1, overflowX: "auto" }}>
                     <DndContext
                       id={`project-sort-${fw.id}`}
