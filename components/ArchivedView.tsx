@@ -357,12 +357,28 @@ export default function ArchivedView({ frameworks: initialFrameworks }: Props) {
                                     textOverflow: "ellipsis",
                                   }}
                                 >
-                                  {task.assignee}
-                                </span>
-                              )}
+                                   {task.assignee}
+                                 </span>
+                               )}
+                             </div>
+                             <button
+                               onClick={() => handleUnarchive("task", task.id)}
+                               disabled={loading === task.id}
+                               style={{
+                                 padding: "3px 10px",
+                                 fontSize: 11,
+                                 color: "var(--accent)",
+                                 background: "none",
+                                 border: "1px solid var(--accent)",
+                                 borderRadius: 3,
+                                 cursor: "pointer",
+                                 opacity: loading === task.id ? 0.5 : 1,
+                               }}
+                             >
+                               {loading === task.id ? "..." : "Unarchive"}
+                             </button>
                             </div>
-                          </div>
-                          ))}
+                         ))}
                       </>
                     );
                   })}
