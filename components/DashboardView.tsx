@@ -50,7 +50,7 @@ import {
   computeProjectDerivedStatus,
 } from "@/lib/health";
 import { countTasksByStatus, getStatusScore } from "@/lib/status";
-import { compareQuarters, quarterRange } from "@/lib/quarters";
+import { compareQuarters, parseQuarter, quarterRange } from "@/lib/quarters";
 import { getDefaultSettings } from "@/lib/computation-settings";
 import type { ComputationSettings } from "@/lib/computation-settings";
 import HealthBadge from "@/components/HealthBadge";
@@ -204,6 +204,38 @@ function getAllTasksForProject(project: Project, selectedQuarter: string, settin
   const filteredSpecial = filterSpecialTasksByQuarter(project.specialTasks || [], selectedQuarter);
   const virtualTasks = expandSpecialTasksToVirtualTasks(filteredSpecial, settings);
   return [...realTasks, ...virtualTasks];
+}
+
+function getYearsFromQuarters(quarters: string[]): number[] {
+  const years = new Set<number>();
+  for (const q of quarters) {
+    const parsed = parseQuarter(q);
+    if (parsed) years.add(parsed.year);
+  }
+  return Array.from(years).sort((a, b) => b - a);
+}
+
+function getFrameworkTasksForYear(
+  framework: Framework,
+  year: number,
+  settings?: ComputationSettings
+): Task[] {
+  const tasks: Task[] = [];
+  for (const prog of framework.programs) {
+    for (const project of prog.projects) {
+      const realDueInYear = project.tasks.filter((t) => {
+        const parsed = parseQuarter(t.adjustedTargetQuarter);
+        return !!parsed && parsed.year === year;
+      });
+      const specialDueInYear = (project.specialTasks || []).filter((st) => {
+        const parsed = parseQuarter(st.dueQuarter);
+        return !!parsed && parsed.year === year;
+      });
+      const virtual = expandSpecialTasksToVirtualTasks(specialDueInYear, settings);
+      tasks.push(...realDueInYear, ...virtual);
+    }
+  }
+  return tasks;
 }
 
 // ── Sort helpers ───────────────────────────────────────────────────────────
@@ -1700,10 +1732,80 @@ export default function DashboardView({
 
   const totalFrameworks = filteredFrameworks.length;
 
+  // ── Year completion summary ──────────────────────────────────────────────────
+  // Derived from existing task quarters (independent of the quarter filter).
+  const years = useMemo(() => getYearsFromQuarters(existingQuarters), [existingQuarters]);
+  const [selectedYear, setSelectedYear] = useState<number | null>(
+    years.length > 0 ? years[0] : null
+  );
+  const yearPct = useMemo(() => {
+    if (selectedYear === null) return null;
+    const frameworkPcts: number[] = [];
+    for (const fw of frameworks) {
+      const yearTasks = getFrameworkTasksForYear(fw, selectedYear, compSettings);
+      if (yearTasks.length === 0) continue;
+      frameworkPcts.push(computeProjectPercentComplete(yearTasks, compSettings));
+    }
+    if (frameworkPcts.length === 0) return null;
+    const mean = frameworkPcts.reduce((sum, pct) => sum + pct, 0) / frameworkPcts.length;
+    return Math.round(mean * 100);
+  }, [selectedYear, compSettings, frameworks]);
+
   // ── render ───────────────────────────────────────────────────────────────
 
   return (
     <div>
+      {/* ── Year completion summary ── */}
+      {years.length > 0 && selectedYear !== null && (
+        <div
+          style={{
+            marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 12,
+            color: "var(--ink-tertiary)",
+          }}
+        >
+          <span>The overall completion rate of ITSD</span>
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(parseInt(e.target.value, 10))}
+            style={{
+              fontSize: 12,
+              color: "var(--ink-primary)",
+              background: "var(--surface)",
+              border: "1px solid var(--rule-strong)",
+              borderRadius: 3,
+              padding: "2px 24px 2px 8px",
+              cursor: "pointer",
+              appearance: "none",
+              backgroundImage:
+                "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238896A8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E\")",
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "right 6px center",
+            }}
+          >
+            {years.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+          <span>is</span>
+          <span
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              color: "var(--ink-primary)",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {yearPct === null ? "—" : `${yearPct}%`}
+          </span>
+        </div>
+      )}
+
       {/* ── Toolbar ── */}
       <div
         style={{
