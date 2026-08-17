@@ -206,6 +206,19 @@ function getAllTasksForProject(project: Project, selectedQuarter: string, settin
   return [...realTasks, ...virtualTasks];
 }
 
+function getProjectTasksForYear(project: Project, year: number, settings?: ComputationSettings): Task[] {
+  const realTasks = project.tasks.filter((t) => {
+    const parsed = parseQuarter(t.adjustedTargetQuarter);
+    return !!parsed && parsed.year === year;
+  });
+  const filteredSpecial = (project.specialTasks || []).filter((st) => {
+    const parsed = parseQuarter(st.dueQuarter);
+    return !!parsed && parsed.year === year;
+  });
+  const virtualTasks = expandSpecialTasksToVirtualTasks(filteredSpecial, settings);
+  return [...realTasks, ...virtualTasks];
+}
+
 function getYearsFromQuarters(quarters: string[]): number[] {
   const years = new Set<number>();
   for (const q of quarters) {
@@ -213,29 +226,6 @@ function getYearsFromQuarters(quarters: string[]): number[] {
     if (parsed) years.add(parsed.year);
   }
   return Array.from(years).sort((a, b) => b - a);
-}
-
-function getFrameworkTasksForYear(
-  framework: Framework,
-  year: number,
-  settings?: ComputationSettings
-): Task[] {
-  const tasks: Task[] = [];
-  for (const prog of framework.programs) {
-    for (const project of prog.projects) {
-      const realDueInYear = project.tasks.filter((t) => {
-        const parsed = parseQuarter(t.adjustedTargetQuarter);
-        return !!parsed && parsed.year === year;
-      });
-      const specialDueInYear = (project.specialTasks || []).filter((st) => {
-        const parsed = parseQuarter(st.dueQuarter);
-        return !!parsed && parsed.year === year;
-      });
-      const virtual = expandSpecialTasksToVirtualTasks(specialDueInYear, settings);
-      tasks.push(...realDueInYear, ...virtual);
-    }
-  }
-  return tasks;
 }
 
 // ── Sort helpers ───────────────────────────────────────────────────────────
@@ -1742,9 +1732,26 @@ export default function DashboardView({
     if (selectedYear === null) return null;
     const frameworkPcts: number[] = [];
     for (const fw of frameworks) {
-      const yearTasks = getFrameworkTasksForYear(fw, selectedYear, compSettings);
-      if (yearTasks.length === 0) continue;
-      frameworkPcts.push(computeProjectPercentComplete(yearTasks, compSettings));
+      const programPcts = fw.programs
+        .map((prog) => {
+          const projPcts = prog.projects
+            .map((p) => {
+              const yt = getProjectTasksForYear(p, selectedYear, compSettings);
+              return yt.length > 0 ? computeProjectPercentComplete(yt, compSettings) : null;
+            })
+            .filter((p): p is number => p !== null);
+          return projPcts.length > 0
+            ? projPcts.reduce((a, b) => a + b, 0) / projPcts.length
+            : null;
+        })
+        .filter((p): p is number => p !== null);
+      const fwPct = programPcts.length > 0
+        ? programPcts.reduce((a, b) => a + b, 0) / programPcts.length
+        : 0;
+      const hasTasks = fw.programs.some((prog) =>
+        prog.projects.some((p) => getProjectTasksForYear(p, selectedYear, compSettings).length > 0)
+      );
+      if (hasTasks) frameworkPcts.push(fwPct);
     }
     if (frameworkPcts.length === 0) return null;
     const mean = frameworkPcts.reduce((sum, pct) => sum + pct, 0) / frameworkPcts.length;
