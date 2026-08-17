@@ -2156,7 +2156,7 @@ export default function DashboardView({
                 </div>
 
               {/* ── Framework table ── */}
-              {!isCollapsed && !programsCollapsed && hasProjects && hasTasksInQuarter && (
+              {!isCollapsed && hasProjects && hasTasksInQuarter && (
                 <div style={{ flex: 1, overflowX: "auto" }}>
                     <DndContext
                       id={`project-sort-${fw.id}`}
@@ -2214,7 +2214,8 @@ export default function DashboardView({
                                   settings={compSettings}
                                 />
                                 {/* Project rows */}
-                                {sortedProjects.map((project, rowIdx) => (
+                                {!programsCollapsed &&
+                                sortedProjects.map((project, rowIdx) => (
                                   <SortableProjectRow
                                     key={project.id}
                                     project={project}
@@ -2242,7 +2243,7 @@ export default function DashboardView({
               )}
 
               {/* Empty framework */}
-              {!isCollapsed && !hasProjects && (
+              {!isCollapsed && !programsCollapsed && !hasProjects && (
                 <p
                   style={{
                     padding: "16px 20px",
@@ -2253,7 +2254,7 @@ export default function DashboardView({
                   No projects in this framework yet.
                 </p>
               )}
-              {!isCollapsed && hasProjects && !hasTasksInQuarter && (
+              {!isCollapsed && !programsCollapsed && hasProjects && !hasTasksInQuarter && (
                 <p
                   style={{
                     padding: "16px 20px",
