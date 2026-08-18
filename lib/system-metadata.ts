@@ -11,7 +11,11 @@ export async function touchLastModified(): Promise<void> {
     update: { value: now },
     create: { key: LAST_MODIFIED_KEY, value: now },
   });
-  revalidateTag(PORTFOLIO_CACHE_TAG, { expire: 0 });
+  try {
+    revalidateTag(PORTFOLIO_CACHE_TAG, { expire: 0 });
+  } catch (err) {
+    console.error("revalidateTag failed:", err);
+  }
 }
 
 export async function getLastModifiedAt(): Promise<string | null> {

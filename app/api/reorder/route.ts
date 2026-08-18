@@ -26,18 +26,27 @@ export async function PATCH(request: NextRequest) {
       { status: 400 }
     );
   }
+  const ids = orderedIds.filter(
+    (id): id is number => typeof id === "number" && Number.isInteger(id)
+  );
+  if (ids.length === 0) {
+    return NextResponse.json(
+      { error: "orderedIds must contain valid ids" },
+      { status: 400 }
+    );
+  }
 
   try {
-    const updates = orderedIds.map((id: number, index: number) => {
+    const updates = ids.map((id, index) => {
       switch (entityType as EntityType) {
         case "framework":
-          return prisma.framework.update({ where: { id }, data: { sortOrder: index } });
+          return prisma.framework.updateMany({ where: { id }, data: { sortOrder: index } });
         case "program":
-          return prisma.program.update({ where: { id }, data: { sortOrder: index } });
+          return prisma.program.updateMany({ where: { id }, data: { sortOrder: index } });
         case "project":
-          return prisma.project.update({ where: { id }, data: { sortOrder: index } });
+          return prisma.project.updateMany({ where: { id }, data: { sortOrder: index } });
         case "task":
-          return prisma.task.update({ where: { id }, data: { sortOrder: index } });
+          return prisma.task.updateMany({ where: { id }, data: { sortOrder: index } });
       }
     });
 
@@ -47,9 +56,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("Reorder failed:", err);
-    return NextResponse.json(
-      { error: "Failed to save order" },
-      { status: 500 }
-    );
+    const message = err instanceof Error ? err.message : "Failed to save order";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
