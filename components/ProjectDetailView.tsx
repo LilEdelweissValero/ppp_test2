@@ -480,9 +480,19 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
   }
 
   async function handleSaveOrder() {
+    console.log("[SAVE ORDER] Button clicked — starting handleSaveOrder");
+    console.log("[SAVE ORDER] sortConfig:", sortConfig);
+    console.log("[SAVE ORDER] sortedTasks:", sortedTasks);
+    console.log("[SAVE ORDER] orderedIds being sent:", sortedTasks.map((t) => t.id));
+
     setSavingOrder(true);
+    console.log("[SAVE ORDER] savingOrder set to true");
+
     setSaveOrderError(null);
+    console.log("[SAVE ORDER] saveOrderError reset to null");
+
     try {
+      console.log("[SAVE ORDER] Sending PATCH request to /api/reorder");
       const response = await fetch("/api/reorder", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -491,15 +501,26 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
           orderedIds: sortedTasks.map((t) => t.id),
         }),
       });
-      if (!response.ok) throw new Error(`Save failed (${response.status})`);
+      console.log("[SAVE ORDER] Response received. status:", response.status);
+      console.log("[SAVE ORDER] Response ok:", response.ok);
+
+      if (!response.ok) {
+        const bodyText = await response.text();
+        console.error("[SAVE ORDER] Response not ok. body:", bodyText);
+        throw new Error(`Save failed (${response.status})`);
+      }
+      console.log("[SAVE ORDER] Request succeeded — applying reordered tasks locally");
       updateTasks(sortedTasks);
       setSortConfig(null);
       router.refresh();
+      console.log("[SAVE ORDER] updateTasks applied, sortConfig cleared, router.refresh() called");
     } catch (err) {
-      console.error("Failed to save task order:", err);
+      console.error("[SAVE ORDER] Caught error in handleSaveOrder:", err);
       setSaveOrderError(err instanceof Error ? err.message : "Failed to save order");
+      console.log("[SAVE ORDER] saveOrderError set to:", err instanceof Error ? err.message : "Failed to save order");
     } finally {
       setSavingOrder(false);
+      console.log("[SAVE ORDER] savingOrder set to false — handleSaveOrder finished");
     }
   }
 
