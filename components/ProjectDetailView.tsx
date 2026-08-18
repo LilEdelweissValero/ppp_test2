@@ -276,6 +276,7 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
   }, []);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
   const [savingOrder, setSavingOrder] = useState(false);
+  const [saveOrderError, setSaveOrderError] = useState<string | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<{
     entityType: "Project" | "Task" | "SpecialTask";
     entityId: number;
@@ -480,6 +481,7 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
 
   async function handleSaveOrder() {
     setSavingOrder(true);
+    setSaveOrderError(null);
     try {
       const response = await fetch("/api/reorder", {
         method: "PATCH",
@@ -489,9 +491,13 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
           orderedIds: sortedTasks.map((t) => t.id),
         }),
       });
-      if (!response.ok) throw new Error("Save order failed");
+      if (!response.ok) throw new Error(`Save failed (${response.status})`);
       updateTasks(sortedTasks);
       setSortConfig(null);
+      router.refresh();
+    } catch (err) {
+      console.error("Failed to save task order:", err);
+      setSaveOrderError(err instanceof Error ? err.message : "Failed to save order");
     } finally {
       setSavingOrder(false);
     }
@@ -679,18 +685,24 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                             </th>
                           );
                         })}
-                        <th style={{ width: 120 }}>
-                          {sortConfig ? (
-                            <button
-                              type="button"
-                              onClick={handleSaveOrder}
-                              disabled={savingOrder}
-                              className="detail-button detail-save-button"
-                            >
-                              {savingOrder ? "Saving…" : "Save order"}
-                            </button>
-                          ) : (
-                            "Actions"
+                        <th style={{ width: 120 }}>Actions</th>
+                        <th style={{ width: 150 }}>
+                          {sortConfig && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={handleSaveOrder}
+                                disabled={savingOrder}
+                                className="detail-button detail-save-button"
+                              >
+                                {savingOrder ? "Saving…" : "Save order"}
+                              </button>
+                              {saveOrderError && (
+                                <span className="detail-save-error" role="alert">
+                                  {saveOrderError}
+                                </span>
+                              )}
+                            </>
                           )}
                         </th>
                       </tr>
