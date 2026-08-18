@@ -275,6 +275,7 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
       .catch(() => {});
   }, []);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
+  const [savingOrder, setSavingOrder] = useState(false);
   const [archiveTarget, setArchiveTarget] = useState<{
     entityType: "Project" | "Task" | "SpecialTask";
     entityId: number;
@@ -477,6 +478,25 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
     }
   }
 
+  async function handleSaveOrder() {
+    setSavingOrder(true);
+    try {
+      const response = await fetch("/api/reorder", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entityType: "task",
+          orderedIds: sortedTasks.map((t) => t.id),
+        }),
+      });
+      if (!response.ok) throw new Error("Save order failed");
+      updateTasks(sortedTasks);
+      setSortConfig(null);
+    } finally {
+      setSavingOrder(false);
+    }
+  }
+
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -628,7 +648,17 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                 items={sortedTasks.map((t) => t.id)}
                 strategy={verticalListSortingStrategy}
               >
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto" style={{ position: "relative" }}>
+                  {sortConfig && (
+                    <button
+                      type="button"
+                      onClick={handleSaveOrder}
+                      disabled={savingOrder}
+                      className="detail-button detail-save-button"
+                    >
+                      {savingOrder ? "Saving…" : "Save order"}
+                    </button>
+                  )}
                   <table className="detail-task-table">
                     <thead>
                       <tr>
