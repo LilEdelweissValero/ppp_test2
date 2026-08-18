@@ -654,7 +654,24 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                 items={sortedTasks.map((t) => t.id)}
                 strategy={verticalListSortingStrategy}
               >
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto detail-task-table-wrap">
+                  {sortConfig && (
+                    <div className="detail-save-controls">
+                      <button
+                        type="button"
+                        onClick={handleSaveOrder}
+                        disabled={savingOrder}
+                        className="detail-button detail-save-button"
+                      >
+                        {savingOrder ? "Saving…" : "SAVE ORDER"}
+                      </button>
+                      {saveOrderError && (
+                        <span className="detail-save-error" role="alert">
+                          {saveOrderError}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <table className="detail-task-table">
                     <thead>
                       <tr>
@@ -686,25 +703,6 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                           );
                         })}
                         <th style={{ width: 120 }}>Actions</th>
-                        <th style={{ width: 150 }}>
-                          {sortConfig && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={handleSaveOrder}
-                                disabled={savingOrder}
-                                className="detail-button detail-save-button"
-                              >
-                                {savingOrder ? "Saving…" : "Save order"}
-                              </button>
-                              {saveOrderError && (
-                                <span className="detail-save-error" role="alert">
-                                  {saveOrderError}
-                                </span>
-                              )}
-                            </>
-                          )}
-                        </th>
                       </tr>
                     </thead>
                     <tbody>

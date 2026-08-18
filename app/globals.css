@@ -355,14 +355,34 @@ select:focus-visible {
   color: white;
 }
 
+.detail-task-table-wrap {
+  position: relative;
+}
+
+.detail-save-controls {
+  position: absolute;
+  top: 3px;
+  right: 8px;
+  z-index: 2;
+  text-align: left;
+}
+
 .detail-save-button {
+  border: 1px solid #fff;
+  background: #000;
+  color: #fff;
   border-radius: 6px;
-  background: var(--surface);
-  box-shadow: 0 1px 3px rgba(15, 17, 23, 0.12);
   min-height: 24px;
   padding: 3px 12px;
   font-size: 11px;
+  font-weight: 700;
   line-height: 1.4;
+}
+
+.detail-save-button:hover {
+  border-color: #fff;
+  background: #111;
+  color: #fff;
 }
 
 .detail-save-button:disabled {
