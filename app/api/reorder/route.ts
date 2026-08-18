@@ -36,21 +36,19 @@ export async function PATCH(request: NextRequest) {
     );
   }
 
-  try {
-    const updates = ids.map((id, index) => {
-      switch (entityType as EntityType) {
-        case "framework":
-          return prisma.framework.updateMany({ where: { id }, data: { sortOrder: index } });
-        case "program":
-          return prisma.program.updateMany({ where: { id }, data: { sortOrder: index } });
-        case "project":
-          return prisma.project.updateMany({ where: { id }, data: { sortOrder: index } });
-        case "task":
-          return prisma.task.updateMany({ where: { id }, data: { sortOrder: index } });
-      }
-    });
+  const tableByType: Record<EntityType, string> = {
+    framework: "Framework",
+    program: "Program",
+    project: "Project",
+    task: "Task",
+  };
 
-    await prisma.$transaction(updates);
+  try {
+    const table = tableByType[entityType as EntityType];
+    const cases = ids.map((id, index) => `WHEN ${id} THEN ${index}`).join(" ");
+    await prisma.$executeRawUnsafe(
+      `UPDATE "${table}" SET "sort_order" = CASE "id" ${cases} END WHERE "id" IN (${ids.join(", ")})`
+    );
 
     await touchLastModified();
     return NextResponse.json({ ok: true });
