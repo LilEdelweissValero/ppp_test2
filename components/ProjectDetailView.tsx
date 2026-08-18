@@ -648,17 +648,7 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                 items={sortedTasks.map((t) => t.id)}
                 strategy={verticalListSortingStrategy}
               >
-                <div className="overflow-x-auto" style={{ position: "relative" }}>
-                  {sortConfig && (
-                    <button
-                      type="button"
-                      onClick={handleSaveOrder}
-                      disabled={savingOrder}
-                      className="detail-button detail-save-button"
-                    >
-                      {savingOrder ? "Saving…" : "Save order"}
-                    </button>
-                  )}
+                <div className="overflow-x-auto">
                   <table className="detail-task-table">
                     <thead>
                       <tr>
@@ -689,7 +679,20 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                             </th>
                           );
                         })}
-                        <th style={{ width: 120 }}>Actions</th>
+                        <th style={{ width: 120 }}>
+                          {sortConfig ? (
+                            <button
+                              type="button"
+                              onClick={handleSaveOrder}
+                              disabled={savingOrder}
+                              className="detail-button detail-save-button"
+                            >
+                              {savingOrder ? "Saving…" : "Save order"}
+                            </button>
+                          ) : (
+                            "Actions"
+                          )}
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
