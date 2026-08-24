@@ -24,17 +24,19 @@ export default function HistoryPage() {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <span
+            <Link
+              href="/"
               style={{
                 fontWeight: 700,
                 fontSize: 13,
                 letterSpacing: "0.12em",
                 textTransform: "uppercase",
                 color: "var(--ink-on-dark)",
+                textDecoration: "none",
               }}
             >
               ITSD Project Tracker
-            </span>
+            </Link>
             <span
               style={{
                 width: 1,
@@ -53,18 +55,6 @@ export default function HistoryPage() {
               History Log
             </span>
           </div>
-
-          <Link
-            href="/"
-            style={{
-              fontSize: 11,
-              color: "rgba(247,248,250,0.60)",
-              textDecoration: "none",
-              letterSpacing: "0.03em",
-            }}
-          >
-            &larr; Back to Dashboard
-          </Link>
         </div>
       </header>
 
