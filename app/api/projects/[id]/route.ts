@@ -42,7 +42,6 @@ export async function PATCH(
         data: { archived },
       });
     });
-    await touchLastModified();
     const project = await prisma.project.findUnique({ where: { id: parseInt(id) } });
     await logChange({
       entityType: "Project",
@@ -51,6 +50,7 @@ export async function PATCH(
       changeType: archived ? "archive" : "unarchive",
       details: archived ? "Archived project and all tasks" : "Unarchived project and all tasks",
     });
+    await touchLastModified();
     return NextResponse.json(project);
   }
 
@@ -68,7 +68,6 @@ export async function PATCH(
     data: updateData,
     include: { program: { select: { id: true, name: true } } },
   });
-  await touchLastModified();
   if (oldProject) {
     const details = diffFields(
       oldProject as Record<string, unknown>,
@@ -83,6 +82,7 @@ export async function PATCH(
         changeType: "update",
         details,
       });
+      await touchLastModified();
     }
   }
   return NextResponse.json(project);

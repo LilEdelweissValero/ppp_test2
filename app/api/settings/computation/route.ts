@@ -7,6 +7,7 @@ import {
 import { validateHealthRules } from "@/lib/computation-settings";
 import type { ComputationSettings } from "@/lib/computation-settings";
 import { logChange, diffSettings } from "@/lib/audit-log";
+import { touchLastModified } from "@/lib/system-metadata";
 
 export async function GET() {
   const settings = await getSettings();
@@ -69,6 +70,7 @@ export async function PUT(request: Request) {
       newValue: JSON.stringify(settings),
       details,
     });
+    await touchLastModified();
 
     return NextResponse.json({ success: true, migrated });
   } catch {

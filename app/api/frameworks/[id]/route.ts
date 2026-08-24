@@ -83,7 +83,6 @@ export async function PATCH(
         }
       }
     });
-    await touchLastModified();
     const framework = await prisma.framework.findUnique({ where: { id: parseInt(id) } });
     await logChange({
       entityType: "Framework",
@@ -92,6 +91,7 @@ export async function PATCH(
       changeType: archived ? "archive" : "unarchive",
       details: archived ? "Archived framework and all child items" : "Unarchived framework and all child items",
     });
+    await touchLastModified();
     return NextResponse.json(framework);
   }
 
@@ -99,7 +99,6 @@ export async function PATCH(
     where: { id: parseInt(id) },
     data: updateData,
   });
-  await touchLastModified();
   if (oldFramework) {
     const details = diffFields(oldFramework as Record<string, unknown>, updateData, ["name", "color"]);
     if (details) {
@@ -110,6 +109,7 @@ export async function PATCH(
         changeType: "update",
         details,
       });
+      await touchLastModified();
     }
   }
   return NextResponse.json(framework);
@@ -131,7 +131,6 @@ export async function DELETE(
   }
   const framework = await prisma.framework.findUnique({ where: { id: parseInt(id) } });
   await prisma.framework.delete({ where: { id: parseInt(id) } });
-  await touchLastModified();
   if (framework) {
     await logChange({
       entityType: "Framework",
@@ -140,6 +139,7 @@ export async function DELETE(
       changeType: "delete",
       oldValue: framework.name,
     });
+    await touchLastModified();
   }
   return NextResponse.json({ ok: true });
 }
