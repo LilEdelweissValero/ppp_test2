@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import type { ComputationSettings } from "@/lib/computation-settings";
 
 interface LogChangeParams {
   entityType: string;
@@ -55,5 +56,45 @@ export function diffFields(
       changes.push(`${field}: "${oldVal ?? ""}" → "${newVal ?? ""}"`);
     }
   }
+  return changes.length > 0 ? changes.join("; ") : null;
+}
+
+export function diffSettings(
+  oldSettings: ComputationSettings,
+  newSettings: ComputationSettings
+): string | null {
+  const changes: string[] = [];
+
+  for (let i = 0; i < oldSettings.statuses.length; i++) {
+    const oldS = oldSettings.statuses[i];
+    const newS = newSettings.statuses[i];
+    if (oldS.name !== newS.name) {
+      changes.push(`status[${i}].name: "${oldS.name}" → "${newS.name}"`);
+    }
+    if (oldS.score !== newS.score) {
+      changes.push(`status[${i}].score: ${oldS.score} → ${newS.score}`);
+    }
+  }
+
+  for (let i = 0; i < oldSettings.healthRules.length; i++) {
+    const oldR = oldSettings.healthRules[i];
+    const newR = newSettings.healthRules[i];
+    if (oldR.healthStatus !== newR.healthStatus) {
+      changes.push(`healthRule[${i}].healthStatus: "${oldR.healthStatus}" → "${newR.healthStatus}"`);
+    }
+    if (JSON.stringify(oldR.quarterConditions) !== JSON.stringify(newR.quarterConditions)) {
+      changes.push(`healthRule[${i}].quarterConditions: ${JSON.stringify(oldR.quarterConditions)} → ${JSON.stringify(newR.quarterConditions)}`);
+    }
+    if (oldR.quarterOperator !== newR.quarterOperator) {
+      changes.push(`healthRule[${i}].quarterOperator: "${oldR.quarterOperator}" → "${newR.quarterOperator}"`);
+    }
+    if (JSON.stringify(oldR.percentConditions) !== JSON.stringify(newR.percentConditions)) {
+      changes.push(`healthRule[${i}].percentConditions: ${JSON.stringify(oldR.percentConditions)} → ${JSON.stringify(newR.percentConditions)}`);
+    }
+    if (oldR.percentOperator !== newR.percentOperator) {
+      changes.push(`healthRule[${i}].percentOperator: "${oldR.percentOperator}" → "${newR.percentOperator}"`);
+    }
+  }
+
   return changes.length > 0 ? changes.join("; ") : null;
 }

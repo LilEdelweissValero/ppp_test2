@@ -28,6 +28,8 @@ const CHANGE_TYPE_STYLES: Record<string, { bg: string; ink: string; label: strin
   import: { bg: "#F3E8FF", ink: "#7C3AED", label: "IMPORT" },
   quarter: { bg: "#FFF3E0", ink: "#8B5200", label: "QUARTER" },
   status: { bg: "#EAF1FE", ink: "#1D4BAA", label: "STATUS" },
+  settings: { bg: "#FFF8E1", ink: "#8B6914", label: "SETTINGS" },
+  reorder: { bg: "#E8F5E9", ink: "#2E7D32", label: "REORDER" },
 };
 
 export default function HistoryLogModal({ open, onClose }: Props) {
@@ -142,6 +144,7 @@ export default function HistoryLogModal({ open, onClose }: Props) {
             <option value="Program">Program</option>
             <option value="Project">Project</option>
             <option value="Task">Task</option>
+            <option value="Settings">Settings</option>
             <option value="Import">Import</option>
           </select>
           <select
@@ -159,6 +162,8 @@ export default function HistoryLogModal({ open, onClose }: Props) {
             <option value="import">Import</option>
             <option value="quarter">Quarter Change</option>
             <option value="status">Status Change</option>
+            <option value="settings">Settings Change</option>
+            <option value="reorder">Reorder</option>
           </select>
         </div>
 

@@ -5,6 +5,7 @@ import {
   getDefaultSettings,
   type ComputationSettings,
 } from "./computation-settings";
+import { logChange } from "./audit-log";
 
 const SETTINGS_KEY = "computationSettings";
 
@@ -50,10 +51,30 @@ export async function migrateStatuses(
     const oldS = oldSettings.statuses[i];
     const newS = newSettings.statuses[i];
     if (oldS.name !== newS.name) {
+      // Find affected tasks before updating so we can log each one
+      const affectedTasks = await prisma.task.findMany({
+        where: { status: oldS.name },
+        select: { id: true, taskCode: true, name: true },
+      });
+
       const result = await prisma.task.updateMany({
         where: { status: oldS.name },
         data: { status: newS.name },
       });
+
+      // Log each individual task status change for audit trail
+      for (const task of affectedTasks) {
+        await logChange({
+          entityType: "Task",
+          entityId: task.id,
+          entityName: `${task.taskCode}: ${task.name}`,
+          changeType: "status",
+          oldValue: oldS.name,
+          newValue: newS.name,
+          details: `Status renamed from "${oldS.name}" to "${newS.name}" via settings`,
+        });
+      }
+
       migrated[`${oldS.name} → ${newS.name}`] = result.count;
     }
   }

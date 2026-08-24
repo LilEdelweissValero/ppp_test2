@@ -6,6 +6,7 @@ import {
 } from "@/lib/computation-settings-server";
 import { validateHealthRules } from "@/lib/computation-settings";
 import type { ComputationSettings } from "@/lib/computation-settings";
+import { logChange, diffSettings } from "@/lib/audit-log";
 
 export async function GET() {
   const settings = await getSettings();
@@ -57,6 +58,17 @@ export async function PUT(request: Request) {
     const oldSettings = await getSettings();
     const migrated = await migrateStatuses(oldSettings, settings);
     await saveSettings(settings);
+
+    const details = diffSettings(oldSettings, settings);
+    await logChange({
+      entityType: "Settings",
+      entityId: 0,
+      entityName: "Computation Settings",
+      changeType: "settings",
+      oldValue: JSON.stringify(oldSettings),
+      newValue: JSON.stringify(settings),
+      details,
+    });
 
     return NextResponse.json({ success: true, migrated });
   } catch {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { touchLastModified } from "@/lib/system-metadata";
+import { logChange } from "@/lib/audit-log";
 
 const VALID_TYPES = ["framework", "program", "project", "task"] as const;
 type EntityType = (typeof VALID_TYPES)[number];
@@ -45,12 +46,30 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const table = tableByType[entityType as EntityType];
+
+    // Fetch existing order before update for audit log
+    const existingRows = await prisma.$queryRawUnsafe<{ id: number }[]>(
+      `SELECT "id" FROM "${table}" WHERE "id" IN (${ids.join(", ")}) ORDER BY "sort_order" ASC`
+    );
+    const existingOrder = existingRows.map((r: { id: number }) => r.id);
+
     const cases = ids.map((id, index) => `WHEN ${id} THEN ${index}`).join(" ");
     await prisma.$executeRawUnsafe(
       `UPDATE "${table}" SET "sort_order" = CASE "id" ${cases} END WHERE "id" IN (${ids.join(", ")})`
     );
 
     await touchLastModified();
+
+    await logChange({
+      entityType: table,
+      entityId: 0,
+      entityName: `${table} reorder`,
+      changeType: "reorder",
+      oldValue: JSON.stringify(existingOrder),
+      newValue: JSON.stringify(ids),
+      details: `Reordered ${ids.length} ${table.toLowerCase()}s`,
+    });
+
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("Reorder failed:", err);
