@@ -58,7 +58,6 @@ import ProjectFormModal from "@/components/ProjectFormModal";
 import ManageFrameworksModal from "@/components/ManageFrameworksModal";
 import ManageProgramsModal from "@/components/ManageProgramsModal";
 import ImportExcelModal from "@/components/ImportExcelModal";
-import HistoryLogModal from "@/components/HistoryLogModal";
 import ComputationSettingsModal from "@/components/ComputationSettingsModal";
 import { usePortfolioCache } from "@/components/PortfolioCacheProvider";
 
@@ -1466,7 +1465,6 @@ export default function DashboardView({
   const [showManageFrameworks, setShowManageFrameworks] = useState(false);
   const [showManagePrograms, setShowManagePrograms] = useState(false);
   const [showImportExcel, setShowImportExcel] = useState(false);
-  const [showHistoryLog, setShowHistoryLog] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [compSettings, setCompSettings] = useState<ComputationSettings | undefined>(undefined);
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
@@ -1939,7 +1937,7 @@ export default function DashboardView({
             onManageFrameworks={() => setShowManageFrameworks(true)}
             onManagePrograms={() => setShowManagePrograms(true)}
             onImportExcel={() => setShowImportExcel(true)}
-            onHistoryLog={() => setShowHistoryLog(true)}
+            onHistoryLog={() => window.open("/history", "_blank")}
             onViewArchive={() => router.push("/archived")}
             onSettings={() => setShowSettings(true)}
           />
@@ -2306,12 +2304,6 @@ export default function DashboardView({
           open
           onClose={() => setShowImportExcel(false)}
           onSave={handleRefresh}
-        />
-      )}
-      {showHistoryLog && (
-        <HistoryLogModal
-          open
-          onClose={() => setShowHistoryLog(false)}
         />
       )}
       <ComputationSettingsModal
