@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 interface LogEntry {
   id: number;
@@ -33,6 +33,7 @@ export default function HistoryLogView() {
   const [totalPages, setTotalPages] = useState(1);
   const [entityFilter, setEntityFilter] = useState("");
   const [changeFilter, setChangeFilter] = useState("");
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -49,6 +50,30 @@ export default function HistoryLogView() {
       })
       .catch(() => setLoading(false));
   }, [page, entityFilter, changeFilter]);
+
+  function handleSort(key: string) {
+    setSortConfig((prev) => {
+      if (prev?.key === key) {
+        return prev.direction === "asc" ? { key, direction: "desc" } : null;
+      }
+      return { key, direction: key === "createdAt" ? "desc" : "asc" };
+    });
+  }
+
+  const sortedLogs = useMemo(() => {
+    if (!sortConfig) return logs;
+    return [...logs].sort((a, b) => {
+      const va = a[sortConfig.key as keyof LogEntry];
+      const vb = b[sortConfig.key as keyof LogEntry];
+      let cmp: number;
+      if (sortConfig.key === "createdAt") {
+        cmp = new Date(va as string).getTime() - new Date(vb as string).getTime();
+      } else {
+        cmp = String(va ?? "").localeCompare(String(vb ?? ""));
+      }
+      return sortConfig.direction === "asc" ? cmp : -cmp;
+    });
+  }, [logs, sortConfig]);
 
   function formatDate(iso: string): string {
     try {
@@ -92,6 +117,8 @@ export default function HistoryLogView() {
     color: "var(--ink-secondary)",
     borderBottom: "2px solid var(--rule-strong)",
     whiteSpace: "nowrap",
+    cursor: "pointer",
+    userSelect: "none",
   };
 
   const tdStyle: React.CSSProperties = {
@@ -180,15 +207,38 @@ export default function HistoryLogView() {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ background: "var(--ground)" }}>
-                  <th style={thStyle}>Date</th>
-                  <th style={thStyle}>Action</th>
-                  <th style={thStyle}>Entity</th>
-                  <th style={thStyle}>Name</th>
-                  <th style={thStyle}>Details</th>
+                  {[
+                    { label: "Date", key: "createdAt" },
+                    { label: "Action", key: "changeType" },
+                    { label: "Entity", key: "entityType" },
+                    { label: "Name", key: "entityName" },
+                    { label: "Details", key: "details" },
+                  ].map(({ label, key }) => {
+                    const active = sortConfig?.key === key;
+                    const arrow = active
+                      ? sortConfig!.direction === "asc"
+                        ? " \u25B2"
+                        : " \u25BC"
+                      : "";
+                    return (
+                      <th
+                        key={key}
+                        style={thStyle}
+                        onClick={() => handleSort(key)}
+                      >
+                        {label}
+                        {arrow && (
+                          <span style={{ fontSize: 7, marginLeft: 2, opacity: active ? 1 : 0.3 }}>
+                            {arrow}
+                          </span>
+                        )}
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
-                {logs.map((log, i) => {
+                {sortedLogs.map((log, i) => {
                   const style = getStyle(log.changeType);
                   return (
                     <tr
