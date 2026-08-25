@@ -73,7 +73,7 @@ export default function DateTimePicker({
   }
 
   return (
-    <span style={{ position: "relative", display: "inline-block" }}>
+    <span style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
       <button
         ref={buttonRef}
         onClick={handleOpen}
@@ -82,13 +82,16 @@ export default function DateTimePicker({
           border: "none",
           padding: 0,
           cursor: "pointer",
-          fontSize: "inherit",
-          fontFamily: "inherit",
+          fontSize: 12,
+          fontFamily: "var(--font-mono)",
+          fontWeight: 600,
           color: "inherit",
-          letterSpacing: "inherit",
+          letterSpacing: "0.02em",
+          fontVariantNumeric: "tabular-nums",
           textDecoration: "none",
-          borderBottom: "1px dashed rgba(247,248,250,0.3)",
+          borderBottom: "1px dashed currentColor",
           lineHeight: "inherit",
+          opacity: 0.9,
         }}
         title="Click to choose a point in time"
       >
@@ -104,7 +107,7 @@ export default function DateTimePicker({
             right: 0,
             background: "var(--surface)",
             border: "1px solid var(--rule)",
-            borderRadius: 4,
+            borderRadius: 6,
             boxShadow: "0 4px 16px rgba(15,17,23,0.12), 0 1px 4px rgba(15,17,23,0.08)",
             padding: 16,
             zIndex: 100,

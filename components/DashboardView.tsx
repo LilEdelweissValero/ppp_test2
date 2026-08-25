@@ -809,6 +809,7 @@ function SortableProjectRow({
   onProjectUpdate,
   settings,
   isHistorical,
+  historicalTimestamp,
 }: {
   project: Project;
   onPrefetch: () => void;
@@ -819,6 +820,7 @@ function SortableProjectRow({
   onProjectUpdate: (fields: Record<string, unknown>) => void;
   settings?: ComputationSettings;
   isHistorical?: boolean;
+  historicalTimestamp?: string | null;
 }) {
   const [shouldPrefetch, setShouldPrefetch] = useState(false);
   const {
@@ -880,7 +882,7 @@ function SortableProjectRow({
         </td>
         <td style={{ ...tdBase, width: 220 }}>
           <Link
-            href={`/projects/${project.id}?cached=1`}
+            href={isHistorical && historicalTimestamp ? `/projects/${project.id}?asOf=${encodeURIComponent(historicalTimestamp)}` : `/projects/${project.id}?cached=1`}
             prefetch={shouldPrefetch}
             onPointerEnter={onPrefetch}
             onFocus={onPrefetch}
@@ -1020,7 +1022,7 @@ function SortableProjectRow({
       {/* project name */}
       <td style={{ ...tdBase, width: 220 }}>
         <Link
-          href={`/projects/${project.id}?cached=1`}
+          href={isHistorical && historicalTimestamp ? `/projects/${project.id}?asOf=${encodeURIComponent(historicalTimestamp)}` : `/projects/${project.id}?cached=1`}
           prefetch={shouldPrefetch ? true : false}
           onPointerEnter={onPrefetch}
           onFocus={onPrefetch}
@@ -2264,7 +2266,7 @@ export default function DashboardView({
                                     selectedQuarter={selectedQuarter}
                                     isEven={rowIdx % 2 === 0}
                                     programName={prog.name}
-                                    onPrefetch={() => router.prefetch(`/projects/${project.id}?cached=1`)}
+                                    onPrefetch={() => router.prefetch(isHistorical && historicalTimestamp ? `/projects/${project.id}?asOf=${encodeURIComponent(historicalTimestamp)}` : `/projects/${project.id}?cached=1`)}
                                     onNavigate={() => {
                                       markDashboardNavigation(project.id);
                                     }}
@@ -2274,6 +2276,7 @@ export default function DashboardView({
                                     }}
                                     settings={compSettings}
                                     isHistorical={isHistorical}
+                                    historicalTimestamp={historicalTimestamp}
                                   />
                                 ))}
                               </SortableContext>

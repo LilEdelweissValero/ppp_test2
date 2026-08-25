@@ -349,21 +349,21 @@ export default function ProjectDetailView({ project: initialProject, historicalT
     setCurrentProject(next);
     setTasks(next.tasks);
     setSpecialTasks(next.specialTasks || []);
-    setProject(next);
+    if (!isHistorical) setProject(next);
   }
 
   function updateTasks(nextTasks: Task[]) {
     setTasks(nextTasks);
     const nextProject = { ...project, tasks: nextTasks };
     setCurrentProject(nextProject);
-    setProject(nextProject);
+    if (!isHistorical) setProject(nextProject);
   }
 
   function updateSpecialTasks(nextSpecialTasks: CachedSpecialTask[]) {
     setSpecialTasks(nextSpecialTasks);
     const nextProject = { ...project, specialTasks: nextSpecialTasks };
     setCurrentProject(nextProject);
-    setProject(nextProject);
+    if (!isHistorical) setProject(nextProject);
   }
 
   const virtualTasks = expandSpecialTasksToVirtualTasks(specialTasks, compSettings);

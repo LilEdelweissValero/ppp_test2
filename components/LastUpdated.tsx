@@ -16,7 +16,7 @@ export default function LastUpdated({
   const isHistorical = !!historicalTimestamp;
   const displayIso = isHistorical ? historicalTimestamp : iso;
 
-  if (!displayIso) return <span>Never</span>;
+  if (!displayIso) return <span style={{ fontSize: 12, fontWeight: 600 }}>Never</span>;
 
   const date = new Date(displayIso);
   const formatted =
@@ -33,7 +33,11 @@ export default function LastUpdated({
     });
 
   if (!onTimeSelect) {
-    return <span>{formatted}</span>;
+    return (
+      <span style={{ fontSize: 12, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+        {formatted}
+      </span>
+    );
   }
 
   return (
