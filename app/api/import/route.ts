@@ -469,6 +469,8 @@ export async function POST(request: NextRequest) {
             projects: seenProjects.size,
             tasks: validTaskRows.length,
             specialTasks: validSpecialTaskRows.length,
+            hasTaskSheet: taskRecords.length > 0,
+            hasSpecialTasksSheet: specialTaskRecords.length > 0,
             problems,
             totalRows,
           });

@@ -9,6 +9,8 @@ interface ImportPreview {
   projects: number;
   tasks: number;
   specialTasks: number;
+  hasTaskSheet: boolean;
+  hasSpecialTasksSheet: boolean;
   problems: { row: string; sheet: string; reason: string }[];
   totalRows: number;
 }
@@ -114,6 +116,8 @@ export default function ImportExcelModal({ open, onClose, onSave }: Props) {
             projects: event.projects as number,
             tasks: event.tasks as number,
             specialTasks: event.specialTasks as number,
+            hasTaskSheet: event.hasTaskSheet as boolean,
+            hasSpecialTasksSheet: event.hasSpecialTasksSheet as boolean,
             problems: (event.problems as ImportPreview["problems"]) || [],
             totalRows: event.totalRows as number,
           });
@@ -342,20 +346,28 @@ export default function ImportExcelModal({ open, onClose, onSave }: Props) {
                 Ready to import
               </p>
               <p style={{ margin: 0, color: "var(--ink-secondary)" }}>
-                {preview.frameworks > 0 && `${preview.frameworks} framework${preview.frameworks !== 1 ? "s" : ""}`}
-                {preview.frameworks > 0 && preview.programs > 0 && ", "}
-                {preview.programs > 0 && `${preview.programs} program${preview.programs !== 1 ? "s" : ""}`}
-                {(preview.frameworks > 0 || preview.programs > 0) && preview.projects > 0 && ", "}
-                {preview.projects > 0 && `${preview.projects} project${preview.projects !== 1 ? "s" : ""}`}
-                {totalImport > 0 && " \u2014 "}
-                {totalImport > 0 && (
-                  <>
-                    {preview.tasks} task{preview.tasks !== 1 ? "s" : ""}
-                    {", "}
-                    {preview.specialTasks} special task{preview.specialTasks !== 1 ? "s" : ""}
-                  </>
-                )}
+                {(() => {
+                  const parts: string[] = [];
+                  if (preview.frameworks > 0) parts.push(`${preview.frameworks} framework${preview.frameworks !== 1 ? "s" : ""}`);
+                  if (preview.programs > 0) parts.push(`${preview.programs} program${preview.programs !== 1 ? "s" : ""}`);
+                  if (preview.projects > 0) parts.push(`${preview.projects} project${preview.projects !== 1 ? "s" : ""}`);
+                  const counts: string[] = [];
+                  if (preview.tasks > 0) counts.push(`${preview.tasks} task${preview.tasks !== 1 ? "s" : ""}`);
+                  if (preview.specialTasks > 0) counts.push(`${preview.specialTasks} special task${preview.specialTasks !== 1 ? "s" : ""}`);
+                  if (counts.length > 0) parts.push(counts.join(", "));
+                  return parts.length > 0 ? parts.join(", ") : "Nothing new to import";
+                })()}
               </p>
+              {!preview.hasTaskSheet && preview.tasks === 0 && (
+                <p style={{ margin: 0, fontSize: 11, color: "var(--ink-tertiary)", fontStyle: "italic" }}>
+                  No task rows found in file
+                </p>
+              )}
+              {!preview.hasSpecialTasksSheet && preview.specialTasks === 0 && (
+                <p style={{ margin: 0, fontSize: 11, color: "var(--ink-tertiary)", fontStyle: "italic" }}>
+                  No &lsquo;Special Tasks&rsquo; rows found in file
+                </p>
+              )}
               {totalImport === 0 && preview.problems.length === 0 && (
                 <p style={{ margin: 0, color: "var(--ink-tertiary)", fontStyle: "italic" }}>
                   Nothing new to import (all rows match existing data)
@@ -455,11 +467,11 @@ export default function ImportExcelModal({ open, onClose, onSave }: Props) {
             <p style={{ fontWeight: 500, color: "#1A6B3C", margin: 0 }}>
               Import Complete
             </p>
-            <p style={{ margin: 0 }}>Frameworks created: {result.frameworksCreated}</p>
-            <p style={{ margin: 0 }}>Programs created: {result.programsCreated}</p>
-            <p style={{ margin: 0 }}>Projects created: {result.projectsCreated}</p>
-            <p style={{ margin: 0 }}>Tasks created: {result.tasksCreated}</p>
-            <p style={{ margin: 0 }}>Special tasks created: {result.specialTasksCreated}</p>
+            {result.frameworksCreated > 0 && <p style={{ margin: 0 }}>Frameworks created: {result.frameworksCreated}</p>}
+            {result.programsCreated > 0 && <p style={{ margin: 0 }}>Programs created: {result.programsCreated}</p>}
+            {result.projectsCreated > 0 && <p style={{ margin: 0 }}>Projects created: {result.projectsCreated}</p>}
+            {result.tasksCreated > 0 && <p style={{ margin: 0 }}>Tasks created: {result.tasksCreated}</p>}
+            {result.specialTasksCreated > 0 && <p style={{ margin: 0 }}>Special tasks created: {result.specialTasksCreated}</p>}
             {result.tasksSkipped > 0 && <p style={{ margin: 0, color: "#92400E" }}>Tasks skipped (duplicates): {result.tasksSkipped}</p>}
             {result.specialTasksSkipped > 0 && <p style={{ margin: 0, color: "#92400E" }}>Special tasks skipped (duplicates): {result.specialTasksSkipped}</p>}
             {result.rowsSkipped > 0 && <p style={{ margin: 0, color: "#92400E" }}>Rows skipped (errors): {result.rowsSkipped}</p>}

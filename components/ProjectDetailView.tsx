@@ -595,7 +595,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
   }
 
   return (
-    <main className="detail-shell">
+    <main className={isHistorical ? "detail-shell readonly-view" : "detail-shell"}>
       <div className="detail-container">
         <div>
           <button type="button" onClick={handleBackToDashboard} className="detail-back">
