@@ -196,6 +196,12 @@ export async function POST(request: NextRequest) {
         data: { name: frameworkName, color: "#E5E7EB", sortOrder: (maxOrder._max.sortOrder ?? -1) + 1 },
       });
       frameworksCreated++;
+      await logChange({
+        entityType: "Framework",
+        entityId: framework.id,
+        entityName: framework.name,
+        changeType: "create",
+      });
     }
 
     let program = await prisma.program.findFirst({
@@ -210,6 +216,12 @@ export async function POST(request: NextRequest) {
         data: { name: programName, frameworkId: framework.id, sortOrder: (maxOrder._max.sortOrder ?? -1) + 1 },
       });
       programsCreated++;
+      await logChange({
+        entityType: "Program",
+        entityId: program.id,
+        entityName: program.name,
+        changeType: "create",
+      });
     }
 
     let project = await prisma.project.findFirst({
@@ -232,6 +244,12 @@ export async function POST(request: NextRequest) {
         },
       });
       projectsCreated++;
+      await logChange({
+        entityType: "Project",
+        entityId: project.id,
+        entityName: project.name,
+        changeType: "create",
+      });
     }
 
     return project;
@@ -362,6 +380,12 @@ export async function POST(request: NextRequest) {
             },
           });
           tasksCreated++;
+          await logChange({
+            entityType: "Task",
+            entityId: (await prisma.task.findFirst({ where: { taskCode }, select: { id: true, name: true } }))?.id ?? 0,
+            entityName: `${taskCode}: ${taskName}`,
+            changeType: "create",
+          });
         }
       }
     }
@@ -464,6 +488,12 @@ export async function POST(request: NextRequest) {
             },
           });
           specialTasksCreated++;
+          await logChange({
+            entityType: "SpecialTask",
+            entityId: (await prisma.specialTask.findFirst({ where: { specialTaskCode }, select: { id: true } }))?.id ?? 0,
+            entityName: `${specialTaskCode}: ${specialTaskName}`,
+            changeType: "create",
+          });
         }
       }
     }

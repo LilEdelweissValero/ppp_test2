@@ -1505,6 +1505,13 @@ export default function DashboardView({
   useEffect(() => {
     if (!historicalTimestamp) {
       setPortfolio(frameworks);
+      // Restore live settings
+      fetch("/api/settings/computation")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data) setCompSettings(data);
+        })
+        .catch(() => {});
       return;
     }
     setSnapshotLoading(true);
@@ -1513,6 +1520,9 @@ export default function DashboardView({
       .then((data) => {
         if (data?.frameworks) {
           setPortfolio(data.frameworks);
+        }
+        if (data?.settings) {
+          setCompSettings(data.settings);
         }
         setSnapshotLoading(false);
       })

@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/db";
+import { parseDetails } from "@/lib/audit-log";
+import type { ComputationSettings } from "@/lib/computation-settings";
 
 // ── Types matching the dashboard data shape ──────────────────────────────────
 
@@ -78,36 +80,22 @@ interface ChangeLogEntry {
   createdAt: string;
 }
 
-// ── Diff string parser ───────────────────────────────────────────────────────
-// Format: `field: "old" → "new"; field2: "old2" → "new2"`
-
-function parseDiffString(details: string): Record<string, { old: string; new: string }> {
-  const result: Record<string, { old: string; new: string }> = {};
-  const parts = details.split("; ");
-  for (const part of parts) {
-    const colonIdx = part.indexOf(": ");
-    if (colonIdx === -1) continue;
-    const field = part.slice(0, colonIdx).trim();
-    const valueStr = part.slice(colonIdx + 2);
-    const arrowIdx = valueStr.indexOf(" → ");
-    if (arrowIdx === -1) continue;
-    const oldVal = valueStr.slice(0, arrowIdx).replace(/^"|"$/g, "").trim();
-    const newVal = valueStr.slice(arrowIdx + 3).replace(/^"|"$/g, "").trim();
-    result[field] = { old: oldVal, new: newVal };
-  }
-  return result;
-}
-
 // ── Snapshot reconstruction ──────────────────────────────────────────────────
 
 export async function getSnapshotAt(timestamp: string): Promise<{
   frameworks: SnapshotFramework[];
   lastModifiedAt: string;
+  settings: ComputationSettings | null;
 }> {
   const targetDate = new Date(timestamp);
 
+  // Minute-precision boundary: revert only changes strictly after the end of
+  // the chosen minute.  "As of 11:49" includes all changes during 11:49:xx.
+  const minuteStart = Math.floor(targetDate.getTime() / 60000) * 60000;
+  const revertAfter = new Date(minuteStart + 60000 - 1); // end of the chosen minute
+
   // Fetch current live data (all items, including archived)
-  const [currentFrameworks, allLogs] = await Promise.all([
+  const [currentFrameworks, allLogs, allSettingsLogs] = await Promise.all([
     prisma.framework.findMany({
       select: {
         id: true,
@@ -184,16 +172,25 @@ export async function getSnapshotAt(timestamp: string): Promise<{
       orderBy: { sortOrder: "asc" },
     }),
     prisma.entityChangeLog.findMany({
-      where: { createdAt: { gt: timestamp } },
+      where: { createdAt: { gt: revertAfter.toISOString() } },
       orderBy: { id: "asc" },
+    }),
+    prisma.entityChangeLog.findMany({
+      where: {
+        changeType: "settings",
+        createdAt: { lte: revertAfter.toISOString() },
+      },
+      orderBy: { id: "desc" },
+      take: 1,
     }),
   ]);
 
-  // If no changes after the timestamp, return current data as-is
+  // If no changes after the boundary, return current data as-is
   if (allLogs.length === 0) {
     return {
       frameworks: filterArchived(currentFrameworks),
       lastModifiedAt: timestamp,
+      settings: null, // null = use current settings
     };
   }
 
@@ -224,8 +221,6 @@ export async function getSnapshotAt(timestamp: string): Promise<{
 
   // Track entities that were created after the target timestamp (to hide them)
   const createdAfter = new Set<string>();
-  // Track entities that were deleted after the target timestamp (to restore them)
-  const deletedAfter = new Set<string>();
 
   // Process changes in chronological order (oldest first)
   for (const log of allLogs) {
@@ -238,20 +233,47 @@ export async function getSnapshotAt(timestamp: string): Promise<{
         break;
       }
       case "delete": {
-        // Entity was deleted AFTER our target timestamp — it existed at that time
-        // Mark it as NOT created after (in case there's a create+delete after)
+        // Entity was deleted AFTER our target timestamp — remove from createdAfter
+        // (it existed before T even if also created before T)
         createdAfter.delete(entityKey);
-        deletedAfter.add(entityKey);
         break;
       }
       case "archive": {
-        // Entity was archived AFTER our target timestamp — it wasn't archived at that time
-        unarchiveEntity(log.entityType, log.entityId);
+        if (log.entityType === "Project") {
+          // Project archived AFTER T → it wasn't archived at T
+          unarchiveEntity("Project", log.entityId);
+          // Cascade: also unarchive all tasks of this project (legacy single-entry)
+          const pr = projectMap.get(log.entityId);
+          if (pr) {
+            for (const t of pr.tasks) {
+              unarchiveEntity("Task", t.id);
+            }
+            for (const st of pr.specialTasks) {
+              unarchiveEntity("SpecialTask", st.id);
+            }
+          }
+        } else {
+          unarchiveEntity(log.entityType, log.entityId);
+        }
         break;
       }
       case "unarchive": {
-        // Entity was unarchived AFTER our target timestamp — it was archived at that time
-        archiveEntity(log.entityType, log.entityId);
+        if (log.entityType === "Project") {
+          // Project unarchived AFTER T → it was archived at T
+          archiveEntity("Project", log.entityId);
+          // Cascade: also archive all tasks of this project (legacy single-entry)
+          const pr = projectMap.get(log.entityId);
+          if (pr) {
+            for (const t of pr.tasks) {
+              archiveEntity("Task", t.id);
+            }
+            for (const st of pr.specialTasks) {
+              archiveEntity("SpecialTask", st.id);
+            }
+          }
+        } else {
+          archiveEntity(log.entityType, log.entityId);
+        }
         break;
       }
       case "update": {
@@ -261,34 +283,86 @@ export async function getSnapshotAt(timestamp: string): Promise<{
         break;
       }
       case "status": {
-        // Task status change — revert to oldValue
-        const task = taskMap.get(log.entityId);
-        if (task && log.oldValue) {
-          task.status = log.oldValue;
+        if (log.entityType === "Task") {
+          const task = taskMap.get(log.entityId);
+          if (task && log.oldValue) {
+            task.status = log.oldValue;
+          }
         }
         break;
       }
       case "quarter": {
-        // Task or Project quarter change — revert to oldValue
-        const task = taskMap.get(log.entityId);
-        if (task && log.oldValue) {
-          task.adjustedTargetQuarter = log.oldValue;
-        }
-        const project = projectMap.get(log.entityId);
-        if (project && log.oldValue) {
-          project.adjustedTargetQuarter = log.oldValue;
+        if (log.entityType === "Task") {
+          const task = taskMap.get(log.entityId);
+          if (task && log.oldValue) {
+            task.adjustedTargetQuarter = log.oldValue;
+          }
+        } else if (log.entityType === "Project") {
+          const project = projectMap.get(log.entityId);
+          if (project && log.oldValue) {
+            project.adjustedTargetQuarter = log.oldValue;
+          }
         }
         break;
       }
       case "quarter_change": {
-        // SpecialTask quarter change — revert to oldValue
-        const st = specialTaskMap.get(log.entityId);
-        if (st && log.oldValue) {
-          st.dueQuarter = log.oldValue;
+        if (log.entityType === "SpecialTask") {
+          const st = specialTaskMap.get(log.entityId);
+          if (st && log.oldValue) {
+            st.dueQuarter = log.oldValue;
+          }
+        } else if (log.entityType === "Task") {
+          const task = taskMap.get(log.entityId);
+          if (task && log.oldValue) {
+            task.adjustedTargetQuarter = log.oldValue;
+          }
+        } else if (log.entityType === "Project") {
+          const project = projectMap.get(log.entityId);
+          if (project && log.oldValue) {
+            project.adjustedTargetQuarter = log.oldValue;
+          }
         }
         break;
       }
-      // settings, reorder, import — no entity-specific reversal needed
+      case "reorder": {
+        // Restore previous ordering from oldValue (JSON array of IDs)
+        if (log.oldValue && log.entityType) {
+          try {
+            const prevOrder: number[] = JSON.parse(log.oldValue);
+            const tableType = log.entityType;
+            if (tableType === "Task") {
+              for (let i = 0; i < prevOrder.length; i++) {
+                const t = taskMap.get(prevOrder[i]);
+                if (t) t.sortOrder = i;
+              }
+            } else if (tableType === "SpecialTask") {
+              for (let i = 0; i < prevOrder.length; i++) {
+                const st = specialTaskMap.get(prevOrder[i]);
+                if (st) st.sortOrder = i;
+              }
+            } else if (tableType === "Project") {
+              for (let i = 0; i < prevOrder.length; i++) {
+                const pr = projectMap.get(prevOrder[i]);
+                if (pr) pr.sortOrder = i;
+              }
+            } else if (tableType === "Program") {
+              for (let i = 0; i < prevOrder.length; i++) {
+                const p = programMap.get(prevOrder[i]);
+                if (p) p.sortOrder = i;
+              }
+            } else if (tableType === "Framework") {
+              for (let i = 0; i < prevOrder.length; i++) {
+                const f = frameworkMap.get(prevOrder[i]);
+                if (f) f.sortOrder = i;
+              }
+            }
+          } catch {
+            // Malformed JSON — skip reorder revert
+          }
+        }
+        break;
+      }
+      // settings, import — no entity-specific reversal needed
     }
   }
 
@@ -331,7 +405,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
   }
 
   function applyUpdateReverse(type: string, id: number, details: string) {
-    const changes = parseDiffString(details);
+    const changes = parseDetails(details);
     if (type === "Framework") {
       const f = frameworkMap.get(id);
       if (f) {
@@ -352,6 +426,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
         if (changes.targetQuarter) p.targetQuarter = changes.targetQuarter.old;
         if (changes.adjustedTargetQuarter) p.adjustedTargetQuarter = changes.adjustedTargetQuarter.old;
         if (changes.actualCompletionDate) p.actualCompletionDate = changes.actualCompletionDate.old || null;
+        if (changes.archived) p.archived = changes.archived.old === "true";
       }
     } else if (type === "Task") {
       const t = taskMap.get(id);
@@ -367,6 +442,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
         if (changes.deliverable) t.deliverable = changes.deliverable.old || null;
         if (changes.targetQuarter) t.targetQuarter = changes.targetQuarter.old;
         if (changes.adjustedTargetQuarter) t.adjustedTargetQuarter = changes.adjustedTargetQuarter.old;
+        if (changes.archived) t.archived = changes.archived.old === "true";
       }
     } else if (type === "SpecialTask") {
       const st = specialTaskMap.get(id);
@@ -381,6 +457,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
         if (changes.done) st.done = parseInt(changes.done.old) || 0;
         if (changes.dueQuarter) st.dueQuarter = changes.dueQuarter.old;
         if (changes.lastUpdatedDate) st.lastUpdatedDate = changes.lastUpdatedDate.old || null;
+        if (changes.archived) st.archived = changes.archived.old === "true";
       }
     }
   }
@@ -478,9 +555,23 @@ export async function getSnapshotAt(timestamp: string): Promise<{
     });
   }
 
+  // Reconstruct historical settings from the latest settings log entry at or before T
+  let historicalSettings: ComputationSettings | null = null;
+  if (allSettingsLogs.length > 0) {
+    const latestSettingsLog = allSettingsLogs[0];
+    if (latestSettingsLog.oldValue) {
+      try {
+        historicalSettings = JSON.parse(latestSettingsLog.oldValue);
+      } catch {
+        // Malformed — fall back to null (current settings)
+      }
+    }
+  }
+
   return {
     frameworks: filterArchived(reconstructed),
     lastModifiedAt: timestamp,
+    settings: historicalSettings,
   };
 }
 

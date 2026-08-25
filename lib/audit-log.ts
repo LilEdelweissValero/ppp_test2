@@ -42,21 +42,92 @@ export async function logChange(params: LogChangeParams): Promise<void> {
   });
 }
 
-export function diffFields(
+// ── Diff helpers ─────────────────────────────────────────────────────────────
+
+/**
+ * Produces a v2 details string: JSON-encoded object of field → {old, new}.
+ * This is immune to semicolons/quotes/newlines inside values.
+ */
+export function diffFieldsV2(
   oldObj: Record<string, unknown>,
   newObj: Record<string, unknown>,
   fields: string[]
 ): string | null {
-  const changes: string[] = [];
+  const changes: Record<string, { old: string; new: string }> = {};
+  let hasChanges = false;
   for (const field of fields) {
     if (!(field in newObj)) continue;
     const oldVal = oldObj[field];
     const newVal = newObj[field];
     if (String(oldVal ?? "") !== String(newVal ?? "")) {
-      changes.push(`${field}: "${oldVal ?? ""}" → "${newVal ?? ""}"`);
+      changes[field] = { old: String(oldVal ?? ""), new: String(newVal ?? "") };
+      hasChanges = true;
     }
   }
-  return changes.length > 0 ? changes.join("; ") : null;
+  return hasChanges ? JSON.stringify(changes) : null;
+}
+
+/**
+ * Produces a human-readable details string (legacy format).
+ * Kept for backward compatibility with existing log entries.
+ */
+export function diffFields(
+  oldObj: Record<string, unknown>,
+  newObj: Record<string, unknown>,
+  fields: string[]
+): string | null {
+  return diffFieldsV2(oldObj, newObj, fields);
+}
+
+/**
+ * Robust details parser that handles both v2 (JSON) and legacy formats.
+ */
+export function parseDetails(details: string): Record<string, { old: string; new: string }> {
+  if (!details) return {};
+
+  // Try v2 JSON format first
+  const trimmed = details.trimStart();
+  if (trimmed.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (typeof parsed === "object" && parsed !== null) {
+        const result: Record<string, { old: string; new: string }> = {};
+        for (const [key, val] of Object.entries(parsed)) {
+          if (
+            typeof val === "object" &&
+            val !== null &&
+            "old" in val &&
+            "new" in val
+          ) {
+            result[key] = val as { old: string; new: string };
+          }
+        }
+        return result;
+      }
+    } catch {
+      // Fall through to legacy parser
+    }
+  }
+
+  // Legacy format: `field: "old" → "new"; field2: "old2" → "new2"`
+  return parseLegacy(details);
+}
+
+function parseLegacy(details: string): Record<string, { old: string; new: string }> {
+  const result: Record<string, { old: string; new: string }> = {};
+  const parts = details.split("; ");
+  for (const part of parts) {
+    const colonIdx = part.indexOf(": ");
+    if (colonIdx === -1) continue;
+    const field = part.slice(0, colonIdx).trim();
+    const valueStr = part.slice(colonIdx + 2);
+    const arrowIdx = valueStr.indexOf(" → ");
+    if (arrowIdx === -1) continue;
+    const oldVal = valueStr.slice(0, arrowIdx).replace(/^"|"$/g, "").trim();
+    const newVal = valueStr.slice(arrowIdx + 3).replace(/^"|"$/g, "").trim();
+    result[field] = { old: oldVal, new: newVal };
+  }
+  return result;
 }
 
 export function diffSettings(

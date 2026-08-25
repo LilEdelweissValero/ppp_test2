@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { touchLastModified } from "@/lib/system-metadata";
-import { logChange, diffFields } from "@/lib/audit-log";
+import { logChange, diffFieldsV2 } from "@/lib/audit-log";
 import { getSettings } from "@/lib/computation-settings-server";
 
 export async function GET(
@@ -92,15 +92,28 @@ export async function PATCH(
     });
     for (const sibling of siblings) {
       if (sibling.dependencies && sibling.dependencies.includes(oldCode)) {
+        const oldDeps = sibling.dependencies;
+        const newDeps = sibling.dependencies.replaceAll(oldCode, newCode);
         await prisma.task.update({
           where: { id: sibling.id },
-          data: { dependencies: sibling.dependencies.replaceAll(oldCode, newCode) },
+          data: { dependencies: newDeps },
+        });
+        await logChange({
+          entityType: "Task",
+          entityId: sibling.id,
+          entityName: `${sibling.taskCode}: ${sibling.name}`,
+          changeType: "update",
+          details: diffFieldsV2(
+            { dependencies: oldDeps },
+            { dependencies: newDeps },
+            ["dependencies"]
+          ),
         });
       }
     }
   }
 
-  const details = diffFields(
+  const details = diffFieldsV2(
     existingTask as Record<string, unknown>,
     updateData,
     ["taskCode", "name", "assignee", "priority", "status", "description", "dependencies", "notes", "deliverable", "attachments", "targetQuarter", "adjustedTargetQuarter"]
@@ -142,7 +155,11 @@ export async function PATCH(
         entityId: existingTask.projectId,
         entityName: project.name,
         changeType: "update",
-        details: `Auto-set actual completion date to ${today} (all tasks completed)`,
+        details: diffFieldsV2(
+          { actualCompletionDate: currentVal },
+          { actualCompletionDate: today },
+          ["actualCompletionDate"]
+        ),
       });
     } else if (!shouldSet && currentVal !== null) {
       await prisma.project.update({
@@ -154,7 +171,11 @@ export async function PATCH(
         entityId: existingTask.projectId,
         entityName: project.name,
         changeType: "update",
-        details: "Auto-cleared actual completion date (not all tasks completed)",
+        details: diffFieldsV2(
+          { actualCompletionDate: currentVal },
+          { actualCompletionDate: null },
+          ["actualCompletionDate"]
+        ),
       });
     }
   }

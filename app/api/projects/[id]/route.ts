@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { touchLastModified } from "@/lib/system-metadata";
-import { logChange, diffFields } from "@/lib/audit-log";
+import { logChange, diffFieldsV2 } from "@/lib/audit-log";
 
 export async function GET(
   _request: NextRequest,
@@ -32,6 +32,15 @@ export async function PATCH(
   const oldProject = await prisma.project.findUnique({ where: { id: parseInt(id) } });
 
   if (archived !== undefined && typeof archived === "boolean" && oldProject) {
+    const tasks = await prisma.task.findMany({
+      where: { projectId: parseInt(id) },
+      select: { id: true, taskCode: true, name: true, archived: true },
+    });
+    const specialTasks = await prisma.specialTask.findMany({
+      where: { projectId: parseInt(id) },
+      select: { id: true, specialTaskCode: true, name: true, archived: true },
+    });
+
     await prisma.$transaction(async (tx) => {
       await tx.project.update({
         where: { id: parseInt(id) },
@@ -43,6 +52,32 @@ export async function PATCH(
       });
     });
     const project = await prisma.project.findUnique({ where: { id: parseInt(id) } });
+
+    // Log per-task cascade entries
+    for (const t of tasks) {
+      if (t.archived !== archived) {
+        await logChange({
+          entityType: "Task",
+          entityId: t.id,
+          entityName: `${t.taskCode}: ${t.name}`,
+          changeType: archived ? "archive" : "unarchive",
+          details: `Project ${archived ? "archived" : "unarchived"}: cascade`,
+        });
+      }
+    }
+    for (const st of specialTasks) {
+      if (st.archived !== archived) {
+        await logChange({
+          entityType: "SpecialTask",
+          entityId: st.id,
+          entityName: `${st.specialTaskCode}: ${st.name}`,
+          changeType: archived ? "archive" : "unarchive",
+          details: `Project ${archived ? "archived" : "unarchived"}: cascade`,
+        });
+      }
+    }
+
+    // Log the project-level archive entry
     await logChange({
       entityType: "Project",
       entityId: parseInt(id),
@@ -69,7 +104,7 @@ export async function PATCH(
     include: { program: { select: { id: true, name: true } } },
   });
   if (oldProject) {
-    const details = diffFields(
+    const details = diffFieldsV2(
       oldProject as Record<string, unknown>,
       updateData,
       ["name", "reference", "owner", "targetQuarter", "adjustedTargetQuarter", "actualCompletionDate", "programId"]

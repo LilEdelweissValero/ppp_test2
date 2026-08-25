@@ -311,7 +311,16 @@ export default function ProjectDetailView({ project: initialProject, historicalT
 
   // Fetch snapshot data when in historical mode
   useEffect(() => {
-    if (!historicalTimestamp) return;
+    if (!historicalTimestamp) {
+      // Restore live settings
+      fetch("/api/settings/computation")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data) setCompSettings(data);
+        })
+        .catch(() => {});
+      return;
+    }
     fetch(`/api/snapshot?timestamp=${encodeURIComponent(historicalTimestamp)}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -324,10 +333,13 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                 setCurrentProject({ ...project, ...pr });
                 setTasks(pr.tasks as Task[]);
                 setSpecialTasks(pr.specialTasks as CachedSpecialTask[]);
-                return;
+                break;
               }
             }
           }
+        }
+        if (data?.settings) {
+          setCompSettings(data.settings);
         }
       })
       .catch(() => {});
