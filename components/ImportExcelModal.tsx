@@ -137,9 +137,10 @@ export default function ImportExcelModal({ open, onClose, onSave }: Props) {
       }
 
       await readNdjsonStream(res, (event) => {
-        if (event.type === "progress") {
+        if (event.type === "progress" && event.phase === "reading") {
           setProgress({ processed: event.processed as number, total: event.total as number });
         } else if (event.type === "preview") {
+          setProgress({ processed: 0, total: 0 });
           setPreview({
             frameworks: event.frameworks as number,
             programs: event.programs as number,
@@ -187,7 +188,7 @@ export default function ImportExcelModal({ open, onClose, onSave }: Props) {
       }
 
       await readNdjsonStream(res, (event) => {
-        if (event.type === "progress") {
+        if (event.type === "progress" && event.phase === "importing") {
           setProgress({ processed: event.processed as number, total: event.total as number });
         } else if (event.type === "result") {
           setResult(event as unknown as ImportResult);
@@ -505,7 +506,7 @@ export default function ImportExcelModal({ open, onClose, onSave }: Props) {
             {phase === "validating" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <div style={{ fontSize: 12, color: "var(--ink-secondary)", fontVariantNumeric: "tabular-nums" }}>
-                  Reading file&thinsp;&hellip;&thinsp;{progress.processed} / {progress.total} rows
+                  Reading file&thinsp;&hellip;{progress.total > 0 && <>{progress.processed} / {progress.total} rows</>}
                 </div>
                 <div style={{ height: 6, borderRadius: 3, background: "var(--rule)", overflow: "hidden" }}>
                   <div className="impeccable-progress-stripe" style={{ height: "100%", width: "100%", borderRadius: 3 }} />
@@ -690,18 +691,14 @@ export default function ImportExcelModal({ open, onClose, onSave }: Props) {
             {phase === "importing" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <div style={{ fontSize: 12, color: "var(--ink-secondary)", fontVariantNumeric: "tabular-nums" }}>
-                  Importing&thinsp;&hellip;&thinsp;{progressPct}% done ({progress.processed} / {progress.total} rows)
+                  {progress.total > 0
+                    ? <>Importing&thinsp;&hellip;&thinsp;{progressPct}% done ({progress.processed} / {progress.total} rows)</>
+                    : <>Preparing import&thinsp;&hellip;</>}
                 </div>
                 <div style={{ height: 6, borderRadius: 3, background: "var(--rule)", overflow: "hidden" }}>
-                  <div
-                    style={{
-                      height: "100%",
-                      width: `${progressPct}%`,
-                      background: "var(--accent)",
-                      borderRadius: 3,
-                      transition: "width 0.15s ease",
-                    }}
-                  />
+                  {progress.total > 0
+                    ? <div style={{ height: "100%", width: `${progressPct}%`, background: "var(--accent)", borderRadius: 3, transition: "width 0.15s ease" }} />
+                    : <div className="impeccable-progress-stripe" style={{ height: "100%", width: "100%", borderRadius: 3 }} />}
                 </div>
               </div>
             )}
