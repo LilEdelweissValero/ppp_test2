@@ -697,3 +697,31 @@ select:focus-visible {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* ── Import modal animations ── */
+
+.impeccable-progress-stripe {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--accent),
+    var(--accent) 8px,
+    var(--accent-hover) 8px,
+    var(--accent-hover) 16px
+  );
+  background-size: 22.63px 100%;
+  animation: impeccable-stripe-slide 0.6s linear infinite;
+}
+
+@keyframes impeccable-stripe-slide {
+  0% { background-position: 0 0; }
+  100% { background-position: 22.63px 0; }
+}
+
+@keyframes impeccable-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.impeccable-spin {
+  animation: impeccable-spin 0.8s linear infinite;
+}
