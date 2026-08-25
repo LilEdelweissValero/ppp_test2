@@ -10,7 +10,7 @@ export default async function ProjectPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ cached?: string }>;
+  searchParams: Promise<{ cached?: string; asOf?: string }>;
 }) {
   const { id } = await params;
   const projectId = Number(id);
@@ -24,5 +24,5 @@ export default async function ProjectPage({
   const project = await getProjectData(projectId);
   if (!project) notFound();
 
-  return <ProjectDetailView project={project} />;
+  return <ProjectDetailView project={project} historicalTimestamp={query.asOf || null} />;
 }

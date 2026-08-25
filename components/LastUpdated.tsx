@@ -1,8 +1,24 @@
 "use client";
 
-export default function LastUpdated({ iso }: { iso: string | null }) {
-  if (!iso) return <span>Never</span>;
-  const date = new Date(iso);
+import DateTimePicker from "@/components/DateTimePicker";
+
+interface LastUpdatedProps {
+  iso: string | null;
+  historicalTimestamp?: string | null;
+  onTimeSelect?: (timestamp: string | null) => void;
+}
+
+export default function LastUpdated({
+  iso,
+  historicalTimestamp,
+  onTimeSelect,
+}: LastUpdatedProps) {
+  const isHistorical = !!historicalTimestamp;
+  const displayIso = isHistorical ? historicalTimestamp : iso;
+
+  if (!displayIso) return <span>Never</span>;
+
+  const date = new Date(displayIso);
   const formatted =
     date.toLocaleDateString("en-US", {
       year: "numeric",
@@ -15,5 +31,16 @@ export default function LastUpdated({ iso }: { iso: string | null }) {
       minute: "2-digit",
       hour12: true,
     });
-  return <span>{formatted}</span>;
+
+  if (!onTimeSelect) {
+    return <span>{formatted}</span>;
+  }
+
+  return (
+    <DateTimePicker
+      currentLabel={formatted}
+      onApply={(ts) => onTimeSelect(ts)}
+      onGoLive={() => onTimeSelect(null)}
+    />
+  );
 }

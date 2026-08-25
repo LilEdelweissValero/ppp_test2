@@ -54,6 +54,7 @@ function expandSpecialTasksToVirtualTasks(specialTasks: CachedSpecialTask[], set
 
 interface Props {
   project: Project;
+  historicalTimestamp?: string | null;
 }
 
 function SortableTaskRow({
@@ -70,6 +71,7 @@ function SortableTaskRow({
   onMouseEnter,
   onMouseLeave,
   settings,
+  isHistorical,
 }: {
   task: Task;
   onEdit: () => void;
@@ -84,6 +86,7 @@ function SortableTaskRow({
   onMouseEnter: (e: React.MouseEvent<HTMLTableRowElement>) => void;
   onMouseLeave: () => void;
   settings?: ComputationSettings;
+  isHistorical?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: task.id });
@@ -105,6 +108,7 @@ function SortableTaskRow({
       onMouseLeave={onMouseLeave}
     >
       <td style={{ width: 32 }}>
+        {!isHistorical && (
         <button
           className="detail-task-action"
           style={{ cursor: "grab", color: "var(--ink-tertiary)", textDecoration: "none" }}
@@ -114,14 +118,15 @@ function SortableTaskRow({
         >
           <span aria-hidden="true">⠿</span>
         </button>
+        )}
       </td>
       <td className="detail-task-code" style={{ width: 100 }}>{task.taskCode}</td>
       <td style={{ width: 220 }}>{task.name}</td>
       <td className="detail-muted" style={{ width: 110 }}>{task.assignee || "—"}</td>
       <td
         className="detail-inline-cell detail-muted"
-        style={{ width: 80 }}
-        onClick={() => setEditingCell({ taskId: task.id, field: "priority" })}
+        style={{ width: 80, cursor: isHistorical ? "default" : undefined }}
+        onClick={() => !isHistorical && setEditingCell({ taskId: task.id, field: "priority" })}
       >
         {editingCell?.taskId === task.id && editingCell.field === "priority" ? (
           <select
@@ -157,8 +162,8 @@ function SortableTaskRow({
       </td>
       <td
         className="detail-inline-cell"
-        style={{ width: 160 }}
-        onClick={() => setEditingCell({ taskId: task.id, field: "status" })}
+        style={{ width: 160, cursor: isHistorical ? "default" : undefined }}
+        onClick={() => !isHistorical && setEditingCell({ taskId: task.id, field: "status" })}
       >
         {editingCell?.taskId === task.id && editingCell.field === "status" ? (
           <select
@@ -208,6 +213,7 @@ function SortableTaskRow({
         </span>
       </td>
       <td style={{ width: 120 }}>
+        {!isHistorical && (
         <div className="detail-task-actions">
           <button
             onClick={onEdit}
@@ -239,15 +245,17 @@ function SortableTaskRow({
             </svg>
           </button>
         </div>
+        )}
       </td>
     </tr>
   );
 }
 
-export default function ProjectDetailView({ project: initialProject }: Props) {
+export default function ProjectDetailView({ project: initialProject, historicalTimestamp }: Props) {
   const router = useRouter();
   const { canReturnToDashboard, setProject } = usePortfolioCache();
   const [project, setCurrentProject] = useState(initialProject);
+  const isHistorical = !!historicalTimestamp;
   const [showEditProject, setShowEditProject] = useState(false);
   const [showAddTask, setShowAddTask] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
@@ -300,6 +308,30 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
     setTasks(initialProject.tasks);
     setSpecialTasks(initialProject.specialTasks || []);
   }, [initialProject]);
+
+  // Fetch snapshot data when in historical mode
+  useEffect(() => {
+    if (!historicalTimestamp) return;
+    fetch(`/api/snapshot?timestamp=${encodeURIComponent(historicalTimestamp)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data?.frameworks) return;
+        // Find this project in the snapshot
+        for (const fw of data.frameworks) {
+          for (const prog of fw.programs) {
+            for (const pr of prog.projects) {
+              if (pr.id === project.id) {
+                setCurrentProject({ ...project, ...pr });
+                setTasks(pr.tasks as Task[]);
+                setSpecialTasks(pr.specialTasks as CachedSpecialTask[]);
+                return;
+              }
+            }
+          }
+        }
+      })
+      .catch(() => {});
+  }, [historicalTimestamp, project.id]);
 
   function handleTaskMouseEnter(task: Task, e: React.MouseEvent<HTMLTableRowElement>) {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
@@ -603,43 +635,50 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
           </div>
 
           <div className="detail-actions">
-            <button
-              onClick={() => setShowEditProject(true)}
-              className="detail-button detail-button-primary"
-            >
-              Edit
-            </button>
-            <button
-              onClick={() => setChangeProjectQuarter(true)}
-              className="detail-button"
-            >
-              Change Due Quarter
-            </button>
-            <button
-              onClick={() =>
-                setViewHistory({ type: "Project", id: project.id })
-              }
-              className="detail-button"
-            >
-              View History
-            </button>
-            <button
-              onClick={() =>
-                setArchiveTarget({
-                  entityType: "Project",
-                  entityId: project.id,
-                  entityName: project.name,
-                })
-              }
-              className="detail-button"
-              title="Archive project"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: "middle" }}>
-                <path d="M21 8v13H3V8" />
-                <path d="M1 3h22v5H1z" />
-                <path d="M10 12h4" />
-              </svg>
-            </button>
+            {!isHistorical && (
+              <>
+                <button
+                  onClick={() => setShowEditProject(true)}
+                  className="detail-button detail-button-primary"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => setChangeProjectQuarter(true)}
+                  className="detail-button"
+                >
+                  Change Due Quarter
+                </button>
+                <button
+                  onClick={() => setViewHistory({ type: "Project", id: project.id })}
+                  className="detail-button"
+                >
+                  View History
+                </button>
+                <button
+                  onClick={() =>
+                    setArchiveTarget({
+                      entityType: "Project",
+                      entityId: project.id,
+                      entityName: project.name,
+                    })
+                  }
+                  className="detail-button"
+                  title="Archive project"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: "middle" }}>
+                    <path d="M21 8v13H3V8" />
+                    <path d="M1 3h22v5H1z" />
+                    <path d="M10 12h4" />
+                  </svg>
+                </button>
+              </>
+            )}
+            {isHistorical && (
+              <span style={{ fontSize: 12, color: "var(--ink-tertiary)", fontStyle: "italic" }}>
+                Historical view — edits are disabled
+              </span>
+            )}
           </div>
         </section>
 
@@ -648,15 +687,18 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
             <div>
               <h2 id="tasks-title" className="detail-task-heading">Tasks</h2>
               <p className="detail-task-subtitle">
-                {tasks.length} task{tasks.length === 1 ? "" : "s"} · Click priority or status to edit inline
+                {tasks.length} task{tasks.length === 1 ? "" : "s"}
+                {!isHistorical && " · Click priority or status to edit inline"}
               </p>
             </div>
-            <button
-              onClick={() => setShowAddTask(true)}
-              className="detail-button detail-button-primary"
-            >
-              Add Task
-            </button>
+            {!isHistorical && (
+              <button
+                onClick={() => setShowAddTask(true)}
+                className="detail-button detail-button-primary"
+              >
+                Add Task
+              </button>
+            )}
           </div>
 
           {tasks.length === 0 ? (
@@ -669,7 +711,7 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
               id="task-sort"
               sensors={sensors}
               collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
+              onDragEnd={isHistorical ? () => {} : handleDragEnd}
             >
               <SortableContext
                 items={sortedTasks.map((t) => t.id)}
@@ -751,6 +793,7 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                           onMouseEnter={(e) => handleTaskMouseEnter(task, e)}
                           onMouseLeave={handleTaskMouseLeave}
                           settings={compSettings}
+                          isHistorical={isHistorical}
                           />
                       ))}
                     </tbody>
@@ -768,7 +811,8 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
             <div>
               <h2 id="special-tasks-title" className="detail-task-heading">Special Tasks</h2>
               <p className="detail-task-subtitle">
-                {specialTasks.length} special task{specialTasks.length === 1 ? "" : "s"} · Click cells to edit inline
+                {specialTasks.length} special task{specialTasks.length === 1 ? "" : "s"}
+                {!isHistorical && " · Click cells to edit inline"}
               </p>
             </div>
           </div>
@@ -812,8 +856,8 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                         {/* NYS */}
                         <td
                           className="detail-inline-cell"
-                          style={{ width: 50, textAlign: "center" }}
-                          onClick={() => setEditingSpecialCell({ taskId: st.id, field: "nys" })}
+                          style={{ width: 50, textAlign: "center", cursor: isHistorical ? "default" : undefined }}
+                          onClick={() => !isHistorical && setEditingSpecialCell({ taskId: st.id, field: "nys" })}
                         >
                           {editingSpecialCell?.taskId === st.id && editingSpecialCell.field === "nys" ? (
                             <input
@@ -848,8 +892,8 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                         {/* PLAN */}
                         <td
                           className="detail-inline-cell"
-                          style={{ width: 55, textAlign: "center" }}
-                          onClick={() => setEditingSpecialCell({ taskId: st.id, field: "plan" })}
+                          style={{ width: 55, textAlign: "center", cursor: isHistorical ? "default" : undefined }}
+                          onClick={() => !isHistorical && setEditingSpecialCell({ taskId: st.id, field: "plan" })}
                         >
                           {editingSpecialCell?.taskId === st.id && editingSpecialCell.field === "plan" ? (
                             <input
@@ -884,8 +928,8 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                         {/* PART */}
                         <td
                           className="detail-inline-cell"
-                          style={{ width: 55, textAlign: "center" }}
-                          onClick={() => setEditingSpecialCell({ taskId: st.id, field: "part" })}
+                          style={{ width: 55, textAlign: "center", cursor: isHistorical ? "default" : undefined }}
+                          onClick={() => !isHistorical && setEditingSpecialCell({ taskId: st.id, field: "part" })}
                         >
                           {editingSpecialCell?.taskId === st.id && editingSpecialCell.field === "part" ? (
                             <input
@@ -920,8 +964,8 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                         {/* MOSTLY */}
                         <td
                           className="detail-inline-cell"
-                          style={{ width: 65, textAlign: "center" }}
-                          onClick={() => setEditingSpecialCell({ taskId: st.id, field: "mostly" })}
+                          style={{ width: 65, textAlign: "center", cursor: isHistorical ? "default" : undefined }}
+                          onClick={() => !isHistorical && setEditingSpecialCell({ taskId: st.id, field: "mostly" })}
                         >
                           {editingSpecialCell?.taskId === st.id && editingSpecialCell.field === "mostly" ? (
                             <input
@@ -956,8 +1000,8 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                         {/* DONE */}
                         <td
                           className="detail-inline-cell"
-                          style={{ width: 55, textAlign: "center" }}
-                          onClick={() => setEditingSpecialCell({ taskId: st.id, field: "done" })}
+                          style={{ width: 55, textAlign: "center", cursor: isHistorical ? "default" : undefined }}
+                          onClick={() => !isHistorical && setEditingSpecialCell({ taskId: st.id, field: "done" })}
                         >
                           {editingSpecialCell?.taskId === st.id && editingSpecialCell.field === "done" ? (
                             <input
@@ -1003,6 +1047,7 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                           </span>
                         </td>
                         <td style={{ width: 120 }}>
+                          {!isHistorical && (
                           <div className="detail-task-actions">
                             <button
                               onClick={() => setEditSpecialTask(st)}
@@ -1042,6 +1087,7 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
                               </svg>
                             </button>
                           </div>
+                          )}
                         </td>
                       </tr>
                     );
@@ -1052,6 +1098,8 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
         </section>
         )}
 
+        {!isHistorical && (
+        <>
         <ProjectFormModal
           open={showEditProject}
           onClose={() => setShowEditProject(false)}
@@ -1181,6 +1229,8 @@ export default function ProjectDetailView({ project: initialProject }: Props) {
             entityId={changeSpecialTaskQuarter.id}
             currentQuarter={changeSpecialTaskQuarter.dueQuarter}
           />
+        )}
+        </>
         )}
 
         {viewHistory && (

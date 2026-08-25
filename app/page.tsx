@@ -1,11 +1,18 @@
 import DashboardView from "@/components/DashboardView";
-import LastUpdated from "@/components/LastUpdated";
+import HeaderTimestamp from "@/components/HeaderTimestamp";
 import { compareQuarters } from "@/lib/quarters";
 import { getDashboardData } from "@/lib/portfolio-data";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ asOf?: string }>;
+}) {
+  const query = await searchParams;
+  const asOf = query.asOf || null;
+
   const { frameworks, lastModifiedAt } = await getDashboardData();
 
   const quarterSet = new Set<string>();
@@ -19,6 +26,8 @@ export default async function DashboardPage() {
     }
   }
   const existingQuarters = [...quarterSet].sort(compareQuarters);
+
+  const isHistorical = !!asOf;
 
   return (
     <div className="min-h-screen" style={{ background: "var(--ground)" }}>
@@ -71,20 +80,31 @@ export default async function DashboardPage() {
             </span>
           </div>
 
-          <div
-            style={{
-              fontSize: 11,
-              color: "rgba(247,248,250,0.35)",
-              letterSpacing: "0.03em",
-            }}
-          >
-            <span style={{ color: "rgba(247,248,250,0.22)", marginRight: 6 }}>
-              LAST UPDATED
-            </span>
-            <LastUpdated iso={lastModifiedAt} />
-          </div>
+          <HeaderTimestamp iso={lastModifiedAt} historicalTimestamp={asOf} />
         </div>
       </header>
+
+      {/* ── Historical mode banner ── */}
+      {isHistorical && (
+        <div
+          style={{
+            background: "var(--accent-bg)",
+            borderBottom: "1px solid var(--accent)",
+            padding: "8px 24px",
+            fontSize: 12,
+            color: "var(--accent)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+          }}
+        >
+          <span style={{ fontWeight: 600 }}>Historical view</span>
+          <span style={{ color: "var(--ink-secondary)" }}>
+            &mdash; Viewing data as of the selected time. All edits are disabled.
+          </span>
+        </div>
+      )}
 
       {/* ── Dashboard body ── */}
       <main
@@ -94,6 +114,7 @@ export default async function DashboardPage() {
           frameworks={frameworks}
           existingQuarters={existingQuarters}
           sourceVersion={lastModifiedAt}
+          historicalTimestamp={asOf}
         />
       </main>
     </div>

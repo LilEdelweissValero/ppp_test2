@@ -127,6 +127,7 @@ interface Props {
   frameworks: Framework[];
   existingQuarters: string[];
   sourceVersion: string | null;
+  historicalTimestamp?: string | null;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -807,6 +808,7 @@ function SortableProjectRow({
   programName,
   onProjectUpdate,
   settings,
+  isHistorical,
 }: {
   project: Project;
   onPrefetch: () => void;
@@ -816,6 +818,7 @@ function SortableProjectRow({
   programName: string;
   onProjectUpdate: (fields: Record<string, unknown>) => void;
   settings?: ComputationSettings;
+  isHistorical?: boolean;
 }) {
   const [shouldPrefetch, setShouldPrefetch] = useState(false);
   const {
@@ -864,6 +867,7 @@ function SortableProjectRow({
         onMouseLeave={() => setHovered(false)}
       >
         <td style={{ ...tdBase, padding: "8px 8px", width: 32 }}>
+          {!isHistorical && (
           <button
             {...attributes}
             {...listeners}
@@ -872,6 +876,7 @@ function SortableProjectRow({
           >
             <GripIcon />
           </button>
+          )}
         </td>
         <td style={{ ...tdBase, width: 220 }}>
           <Link
@@ -888,8 +893,8 @@ function SortableProjectRow({
         </td>
         <td style={{ ...tdBase, width: 150, fontSize: 11, color: "var(--ink-secondary)" }}>{programName}</td>
         <td
-          style={{ ...tdBase, width: 100, fontSize: 11, color: "var(--ink-tertiary)", fontFamily: "var(--font-mono)", cursor: "text" }}
-          onClick={() => !editingCell && setEditingCell({ field: "reference" })}
+          style={{ ...tdBase, width: 100, fontSize: 11, color: "var(--ink-tertiary)", fontFamily: "var(--font-mono)", cursor: isHistorical ? "default" : "text" }}
+          onClick={() => !isHistorical && !editingCell && setEditingCell({ field: "reference" })}
         >
           {editingCell?.field === "reference" ? (
             <input
@@ -918,8 +923,8 @@ function SortableProjectRow({
           )}
         </td>
         <td
-          style={{ ...tdBase, width: 110, fontSize: 11, color: "var(--ink-secondary)", cursor: "text" }}
-          onClick={() => !editingCell && setEditingCell({ field: "owner" })}
+          style={{ ...tdBase, width: 110, fontSize: 11, color: "var(--ink-secondary)", cursor: isHistorical ? "default" : "text" }}
+          onClick={() => !isHistorical && !editingCell && setEditingCell({ field: "owner" })}
         >
           {editingCell?.field === "owner" ? (
             <input
@@ -991,6 +996,7 @@ function SortableProjectRow({
     >
       {/* drag handle */}
       <td style={{ ...tdBase, padding: "8px 8px", width: 32 }}>
+        {!isHistorical && (
         <button
           {...attributes}
           {...listeners}
@@ -1008,6 +1014,7 @@ function SortableProjectRow({
         >
           <GripIcon />
         </button>
+        )}
       </td>
 
       {/* project name */}
@@ -1046,9 +1053,9 @@ function SortableProjectRow({
           color: "var(--ink-tertiary)",
           fontSize: 11,
           fontFamily: "var(--font-mono)",
-          cursor: "text",
+          cursor: isHistorical ? "default" : "text",
         }}
-        onClick={() => !editingCell && setEditingCell({ field: "reference" })}
+        onClick={() => !isHistorical && !editingCell && setEditingCell({ field: "reference" })}
       >
         {editingCell?.field === "reference" ? (
           <input
@@ -1095,9 +1102,9 @@ function SortableProjectRow({
           color: "var(--ink-secondary)",
           fontSize: 11,
           borderRight: "1px solid var(--rule-strong)",
-          cursor: "text",
+          cursor: isHistorical ? "default" : "text",
         }}
-        onClick={() => !editingCell && setEditingCell({ field: "owner" })}
+        onClick={() => !isHistorical && !editingCell && setEditingCell({ field: "owner" })}
       >
         {editingCell?.field === "owner" ? (
           <input
@@ -1180,9 +1187,9 @@ function SortableProjectRow({
             ? "var(--ink-tertiary)"
             : "var(--ink-secondary)",
           fontStyle: project.adjustedTargetQuarter === project.targetQuarter ? "italic" : "normal",
-          cursor: "pointer",
+          cursor: isHistorical ? "default" : "pointer",
         }}
-        onClick={() => !editingCell && setEditingCell({ field: "dueQ" })}
+        onClick={() => !isHistorical && !editingCell && setEditingCell({ field: "dueQ" })}
       >
         {editingCell?.field === "dueQ" ? (
           <select
@@ -1434,6 +1441,7 @@ export default function DashboardView({
   frameworks,
   existingQuarters,
   sourceVersion,
+  historicalTimestamp,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1445,6 +1453,8 @@ export default function DashboardView({
     version,
   } = usePortfolioCache();
   const [portfolio, setPortfolio] = useState(frameworks);
+  const isHistorical = !!historicalTimestamp;
+  const [snapshotLoading, setSnapshotLoading] = useState(false);
 
   const [selectedQuarter, setSelectedQuarter] = useState(searchParams.get("q") || ALL_TIME);
 
@@ -1455,9 +1465,14 @@ export default function DashboardView({
     } else {
       params.set("q", selectedQuarter);
     }
+    if (historicalTimestamp) {
+      params.set("asOf", historicalTimestamp);
+    } else {
+      params.delete("asOf");
+    }
     const qs = params.toString();
     router.replace(qs ? `?${qs}` : window.location.pathname);
-  }, [selectedQuarter, router]);
+  }, [selectedQuarter, historicalTimestamp, router]);
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
   const [programsCollapsed, setProgramsCollapsed] = useState(false);
@@ -1483,6 +1498,24 @@ export default function DashboardView({
   useEffect(() => {
     setPortfolio(frameworks);
   }, [frameworks]);
+
+  // Fetch snapshot data when in historical mode
+  useEffect(() => {
+    if (!historicalTimestamp) {
+      setPortfolio(frameworks);
+      return;
+    }
+    setSnapshotLoading(true);
+    fetch(`/api/snapshot?timestamp=${encodeURIComponent(historicalTimestamp)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.frameworks) {
+          setPortfolio(data.frameworks);
+        }
+        setSnapshotLoading(false);
+      })
+      .catch(() => setSnapshotLoading(false));
+  }, [historicalTimestamp, frameworks]);
 
   useEffect(() => {
     seedPortfolio(frameworks, sourceVersion);
@@ -1907,41 +1940,45 @@ export default function DashboardView({
         <div style={{ flex: 1 }} />
 
         {/* Add Project button */}
-        <button
-          onClick={() => setShowAddProject(true)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "7px 14px",
-            background: "var(--accent)",
-            color: "#FFFFFF",
-            border: "none",
-            borderRadius: 3,
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: "pointer",
-            letterSpacing: "0.01em",
-            transition: "background 0.12s",
-          }}
-        >
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-          Add Project
-        </button>
+        {!isHistorical && (
+          <button
+            onClick={() => setShowAddProject(true)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "7px 14px",
+              background: "var(--accent)",
+              color: "#FFFFFF",
+              border: "none",
+              borderRadius: 3,
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              letterSpacing: "0.01em",
+              transition: "background 0.12s",
+            }}
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+              <path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            Add Project
+          </button>
+        )}
 
         {/* Manage menu */}
-        <div style={{ display: "flex", alignItems: "flex-end" }}>
-          <ActionsMenu
-            onManageFrameworks={() => setShowManageFrameworks(true)}
-            onManagePrograms={() => setShowManagePrograms(true)}
-            onImportExcel={() => setShowImportExcel(true)}
-            onHistoryLog={() => window.open("/history", "_blank")}
-            onViewArchive={() => router.push("/archived")}
-            onSettings={() => setShowSettings(true)}
-          />
-        </div>
+        {!isHistorical && (
+          <div style={{ display: "flex", alignItems: "flex-end" }}>
+            <ActionsMenu
+              onManageFrameworks={() => setShowManageFrameworks(true)}
+              onManagePrograms={() => setShowManagePrograms(true)}
+              onImportExcel={() => setShowImportExcel(true)}
+              onHistoryLog={() => window.open("/history", "_blank")}
+              onViewArchive={() => router.push("/archived")}
+              onSettings={() => setShowSettings(true)}
+            />
+          </div>
+        )}
       </div>
 
       {/* ── Empty state ── */}
@@ -2167,7 +2204,7 @@ export default function DashboardView({
                       id={`project-sort-${fw.id}`}
                       sensors={sensors}
                       collisionDetection={closestCenter}
-                      onDragEnd={(event) => handleProjectDragEnd(fw.id, event)}
+                      onDragEnd={isHistorical ? () => {} : (event) => handleProjectDragEnd(fw.id, event)}
                     >
                       <table
                         style={{
@@ -2236,6 +2273,7 @@ export default function DashboardView({
                                       if (cached) setProject({ ...cached, ...fields });
                                     }}
                                     settings={compSettings}
+                                    isHistorical={isHistorical}
                                   />
                                 ))}
                               </SortableContext>
@@ -2276,40 +2314,44 @@ export default function DashboardView({
       </div>
 
       {/* ── Modals ── */}
-      <ProjectFormModal
-        open={showAddProject}
-        onClose={() => setShowAddProject(false)}
-        onSave={handleRefresh}
-        frameworkOptions={portfolio}
-      />
-      {showManageFrameworks && (
-        <ManageFrameworksModal
-          open
-          onClose={() => setShowManageFrameworks(false)}
-          frameworks={portfolio}
-          onChange={handleFrameworksChange}
-        />
+      {!isHistorical && (
+        <>
+          <ProjectFormModal
+            open={showAddProject}
+            onClose={() => setShowAddProject(false)}
+            onSave={handleRefresh}
+            frameworkOptions={portfolio}
+          />
+          {showManageFrameworks && (
+            <ManageFrameworksModal
+              open
+              onClose={() => setShowManageFrameworks(false)}
+              frameworks={portfolio}
+              onChange={handleFrameworksChange}
+            />
+          )}
+          {showManagePrograms && (
+            <ManageProgramsModal
+              open
+              onClose={() => setShowManagePrograms(false)}
+              frameworks={portfolio}
+              programs={programOptions}
+              onChange={handleProgramsChange}
+            />
+          )}
+          {showImportExcel && (
+            <ImportExcelModal
+              open
+              onClose={() => setShowImportExcel(false)}
+              onSave={handleRefresh}
+            />
+          )}
+          <ComputationSettingsModal
+            open={showSettings}
+            onClose={() => setShowSettings(false)}
+          />
+        </>
       )}
-      {showManagePrograms && (
-        <ManageProgramsModal
-          open
-          onClose={() => setShowManagePrograms(false)}
-          frameworks={portfolio}
-          programs={programOptions}
-          onChange={handleProgramsChange}
-        />
-      )}
-      {showImportExcel && (
-        <ImportExcelModal
-          open
-          onClose={() => setShowImportExcel(false)}
-          onSave={handleRefresh}
-        />
-      )}
-      <ComputationSettingsModal
-        open={showSettings}
-        onClose={() => setShowSettings(false)}
-      />
     </div>
   );
 }
