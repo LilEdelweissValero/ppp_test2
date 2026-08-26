@@ -57,6 +57,11 @@ import HealthBadge from "@/components/HealthBadge";
 import ProjectFormModal from "@/components/ProjectFormModal";
 import ManageFrameworksModal from "@/components/ManageFrameworksModal";
 import ManageProgramsModal from "@/components/ManageProgramsModal";
+import ManageProjectsModal from "@/components/ManageProjectsModal";
+import ManageTasksModal from "@/components/ManageTasksModal";
+import ChangeLevelModal, {
+  type LevelChangeConfig,
+} from "@/components/ChangeLevelModal";
 import ImportExcelModal from "@/components/ImportExcelModal";
 import ComputationSettingsModal from "@/components/ComputationSettingsModal";
 import { usePortfolioCache } from "@/components/PortfolioCacheProvider";
@@ -1325,6 +1330,8 @@ function SortableProjectRow({
 function ActionsMenu({
   onManageFrameworks,
   onManagePrograms,
+  onManageProjects,
+  onManageTasks,
   onImportExcel,
   onHistoryLog,
   onViewArchive,
@@ -1332,6 +1339,8 @@ function ActionsMenu({
 }: {
   onManageFrameworks: () => void;
   onManagePrograms: () => void;
+  onManageProjects: () => void;
+  onManageTasks: () => void;
   onImportExcel: () => void;
   onHistoryLog: () => void;
   onViewArchive: () => void;
@@ -1353,6 +1362,8 @@ function ActionsMenu({
   const items = [
     { label: "Manage Frameworks", action: onManageFrameworks },
     { label: "Manage Programs", action: onManagePrograms },
+    { label: "Manage Projects", action: onManageProjects },
+    { label: "Manage Tasks", action: onManageTasks },
     { label: "Import / Export Excel", action: onImportExcel },
     { label: "History Log", action: onHistoryLog },
     { label: "View Archive", action: onViewArchive },
@@ -1481,6 +1492,9 @@ export default function DashboardView({
   const [showAddProject, setShowAddProject] = useState(false);
   const [showManageFrameworks, setShowManageFrameworks] = useState(false);
   const [showManagePrograms, setShowManagePrograms] = useState(false);
+  const [showManageProjects, setShowManageProjects] = useState(false);
+  const [showManageTasks, setShowManageTasks] = useState(false);
+  const [changeLevelConfig, setChangeLevelConfig] = useState<LevelChangeConfig | null>(null);
   const [showImportExcel, setShowImportExcel] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [compSettings, setCompSettings] = useState<ComputationSettings | undefined>(undefined);
@@ -1596,6 +1610,56 @@ export default function DashboardView({
       ),
     [portfolio]
   );
+
+  const allProjectRows = useMemo(
+    () =>
+      portfolio.flatMap((framework) =>
+        framework.programs.flatMap((program) =>
+          program.projects.map((project) => ({
+            id: project.id,
+            name: project.name,
+            reference: project.reference,
+            owner: project.owner,
+            programName: program.name,
+            frameworkName: framework.name,
+          }))
+        )
+      ),
+    [portfolio]
+  );
+
+  const allTaskRows = useMemo(
+    () =>
+      portfolio.flatMap((framework) =>
+        framework.programs.flatMap((program) =>
+          program.projects.flatMap((project) =>
+            project.tasks.map((task) => ({
+              id: task.id,
+              taskCode: task.taskCode,
+              name: task.name,
+              projectName: project.name,
+              programName: program.name,
+              frameworkName: framework.name,
+            }))
+          )
+        )
+      ),
+    [portfolio]
+  );
+
+  function openChangeLevel(sourceType: LevelChangeConfig["sourceType"], itemIds: number[]) {
+    setChangeLevelConfig({ sourceType, itemIds });
+  }
+
+  function handleChangeLevelSuccess() {
+    setChangeLevelConfig(null);
+    setShowManageFrameworks(false);
+    setShowManagePrograms(false);
+    setShowManageProjects(false);
+    setShowManageTasks(false);
+    setFrameworkProjectsOverride({});
+    router.refresh();
+  }
 
   function handleFrameworksChange(nextFrameworks: { id: number; name: string; color: string }[]) {
     setPortfolio((current) =>
@@ -1984,6 +2048,8 @@ export default function DashboardView({
             <ActionsMenu
               onManageFrameworks={() => setShowManageFrameworks(true)}
               onManagePrograms={() => setShowManagePrograms(true)}
+              onManageProjects={() => setShowManageProjects(true)}
+              onManageTasks={() => setShowManageTasks(true)}
               onImportExcel={() => setShowImportExcel(true)}
               onHistoryLog={() => window.open("/history", "_blank")}
               onViewArchive={() => router.push("/archived")}
@@ -2341,6 +2407,7 @@ export default function DashboardView({
               onClose={() => setShowManageFrameworks(false)}
               frameworks={portfolio}
               onChange={handleFrameworksChange}
+              onChangeLevel={(ids) => openChangeLevel("framework", ids)}
             />
           )}
           {showManagePrograms && (
@@ -2350,6 +2417,33 @@ export default function DashboardView({
               frameworks={portfolio}
               programs={programOptions}
               onChange={handleProgramsChange}
+              onChangeLevel={(ids) => openChangeLevel("program", ids)}
+            />
+          )}
+          {showManageProjects && (
+            <ManageProjectsModal
+              open
+              onClose={() => setShowManageProjects(false)}
+              projects={allProjectRows}
+              onChangeLevel={(ids) => openChangeLevel("project", ids)}
+            />
+          )}
+          {showManageTasks && (
+            <ManageTasksModal
+              open
+              onClose={() => setShowManageTasks(false)}
+              tasks={allTaskRows}
+              onChangeLevel={(ids) => openChangeLevel("task", ids)}
+            />
+          )}
+          {changeLevelConfig && (
+            <ChangeLevelModal
+              open
+              onClose={() => setChangeLevelConfig(null)}
+              config={changeLevelConfig}
+              portfolio={portfolio}
+              statuses={compSettings?.statuses}
+              onSuccess={handleChangeLevelSuccess}
             />
           )}
           {showImportExcel && (

@@ -39,6 +39,7 @@ interface Props {
   frameworks: Framework[];
   programs: Program[];
   onChange: (programs: Program[]) => void;
+  onChangeLevel: (ids: number[]) => void;
 }
 
 function SortableProgram({
@@ -50,6 +51,8 @@ function SortableProgram({
   handleRename,
   handleArchive,
   loading,
+  selected,
+  onToggle,
 }: {
   program: Program;
   editId: number | null;
@@ -59,6 +62,8 @@ function SortableProgram({
   handleRename: (id: number) => void;
   handleArchive: (id: number, name: string) => void;
   loading: boolean;
+  selected: boolean;
+  onToggle: (id: number) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: program.id });
@@ -129,6 +134,13 @@ function SortableProgram({
       ) : (
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={() => onToggle(program.id)}
+              style={{ accentColor: "var(--accent)", cursor: "pointer" }}
+              aria-label={`Select ${program.name} for level change`}
+            />
             <button
               style={{
                 cursor: "grab",
@@ -179,6 +191,7 @@ export default function ManageProgramsModal({
   frameworks,
   programs: initialPrograms,
   onChange,
+  onChangeLevel,
 }: Props) {
   const [programs, setPrograms] = useState<Program[]>(initialPrograms);
   const initialRef = useRef(initialPrograms);
@@ -189,6 +202,7 @@ export default function ManageProgramsModal({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [archiveTarget, setArchiveTarget] = useState<{
     entityId: number;
     entityName: string;
@@ -211,6 +225,7 @@ export default function ManageProgramsModal({
       setEditName("");
       setError("");
       setIsDirty(false);
+      setSelectedIds(new Set());
     }
     // Only reset when modal opens/closes, not on prop changes while open
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -264,8 +279,28 @@ export default function ManageProgramsModal({
   function handleArchiveConfirmLocal() {
     if (!archiveTarget) return;
     setPrograms(programs.filter((p) => p.id !== archiveTarget.entityId));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(archiveTarget.entityId);
+      return next;
+    });
     setIsDirty(true);
     setArchiveTarget(null);
+  }
+
+  function toggleSelect(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const allSelected = programs.length > 0 && programs.every((p) => selectedIds.has(p.id));
+
+  function toggleSelectAll() {
+    setSelectedIds(allSelected ? new Set() : new Set(programs.map((p) => p.id)));
   }
 
   async function handleSave() {
@@ -432,6 +467,58 @@ export default function ManageProgramsModal({
           <p style={{ color: "#B91C1C", fontSize: 12 }}>{error}</p>
         )}
 
+        {selectedIds.size > 0 && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              background: "var(--ground)",
+              borderRadius: 3,
+              padding: "8px 12px",
+            }}
+          >
+            <span style={{ fontSize: 12, color: "var(--ink-secondary)" }}>
+              {selectedIds.size} selected
+            </span>
+            <button
+              onClick={() => onChangeLevel([...selectedIds])}
+              style={{
+                padding: "5px 12px",
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#FFFFFF",
+                background: "var(--accent)",
+                borderRadius: 3,
+                cursor: "pointer",
+                border: "none",
+              }}
+            >
+              Change Level…
+            </button>
+          </div>
+        )}
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 11,
+            color: "var(--ink-tertiary)",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={allSelected}
+            onChange={toggleSelectAll}
+            disabled={programs.length === 0}
+            style={{ accentColor: "var(--accent)", cursor: "pointer" }}
+            aria-label="Select all programs"
+          />
+          <span>Select all</span>
+        </div>
+
         <DndContext
           id="program-sort"
           sensors={sensors}
@@ -454,6 +541,8 @@ export default function ManageProgramsModal({
                   handleRename={handleRenameLocal}
                   handleArchive={handleArchiveClick}
                   loading={loading}
+                  selected={selectedIds.has(program.id)}
+                  onToggle={toggleSelect}
                 />
               ))}
             </div>

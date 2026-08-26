@@ -43,6 +43,7 @@ interface Props {
   onClose: () => void;
   frameworks: Framework[];
   onChange: (frameworks: Framework[]) => void;
+  onChangeLevel: (ids: number[]) => void;
 }
 
 function SortableFramework({
@@ -56,6 +57,8 @@ function SortableFramework({
   handleRename,
   handleArchive,
   loading,
+  selected,
+  onToggle,
 }: {
   fw: Framework;
   editId: number | null;
@@ -67,6 +70,8 @@ function SortableFramework({
   handleRename: (id: number) => void;
   handleArchive: (id: number, name: string) => void;
   loading: boolean;
+  selected: boolean;
+  onToggle: (id: number) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: fw.id });
@@ -139,6 +144,13 @@ function SortableFramework({
       ) : (
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={() => onToggle(fw.id)}
+              style={{ accentColor: "var(--accent)", cursor: "pointer" }}
+              aria-label={`Select ${fw.name} for level change`}
+            />
             <button
               style={{ cursor: "grab", color: "var(--ink-tertiary)", padding: 4 }}
               {...attributes}
@@ -219,6 +231,7 @@ export default function ManageFrameworksModal({
   onClose,
   frameworks: initialFrameworks,
   onChange,
+  onChangeLevel,
 }: Props) {
   const [frameworks, setFrameworks] = useState<Framework[]>(initialFrameworks);
   const initialRef = useRef(initialFrameworks);
@@ -230,6 +243,7 @@ export default function ManageFrameworksModal({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [archiveTarget, setArchiveTarget] = useState<{
     entityId: number;
     entityName: string;
@@ -253,6 +267,7 @@ export default function ManageFrameworksModal({
       setEditColor("");
       setError("");
       setIsDirty(false);
+      setSelectedIds(new Set());
     }
   }, [open, initialFrameworks]);
 
@@ -306,8 +321,28 @@ export default function ManageFrameworksModal({
         : item
     );
     setFrameworks(next.filter((item) => (item as unknown as { archived?: boolean }).archived !== true));
+    setSelectedIds((prev) => {
+      const nextIds = new Set(prev);
+      nextIds.delete(archiveTarget.entityId);
+      return nextIds;
+    });
     setIsDirty(true);
     setArchiveTarget(null);
+  }
+
+  function toggleSelect(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const allSelected = frameworks.length > 0 && frameworks.every((f) => selectedIds.has(f.id));
+
+  function toggleSelectAll() {
+    setSelectedIds(allSelected ? new Set() : new Set(frameworks.map((f) => f.id)));
   }
 
   async function handleSave() {
@@ -463,6 +498,60 @@ export default function ManageFrameworksModal({
           <p style={{ color: "#B91C1C", fontSize: 12, marginBottom: 16 }}>{error}</p>
         )}
 
+        {selectedIds.size > 0 && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              background: "var(--ground)",
+              borderRadius: 3,
+              padding: "8px 12px",
+              marginBottom: 12,
+            }}
+          >
+            <span style={{ fontSize: 12, color: "var(--ink-secondary)" }}>
+              {selectedIds.size} selected
+            </span>
+            <button
+              onClick={() => onChangeLevel([...selectedIds])}
+              style={{
+                padding: "5px 12px",
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#FFFFFF",
+                background: "var(--accent)",
+                borderRadius: 3,
+                cursor: "pointer",
+                border: "none",
+              }}
+            >
+              Change Level…
+            </button>
+          </div>
+        )}
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 8,
+            fontSize: 11,
+            color: "var(--ink-tertiary)",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={allSelected}
+            onChange={toggleSelectAll}
+            disabled={frameworks.length === 0}
+            style={{ accentColor: "var(--accent)", cursor: "pointer" }}
+            aria-label="Select all frameworks"
+          />
+          <span>Select all</span>
+        </div>
+
         <DndContext
           id="framework-sort"
           sensors={sensors}
@@ -487,6 +576,8 @@ export default function ManageFrameworksModal({
                   handleRename={handleRenameLocal}
                   handleArchive={handleArchiveClick}
                   loading={loading}
+                  selected={selectedIds.has(fw.id)}
+                  onToggle={toggleSelect}
                 />
               ))}
             </div>
