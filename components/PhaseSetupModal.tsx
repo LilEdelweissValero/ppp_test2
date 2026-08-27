@@ -80,6 +80,10 @@ export default function PhaseSetupModal({
       setError("All phases must have a name.");
       return;
     }
+    if (unassignedTasks.length > 0 || unassignedSpecialTasks.length > 0) {
+      setError("All tasks must be assigned to a phase.");
+      return;
+    }
 
     setSaving(true);
     setError(null);
@@ -245,16 +249,16 @@ export default function PhaseSetupModal({
       </div>
 
       {/* Task assignment */}
-      {(unassignedTasks.length > 0 || unassignedSpecialTasks.length > 0) && (
+      {(tasks.length > 0 || specialTasks.length > 0) && (
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-primary)", marginBottom: 8 }}>
-            Assign Tasks to Phases
+            Assign Tasks to Phases (required)
           </div>
 
-          {unassignedTasks.length > 0 && (
+          {tasks.length > 0 && (
             <div style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 11, color: "var(--ink-tertiary)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                Regular Tasks ({unassignedTasks.length} unassigned)
+                Regular Tasks
               </div>
               {tasks.map((task) => (
                 <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
@@ -284,7 +288,7 @@ export default function PhaseSetupModal({
                       color: "var(--ink-primary)",
                     }}
                   >
-                    <option value="">Unassigned</option>
+                    <option value="">-- Select phase --</option>
                     {phases.filter((p) => p.name.trim()).map((p) => (
                       <option key={p.name} value={p.name}>{p.name}</option>
                     ))}
@@ -294,10 +298,10 @@ export default function PhaseSetupModal({
             </div>
           )}
 
-          {unassignedSpecialTasks.length > 0 && (
+          {specialTasks.length > 0 && (
             <div>
               <div style={{ fontSize: 11, color: "var(--ink-tertiary)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                Special Tasks ({unassignedSpecialTasks.length} unassigned)
+                Special Tasks
               </div>
               {specialTasks.map((st) => (
                 <div key={st.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
@@ -327,7 +331,7 @@ export default function PhaseSetupModal({
                       color: "var(--ink-primary)",
                     }}
                   >
-                    <option value="">Unassigned</option>
+                    <option value="">-- Select phase --</option>
                     {phases.filter((p) => p.name.trim()).map((p) => (
                       <option key={p.name} value={p.name}>{p.name}</option>
                     ))}
@@ -366,15 +370,15 @@ export default function PhaseSetupModal({
         </button>
         <button
           onClick={handleSave}
-          disabled={saving || !weightValid}
+          disabled={saving || !weightValid || unassignedTasks.length > 0 || unassignedSpecialTasks.length > 0}
           style={{
             padding: "8px 16px",
             fontSize: 13,
             border: "none",
             borderRadius: 3,
-            background: saving || !weightValid ? "var(--ink-tertiary)" : "var(--accent)",
+            background: saving || !weightValid || unassignedTasks.length > 0 || unassignedSpecialTasks.length > 0 ? "var(--ink-tertiary)" : "var(--accent)",
             color: "#fff",
-            cursor: saving || !weightValid ? "not-allowed" : "pointer",
+            cursor: saving || !weightValid || unassignedTasks.length > 0 || unassignedSpecialTasks.length > 0 ? "not-allowed" : "pointer",
             fontWeight: 600,
           }}
         >
