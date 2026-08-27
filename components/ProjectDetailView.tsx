@@ -23,6 +23,7 @@ import {
   computeProjectPercentComplete,
   computeProjectHealth,
   computeTaskPercentDone,
+  computePhasePercentComplete,
 } from "@/lib/health";
 import { PRIORITY_LABELS, getStatusList, getStatusScore } from "@/lib/status";
 import { getDefaultSettings } from "@/lib/computation-settings";
@@ -31,23 +32,25 @@ import { compareQuarters } from "@/lib/quarters";
 import HealthBadge from "@/components/HealthBadge";
 import ProjectFormModal from "@/components/ProjectFormModal";
 import TaskFormModal from "@/components/TaskFormModal";
+import PhaseFormModal from "@/components/PhaseFormModal";
+import PhaseSetupModal from "@/components/PhaseSetupModal";
 import ChangeDueQuarterModal from "@/components/ChangeDueQuarterModal";
 import ChangeHistoryModal from "@/components/ChangeHistoryModal";
 import ArchiveConfirmModal from "@/components/ArchiveConfirmModal";
-import { CachedProject, CachedTask, CachedSpecialTask, usePortfolioCache } from "@/components/PortfolioCacheProvider";
+import { CachedProject, CachedTask, CachedSpecialTask, CachedPhase, usePortfolioCache } from "@/components/PortfolioCacheProvider";
 
 type Task = CachedTask;
 type Project = CachedProject;
 
-function expandSpecialTasksToVirtualTasks(specialTasks: CachedSpecialTask[], settings?: ComputationSettings): { status: string }[] {
+function expandSpecialTasksToVirtualTasks(specialTasks: CachedSpecialTask[], settings?: ComputationSettings): { status: string; phaseId: number | null }[] {
   const statuses = settings?.statuses ?? getDefaultSettings().statuses;
-  const virtuals: { status: string }[] = [];
+  const virtuals: { status: string; phaseId: number | null }[] = [];
   for (const st of specialTasks) {
-    for (let i = 0; i < st.nys; i++) virtuals.push({ status: statuses[0].name });
-    for (let i = 0; i < st.plan; i++) virtuals.push({ status: statuses[1].name });
-    for (let i = 0; i < st.part; i++) virtuals.push({ status: statuses[2].name });
-    for (let i = 0; i < st.mostly; i++) virtuals.push({ status: statuses[3].name });
-    for (let i = 0; i < st.done; i++) virtuals.push({ status: statuses[4].name });
+    for (let i = 0; i < st.nys; i++) virtuals.push({ status: statuses[0].name, phaseId: st.phaseId });
+    for (let i = 0; i < st.plan; i++) virtuals.push({ status: statuses[1].name, phaseId: st.phaseId });
+    for (let i = 0; i < st.part; i++) virtuals.push({ status: statuses[2].name, phaseId: st.phaseId });
+    for (let i = 0; i < st.mostly; i++) virtuals.push({ status: statuses[3].name, phaseId: st.phaseId });
+    for (let i = 0; i < st.done; i++) virtuals.push({ status: statuses[4].name, phaseId: st.phaseId });
   }
   return virtuals;
 }
@@ -72,6 +75,8 @@ function SortableTaskRow({
   onMouseLeave,
   settings,
   isHistorical,
+  phases,
+  onAssignPhase,
 }: {
   task: Task;
   onEdit: () => void;
@@ -87,6 +92,8 @@ function SortableTaskRow({
   onMouseLeave: () => void;
   settings?: ComputationSettings;
   isHistorical?: boolean;
+  phases: CachedPhase[];
+  onAssignPhase: (taskId: number, phaseId: number | null) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: task.id });
@@ -122,6 +129,32 @@ function SortableTaskRow({
       </td>
       <td className="detail-task-code" style={{ width: 100 }}>{task.taskCode}</td>
       <td style={{ width: 220 }}>{task.name}</td>
+      {phases.length > 0 && (
+        <td style={{ width: 100 }}>
+          <select
+            defaultValue={task.phaseId ?? ""}
+            onChange={(e) => {
+              const val = e.target.value;
+              onAssignPhase(task.id, val ? parseInt(val) : null);
+            }}
+            disabled={isHistorical}
+            style={{
+              fontSize: 11,
+              padding: "2px 4px",
+              border: "1px solid var(--rule)",
+              borderRadius: 3,
+              background: "var(--surface)",
+              color: "var(--ink-primary)",
+              width: "100%",
+            }}
+          >
+            <option value="">—</option>
+            {phases.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </td>
+      )}
       <td className="detail-muted" style={{ width: 110 }}>{task.assignee || "—"}</td>
       <td
         className="detail-inline-cell detail-muted"
@@ -262,7 +295,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
   const [changeProjectQuarter, setChangeProjectQuarter] = useState(false);
   const [changeTaskQuarter, setChangeTaskQuarter] = useState<Task | null>(null);
   const [viewHistory, setViewHistory] = useState<{
-    type: "Project" | "Task" | "SpecialTask";
+    type: "Project" | "Task" | "SpecialTask" | "Phase";
     id: number;
   } | null>(null);
   const [editingCell, setEditingCell] = useState<{
@@ -272,7 +305,16 @@ export default function ProjectDetailView({ project: initialProject, historicalT
   const selectRef = useRef<HTMLSelectElement>(null);
   const [tasks, setTasks] = useState<Task[]>(initialProject.tasks);
   const [specialTasks, setSpecialTasks] = useState<CachedSpecialTask[]>(initialProject.specialTasks || []);
+  const [phases, setPhases] = useState<CachedPhase[]>(initialProject.phases || []);
   const [compSettings, setCompSettings] = useState<ComputationSettings | undefined>(undefined);
+  const [showPhaseSetup, setShowPhaseSetup] = useState(false);
+  const [showAddPhase, setShowAddPhase] = useState(false);
+  const [editPhase, setEditPhase] = useState<CachedPhase | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<{
+    entityType: "Project" | "Task" | "SpecialTask" | "Phase";
+    entityId: number;
+    entityName: string;
+  } | null>(null);
 
   useEffect(() => {
     fetch("/api/settings/computation")
@@ -285,11 +327,6 @@ export default function ProjectDetailView({ project: initialProject, historicalT
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
   const [savingOrder, setSavingOrder] = useState(false);
   const [saveOrderError, setSaveOrderError] = useState<string | null>(null);
-  const [archiveTarget, setArchiveTarget] = useState<{
-    entityType: "Project" | "Task" | "SpecialTask";
-    entityId: number;
-    entityName: string;
-  } | null>(null);
   const [archiveLoading, setArchiveLoading] = useState(false);
   const [hoveredTask, setHoveredTask] = useState<Task | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
@@ -307,6 +344,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
     setCurrentProject(initialProject);
     setTasks(initialProject.tasks);
     setSpecialTasks(initialProject.specialTasks || []);
+    setPhases(initialProject.phases || []);
   }, [initialProject]);
 
   // Fetch snapshot data when in historical mode
@@ -378,9 +416,23 @@ export default function ProjectDetailView({ project: initialProject, historicalT
     if (!isHistorical) setProject(nextProject);
   }
 
+  function updatePhases(nextPhases: CachedPhase[]) {
+    setPhases(nextPhases);
+    const nextProject = { ...project, phases: nextPhases };
+    setCurrentProject(nextProject);
+    if (!isHistorical) setProject(nextProject);
+  }
+
   const virtualTasks = expandSpecialTasksToVirtualTasks(specialTasks, compSettings);
+  const allTasksWithPhase = [...tasks.map((t) => ({ status: t.status, phaseId: t.phaseId })), ...virtualTasks];
   const allTasksForPct = [...tasks, ...virtualTasks];
-  const pct = computeProjectPercentComplete(allTasksForPct, compSettings);
+  const hasPhases = phases.length > 0;
+  const pct = computeProjectPercentComplete(
+    allTasksForPct,
+    compSettings,
+    hasPhases ? phases : undefined,
+    hasPhases ? allTasksWithPhase : undefined
+  );
   const health =
     allTasksForPct.length > 0
       ? computeProjectHealth(pct * 100, project.adjustedTargetQuarter, compSettings)
@@ -392,6 +444,21 @@ export default function ProjectDetailView({ project: initialProject, historicalT
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+
+  async function handleAssignPhase(taskId: number, phaseId: number | null) {
+    try {
+      await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phaseId: phaseId ? String(phaseId) : null }),
+      });
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, phaseId } : t))
+      );
+    } catch {
+      // silently fail
+    }
+  }
 
   function handleBackToDashboard() {
     if (canReturnToDashboard(project.id)) {
@@ -410,15 +477,20 @@ export default function ProjectDetailView({ project: initialProject, historicalT
           ? `/api/projects/${archiveTarget.entityId}`
           : archiveTarget.entityType === "SpecialTask"
           ? `/api/special-tasks/${archiveTarget.entityId}`
+          : archiveTarget.entityType === "Phase"
+          ? `/api/phases/${archiveTarget.entityId}`
           : `/api/tasks/${archiveTarget.entityId}`;
       const res = await fetch(endpoint, {
-        method: "PATCH",
+        method: archiveTarget.entityType === "Phase" ? "DELETE" : "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ archived: true }),
+        body: archiveTarget.entityType === "Phase" ? undefined : JSON.stringify({ archived: true }),
       });
       if (res.ok) {
         if (archiveTarget.entityType === "Project") {
           router.push("/");
+        } else if (archiveTarget.entityType === "Phase") {
+          setPhases(phases.filter((p) => p.id !== archiveTarget.entityId));
+          setArchiveTarget(null);
         } else if (archiveTarget.entityType === "SpecialTask") {
           updateSpecialTasks(specialTasks.filter((st) => st.id !== archiveTarget.entityId));
           setArchiveTarget(null);
@@ -694,6 +766,102 @@ export default function ProjectDetailView({ project: initialProject, historicalT
           </div>
         </section>
 
+        {/* ── Phases Section ── */}
+        <section className="detail-task-panel" aria-labelledby="phases-title" style={{ borderLeft: "3px solid #6366F1" }}>
+          <div className="detail-task-header">
+            <div>
+              <h2 id="phases-title" className="detail-task-heading">Phases</h2>
+              <p className="detail-task-subtitle">
+                {phases.length} phase{phases.length === 1 ? "" : "s"}
+                {phases.length > 0 && " · Weights must equal 100%"}
+              </p>
+            </div>
+            {!isHistorical && (
+              <button
+                onClick={() => {
+                  if (phases.length === 0 && (tasks.length > 0 || specialTasks.length > 0)) {
+                    setShowPhaseSetup(true);
+                  } else {
+                    setShowAddPhase(true);
+                  }
+                }}
+                className="detail-button detail-button-primary"
+              >
+                Add Phase
+              </button>
+            )}
+          </div>
+
+          {phases.length === 0 ? (
+            <div className="detail-empty">
+              <p>No phases defined.</p>
+              <p>Phases let you group tasks and weight their contribution to project completion.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto detail-task-table-wrap">
+              <table className="detail-task-table">
+                <thead>
+                  <tr>
+                    {[
+                      { label: "Name", key: "name", width: 200 },
+                      { label: "Weight", key: "weight", width: 80 },
+                      { label: "# Tasks", key: "taskCount", width: 70 },
+                      { label: "% Complete", key: "pct", width: 100 },
+                    ].map(({ label, key, width }) => (
+                      <th key={key} style={{ width, userSelect: "none" }}>{label}</th>
+                    ))}
+                    <th style={{ width: 100 }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {phases.map((phase) => {
+                    const phaseTasks = tasks.filter((t) => t.phaseId === phase.id);
+                    const phaseSpecialTasks = specialTasks.filter((st) => st.phaseId === phase.id);
+                    const phaseVirtualTasks = expandSpecialTasksToVirtualTasks(phaseSpecialTasks, compSettings);
+                    const allPhaseTasks = [...phaseTasks.map((t) => ({ status: t.status })), ...phaseVirtualTasks];
+                    const phasePct = computePhasePercentComplete(allPhaseTasks, compSettings);
+                    const phasePctRounded = Math.round(phasePct * 100);
+
+                    return (
+                      <tr key={phase.id} className="detail-task-row">
+                        <td style={{ width: 200, fontWeight: 500 }}>{phase.name}</td>
+                        <td style={{ width: 80, textAlign: "center" }}>{phase.weight}%</td>
+                        <td style={{ width: 70, textAlign: "center" }}>{phaseTasks.length + phaseSpecialTasks.length}</td>
+                        <td style={{ width: 100, textAlign: "center" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
+                            <div style={{ width: 50, height: 6, background: "var(--rule)", borderRadius: 3, overflow: "hidden" }}>
+                              <div style={{ width: `${phasePctRounded}%`, height: "100%", background: phasePctRounded === 100 ? "#1A6B3C" : "#6366F1", borderRadius: 3 }} />
+                            </div>
+                            <span style={{ fontSize: 11, fontVariantNumeric: "tabular-nums" }}>{phasePctRounded}%</span>
+                          </div>
+                        </td>
+                        <td style={{ width: 100 }}>
+                          {!isHistorical && (
+                            <div style={{ display: "flex", gap: 4 }}>
+                              <button
+                                onClick={() => setEditPhase(phase)}
+                                style={{ fontSize: 11, color: "var(--accent)", background: "none", border: "none", cursor: "pointer" }}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => setArchiveTarget({ entityType: "Phase", entityId: phase.id, entityName: phase.name })}
+                                style={{ fontSize: 11, color: "var(--ink-tertiary)", background: "none", border: "none", cursor: "pointer" }}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
         <section className="detail-task-panel" aria-labelledby="tasks-title">
           <div className="detail-task-header">
             <div>
@@ -754,6 +922,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                         {[
                           { label: "Code", key: "taskCode", width: 100 },
                           { label: "Name", key: "name", width: 220 },
+                          ...(hasPhases ? [{ label: "Phase", key: "phaseId", width: 100 }] : []),
                           { label: "Assignee", key: "assignee", width: 110 },
                           { label: "Priority", key: "priority", width: 80 },
                           { label: "Status", key: "status", width: 160 },
@@ -806,6 +975,8 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                           onMouseLeave={handleTaskMouseLeave}
                           settings={compSettings}
                           isHistorical={isHistorical}
+                          phases={phases}
+                          onAssignPhase={handleAssignPhase}
                           />
                       ))}
                     </tbody>
@@ -836,6 +1007,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                     {[
                       { label: "Code", key: "specialTaskCode", width: 100 },
                       { label: "Name", key: "name", width: 180 },
+                      ...(hasPhases ? [{ label: "Phase", key: "phaseId", width: 100 }] : []),
                       { label: "#", key: "total", width: 50 },
                       { label: "NYS", key: "nys", width: 50 },
                       { label: "PLAN.", key: "plan", width: 55 },
@@ -861,6 +1033,41 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                       <tr key={st.id} className="detail-task-row">
                         <td className="detail-task-code" style={{ width: 100 }}>{st.specialTaskCode}</td>
                         <td style={{ width: 180 }}>{st.name}</td>
+                        {hasPhases && (
+                          <td style={{ width: 100 }}>
+                            <select
+                              defaultValue={st.phaseId ?? ""}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                const phaseId = val ? parseInt(val) : null;
+                                fetch(`/api/special-tasks/${st.id}`, {
+                                  method: "PATCH",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ phaseId: phaseId ? String(phaseId) : null }),
+                                }).then(() => {
+                                  setSpecialTasks((prev) =>
+                                    prev.map((s) => (s.id === st.id ? { ...s, phaseId } : s))
+                                  );
+                                });
+                              }}
+                              disabled={isHistorical}
+                              style={{
+                                fontSize: 11,
+                                padding: "2px 4px",
+                                border: "1px solid var(--rule)",
+                                borderRadius: 3,
+                                background: "var(--surface)",
+                                color: "var(--ink-primary)",
+                                width: "100%",
+                              }}
+                            >
+                              <option value="">—</option>
+                              {phases.map((p) => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                              ))}
+                            </select>
+                          </td>
+                        )}
                         {/* # */}
                         <td style={{ width: 50, textAlign: "center", fontSize: 11 }}>
                           {total}
@@ -1144,6 +1351,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
             updateSpecialTasks([...specialTasks, newSpecialTask]);
           }}
           projectId={project.id}
+          phases={phases}
         />
 
         {editTask && (
@@ -1157,6 +1365,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
               setEditTask(null);
             }}
             projectId={project.id}
+            phases={phases}
             initialData={{
               id: editTask.id,
               taskCode: editTask.taskCode,
@@ -1170,6 +1379,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
               targetQuarter: editTask.targetQuarter,
               deliverable: editTask.deliverable || "",
               attachments: Array.isArray(editTask.attachments) ? editTask.attachments as { url: string; title: string | null }[] : [],
+              phaseId: editTask.phaseId,
             }}
           />
         )}
@@ -1215,12 +1425,14 @@ export default function ProjectDetailView({ project: initialProject, historicalT
               setEditSpecialTask(null);
             }}
             projectId={project.id}
+            phases={phases}
             initialSpecialData={{
               id: editSpecialTask.id,
               specialTaskCode: editSpecialTask.specialTaskCode,
               name: editSpecialTask.name,
               dueQuarter: editSpecialTask.dueQuarter,
               lastUpdatedDate: editSpecialTask.lastUpdatedDate,
+              phaseId: editSpecialTask.phaseId,
             }}
           />
         )}
@@ -1243,6 +1455,45 @@ export default function ProjectDetailView({ project: initialProject, historicalT
           />
         )}
         </>
+        )}
+
+        {showPhaseSetup && (
+          <PhaseSetupModal
+            open={showPhaseSetup}
+            onClose={() => setShowPhaseSetup(false)}
+            projectId={project.id}
+            tasks={tasks}
+            specialTasks={specialTasks}
+            onSaved={(createdPhases, updatedTasks, updatedSpecialTasks) => {
+              setPhases(createdPhases);
+              setTasks(updatedTasks);
+              setSpecialTasks(updatedSpecialTasks);
+            }}
+          />
+        )}
+
+        {showAddPhase && (
+          <PhaseFormModal
+            open={showAddPhase}
+            onClose={() => setShowAddPhase(false)}
+            projectId={project.id}
+            onSaved={(phase) => {
+              setPhases([...phases, phase]);
+            }}
+          />
+        )}
+
+        {editPhase && (
+          <PhaseFormModal
+            open={!!editPhase}
+            onClose={() => setEditPhase(null)}
+            projectId={project.id}
+            initialData={editPhase}
+            onSaved={(updatedPhase) => {
+              setPhases(phases.map((p) => p.id === updatedPhase.id ? updatedPhase : p));
+              setEditPhase(null);
+            }}
+          />
         )}
 
         {viewHistory && (

@@ -21,6 +21,8 @@ const TASK_COLUMNS = [
   "task_deliverable",
   "task_attachment_url",
   "task_archived",
+  "phase_name",
+  "phase_weight",
 ];
 
 const SPECIAL_TASK_COLUMNS = [
@@ -41,6 +43,8 @@ const SPECIAL_TASK_COLUMNS = [
   "due_quarter",
   "last_updated_date",
   "archived",
+  "phase_name",
+  "phase_weight",
 ];
 
 export async function GET() {
@@ -59,6 +63,9 @@ export async function GET() {
         deliverable: true,
         attachments: true,
         archived: true,
+        phase: {
+          select: { name: true, weight: true },
+        },
         project: {
           select: {
             name: true,
@@ -91,6 +98,9 @@ export async function GET() {
         dueQuarter: true,
         lastUpdatedDate: true,
         archived: true,
+        phase: {
+          select: { name: true, weight: true },
+        },
         project: {
           select: {
             name: true,
@@ -133,6 +143,8 @@ export async function GET() {
       ? (t.attachments as { url: string; title?: string | null }[]).map((a) => a.url).join(", ")
       : "",
     t.archived ? "TRUE" : "FALSE",
+    t.phase?.name ?? "",
+    t.phase?.weight ?? "",
   ]);
 
   const specialTaskRows = specialTasks.map((st) => [
@@ -153,6 +165,8 @@ export async function GET() {
     st.dueQuarter,
     st.lastUpdatedDate ?? "",
     st.archived ? "TRUE" : "FALSE",
+    st.phase?.name ?? "",
+    st.phase?.weight ?? "",
   ]);
 
   const wb = XLSX.utils.book_new();

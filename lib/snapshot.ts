@@ -18,6 +18,7 @@ interface SnapshotTask {
   attachments: unknown;
   dependencies: string | null;
   adjustedTargetQuarter: string;
+  phaseId: number | null;
   archived: boolean;
 }
 
@@ -34,6 +35,16 @@ interface SnapshotSpecialTask {
   done: number;
   dueQuarter: string;
   lastUpdatedDate: string | null;
+  phaseId: number | null;
+  archived: boolean;
+}
+
+interface SnapshotPhase {
+  id: number;
+  projectId: number;
+  name: string;
+  weight: number;
+  sortOrder: number;
   archived: boolean;
 }
 
@@ -47,6 +58,7 @@ interface SnapshotProject {
   adjustedTargetQuarter: string;
   actualCompletionDate: string | null;
   archived: boolean;
+  phases: SnapshotPhase[];
   tasks: SnapshotTask[];
   specialTasks: SnapshotSpecialTask[];
 }
@@ -122,6 +134,17 @@ export async function getSnapshotAt(timestamp: string): Promise<{
                 actualCompletionDate: true,
                 sortOrder: true,
                 archived: true,
+                phases: {
+                  select: {
+                    id: true,
+                    projectId: true,
+                    name: true,
+                    weight: true,
+                    sortOrder: true,
+                    archived: true,
+                  },
+                  orderBy: { sortOrder: "asc" },
+                },
                 tasks: {
                   select: {
                     id: true,
@@ -139,6 +162,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
                     adjustedTargetQuarter: true,
                     deliverable: true,
                     attachments: true,
+                    phaseId: true,
                     archived: true,
                   },
                   orderBy: { sortOrder: "asc" },
@@ -158,6 +182,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
                     done: true,
                     dueQuarter: true,
                     lastUpdatedDate: true,
+                    phaseId: true,
                     archived: true,
                   },
                   orderBy: { sortOrder: "asc" },
@@ -200,7 +225,14 @@ export async function getSnapshotAt(timestamp: string): Promise<{
   const projectMap = new Map(
     currentFrameworks.flatMap((f) =>
       f.programs.flatMap((p) =>
-        p.projects.map((pr) => [pr.id, { ...pr, tasks: [...pr.tasks], specialTasks: [...pr.specialTasks] }])
+        p.projects.map((pr) => [pr.id, { ...pr, phases: [...pr.phases], tasks: [...pr.tasks], specialTasks: [...pr.specialTasks] }])
+      )
+    )
+  );
+  const phaseMap = new Map(
+    currentFrameworks.flatMap((f) =>
+      f.programs.flatMap((p) =>
+        p.projects.flatMap((pr) => pr.phases.map((ph) => [ph.id, { ...ph }]))
       )
     )
   );
@@ -340,6 +372,11 @@ export async function getSnapshotAt(timestamp: string): Promise<{
                 const st = specialTaskMap.get(prevOrder[i]);
                 if (st) st.sortOrder = i;
               }
+            } else if (tableType === "Phase") {
+              for (let i = 0; i < prevOrder.length; i++) {
+                const ph = phaseMap.get(prevOrder[i]);
+                if (ph) ph.sortOrder = i;
+              }
             } else if (tableType === "Project") {
               for (let i = 0; i < prevOrder.length; i++) {
                 const pr = projectMap.get(prevOrder[i]);
@@ -376,6 +413,9 @@ export async function getSnapshotAt(timestamp: string): Promise<{
     } else if (type === "Project") {
       const p = projectMap.get(id);
       if (p) p.archived = false;
+    } else if (type === "Phase") {
+      const ph = phaseMap.get(id);
+      if (ph) ph.archived = false;
     } else if (type === "Task") {
       const t = taskMap.get(id);
       if (t) t.archived = false;
@@ -395,6 +435,9 @@ export async function getSnapshotAt(timestamp: string): Promise<{
     } else if (type === "Project") {
       const p = projectMap.get(id);
       if (p) p.archived = true;
+    } else if (type === "Phase") {
+      const ph = phaseMap.get(id);
+      if (ph) ph.archived = true;
     } else if (type === "Task") {
       const t = taskMap.get(id);
       if (t) t.archived = true;
@@ -427,6 +470,13 @@ export async function getSnapshotAt(timestamp: string): Promise<{
         if (changes.adjustedTargetQuarter) p.adjustedTargetQuarter = changes.adjustedTargetQuarter.old;
         if (changes.actualCompletionDate) p.actualCompletionDate = changes.actualCompletionDate.old || null;
         if (changes.archived) p.archived = changes.archived.old === "true";
+      }
+    } else if (type === "Phase") {
+      const ph = phaseMap.get(id);
+      if (ph) {
+        if (changes.name) ph.name = changes.name.old;
+        if (changes.weight) ph.weight = parseFloat(changes.weight.old) || 0;
+        if (changes.archived) ph.archived = changes.archived.old === "true";
       }
     } else if (type === "Task") {
       const t = taskMap.get(id);
@@ -497,6 +547,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
             attachments: t.attachments,
             dependencies: t.dependencies,
             adjustedTargetQuarter: t.adjustedTargetQuarter,
+            phaseId: t.phaseId,
             archived: t.archived,
           });
         }
@@ -518,7 +569,22 @@ export async function getSnapshotAt(timestamp: string): Promise<{
             done: st.done,
             dueQuarter: st.dueQuarter,
             lastUpdatedDate: st.lastUpdatedDate,
+            phaseId: st.phaseId,
             archived: st.archived,
+          });
+        }
+
+        const phases: SnapshotPhase[] = [];
+        for (const [phid, ph] of phaseMap) {
+          if (ph.projectId !== prid) continue;
+          if (createdAfter.has(`Phase:${phid}`)) continue;
+          phases.push({
+            id: ph.id,
+            projectId: ph.projectId,
+            name: ph.name,
+            weight: ph.weight,
+            sortOrder: ph.sortOrder,
+            archived: ph.archived,
           });
         }
 
@@ -532,6 +598,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
           adjustedTargetQuarter: pr.adjustedTargetQuarter,
           actualCompletionDate: pr.actualCompletionDate,
           archived: pr.archived,
+          phases,
           tasks,
           specialTasks,
         });
@@ -590,6 +657,7 @@ function filterArchived(frameworks: SnapshotFramework[]): SnapshotFramework[] {
             .filter((pr) => !pr.archived)
             .map((pr) => ({
               ...pr,
+              phases: pr.phases.filter((ph) => !ph.archived),
               tasks: pr.tasks.filter((t) => !t.archived),
               specialTasks: pr.specialTasks.filter((st) => !st.archived),
             })),

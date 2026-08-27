@@ -33,6 +33,7 @@ export async function PATCH(
     dueQuarter,
     lastUpdatedDate,
     archived,
+    phaseId,
   } = body;
 
   const existingTask = await prisma.specialTask.findUnique({ where: { id: parseInt(id) } });
@@ -68,6 +69,7 @@ export async function PATCH(
   if (done !== undefined) updateData.done = done;
   if (dueQuarter !== undefined) updateData.dueQuarter = dueQuarter;
   if (archived !== undefined && typeof archived === "boolean") updateData.archived = archived;
+  if (phaseId !== undefined) updateData.phaseId = phaseId ? parseInt(phaseId) : null;
 
   // Auto-set lastUpdatedDate when numeric fields change (unless explicitly provided)
   const numericFieldsChanged = [nys, plan, part, mostly, done].some((v) => v !== undefined);

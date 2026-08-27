@@ -24,6 +24,8 @@ const EXCEL_COLUMNS = [
   "task_deliverable",
   "task_attachment_url",
   "task_archived",
+  "phase_name",
+  "phase_weight",
 ];
 
 const SPECIAL_TASK_COLUMNS = [
@@ -44,6 +46,8 @@ const SPECIAL_TASK_COLUMNS = [
   "due_quarter",
   "last_updated_date",
   "archived",
+  "phase_name",
+  "phase_weight",
 ];
 
 const VALID_PRIORITIES = ["Low", "Moderate", "High"];
@@ -125,6 +129,8 @@ interface ValidatedTaskRow {
   taskPriority: string;
   taskTargetQuarter: string;
   taskArchived: boolean;
+  phaseName: string | null;
+  phaseWeight: number | null;
   row: Record<string, string>;
   rowNum: number;
 }
@@ -139,6 +145,8 @@ interface ValidatedSpecialTaskRow {
   specialTaskCode: string;
   specialTaskName: string;
   dueQuarter: string;
+  phaseName: string | null;
+  phaseWeight: number | null;
   row: Record<string, string>;
   rowNum: number;
   archived: boolean;
@@ -362,7 +370,10 @@ export async function POST(request: NextRequest) {
             projectOwner: row.project_owner || null,
             projectTargetQuarter,
             taskCode, taskName, taskStatus, taskPriority, taskTargetQuarter,
-            taskArchived, row, rowNum,
+            taskArchived,
+            phaseName: row.phase_name || null,
+            phaseWeight: row.phase_weight ? parseFloat(row.phase_weight) : null,
+            row, rowNum,
           });
 
           processedValidation++;
@@ -451,6 +462,8 @@ export async function POST(request: NextRequest) {
             projectOwner: row.project_owner || null,
             projectTargetQuarter,
             specialTaskCode, specialTaskName, dueQuarter,
+            phaseName: row.phase_name || null,
+            phaseWeight: row.phase_weight ? parseFloat(row.phase_weight) : null,
             row, rowNum, archived: specialTaskArchived,
           });
 
@@ -548,10 +561,31 @@ export async function POST(request: NextRequest) {
             v.projectRef, v.projectOwner, v.projectTargetQuarter,
           );
 
+          // Find or create phase if specified
+          let phaseId: number | null = null;
+          if (v.phaseName) {
+            let phase = await prisma.phase.findFirst({
+              where: { name: v.phaseName, projectId: project.id },
+            });
+            if (!phase) {
+              const maxPhaseOrder = await prisma.phase.aggregate({ _max: { sortOrder: true }, where: { projectId: project.id } });
+              phase = await prisma.phase.create({
+                data: {
+                  name: v.phaseName,
+                  projectId: project.id,
+                  weight: v.phaseWeight ?? 0,
+                  sortOrder: (maxPhaseOrder._max.sortOrder ?? -1) + 1,
+                },
+              });
+              await logChange({ entityType: "Phase", entityId: phase.id, entityName: phase.name, changeType: "create" });
+            }
+            phaseId = phase.id;
+          }
+
           const maxTaskOrder = await prisma.task.aggregate({ _max: { sortOrder: true }, where: { projectId: project.id } });
           const created = await prisma.task.create({
             data: {
-              taskCode: v.taskCode, projectId: project.id, name: v.taskName,
+              taskCode: v.taskCode, projectId: project.id, phaseId, name: v.taskName,
               assignee: v.row.task_assignee || null,
               priority: v.taskPriority || "Low",
               sortOrder: (maxTaskOrder._max.sortOrder ?? -1) + 1,
@@ -592,10 +626,31 @@ export async function POST(request: NextRequest) {
             v.projectRef, v.projectOwner, v.projectTargetQuarter,
           );
 
+          // Find or create phase if specified
+          let phaseId: number | null = null;
+          if (v.phaseName) {
+            let phase = await prisma.phase.findFirst({
+              where: { name: v.phaseName, projectId: project.id },
+            });
+            if (!phase) {
+              const maxPhaseOrder = await prisma.phase.aggregate({ _max: { sortOrder: true }, where: { projectId: project.id } });
+              phase = await prisma.phase.create({
+                data: {
+                  name: v.phaseName,
+                  projectId: project.id,
+                  weight: v.phaseWeight ?? 0,
+                  sortOrder: (maxPhaseOrder._max.sortOrder ?? -1) + 1,
+                },
+              });
+              await logChange({ entityType: "Phase", entityId: phase.id, entityName: phase.name, changeType: "create" });
+            }
+            phaseId = phase.id;
+          }
+
           const maxOrder = await prisma.specialTask.aggregate({ _max: { sortOrder: true }, where: { projectId: project.id } });
           const created = await prisma.specialTask.create({
             data: {
-              specialTaskCode: v.specialTaskCode, projectId: project.id, name: v.specialTaskName,
+              specialTaskCode: v.specialTaskCode, projectId: project.id, phaseId, name: v.specialTaskName,
               sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
               total: parseInt(v.row.total) || 0,
               nys: parseInt(v.row.nys) || 0,

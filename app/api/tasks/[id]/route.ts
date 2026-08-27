@@ -36,6 +36,7 @@ export async function PATCH(
     deliverable,
     attachments,
     archived,
+    phaseId,
   } = body;
 
   const existingTask = await prisma.task.findUnique({ where: { id: parseInt(id) } });
@@ -60,7 +61,7 @@ export async function PATCH(
     }
   }
 
-  const updateData: Record<string, string | boolean | null | { url: string; title: string | null }[]> = {};
+  const updateData: Record<string, string | boolean | number | null | { url: string; title: string | null }[]> = {};
   if (taskCode !== undefined) updateData.taskCode = taskCode.trim();
   if (name !== undefined) updateData.name = name.trim();
   if (assignee !== undefined) updateData.assignee = assignee || null;
@@ -78,6 +79,7 @@ export async function PATCH(
       : null;
   }
   if (archived !== undefined && typeof archived === "boolean") updateData.archived = archived;
+  if (phaseId !== undefined) updateData.phaseId = phaseId ? parseInt(phaseId) : null;
 
   const task = await prisma.task.update({
     where: { id: parseInt(id) },

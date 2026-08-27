@@ -12,10 +12,20 @@ export interface ProgramWithProjects {
   projects: ProjectWithTasks[];
 }
 
+export interface Phase {
+  id: number;
+  name: string;
+  projectId: number;
+  weight: number;
+  sortOrder: number;
+  archived: boolean;
+}
+
 export interface SpecialTask {
   id: number;
   specialTaskCode: string;
   projectId: number;
+  phaseId: number | null;
   name: string;
   sortOrder: number;
   total: number;
@@ -38,6 +48,7 @@ export interface ProjectWithTasks {
   targetQuarter: string;
   adjustedTargetQuarter: string;
   actualCompletionDate: string | null;
+  phases: Phase[];
   tasks: Task[];
   specialTasks: SpecialTask[];
 }
@@ -46,6 +57,7 @@ export interface Task {
   id: number;
   taskCode: string;
   projectId: number;
+  phaseId: number | null;
   name: string;
   assignee: string | null;
   priority: string;

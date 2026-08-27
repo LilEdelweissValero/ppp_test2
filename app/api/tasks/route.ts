@@ -19,6 +19,7 @@ export async function POST(request: NextRequest) {
     targetQuarter,
     deliverable,
     attachments,
+    phaseId,
   } = body;
 
   if (!projectId) {
@@ -69,6 +70,7 @@ export async function POST(request: NextRequest) {
     data: {
       taskCode: taskCode.trim(),
       projectId: parsedProjectId,
+      phaseId: phaseId ? parseInt(phaseId) : null,
       name: name.trim(),
       assignee: assignee || null,
       priority: priority || "Low",

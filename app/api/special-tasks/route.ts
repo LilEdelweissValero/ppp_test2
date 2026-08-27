@@ -11,6 +11,7 @@ export async function POST(request: NextRequest) {
     specialTaskCode,
     name,
     dueQuarter,
+    phaseId,
   } = body;
 
   if (!projectId) {
@@ -56,6 +57,7 @@ export async function POST(request: NextRequest) {
     data: {
       specialTaskCode: specialTaskCode.trim(),
       projectId: parsedProjectId,
+      phaseId: phaseId ? parseInt(phaseId) : null,
       name: name.trim(),
       sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
       dueQuarter,

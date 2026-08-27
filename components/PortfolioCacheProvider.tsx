@@ -16,6 +16,7 @@ export interface CachedTask {
   attachments: unknown;
   dependencies: string | null;
   notes: string | null;
+  phaseId: number | null;
 }
 
 export interface CachedSpecialTask {
@@ -31,6 +32,15 @@ export interface CachedSpecialTask {
   done: number;
   dueQuarter: string;
   lastUpdatedDate: string | null;
+  phaseId: number | null;
+}
+
+export interface CachedPhase {
+  id: number;
+  name: string;
+  weight: number;
+  sortOrder: number;
+  archived: boolean;
 }
 
 export interface CachedProject {
@@ -43,6 +53,7 @@ export interface CachedProject {
   adjustedTargetQuarter: string;
   actualCompletionDate: string | null;
   program: { id: number; name: string };
+  phases: CachedPhase[];
   tasks: CachedTask[];
   specialTasks: CachedSpecialTask[];
 }

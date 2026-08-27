@@ -27,6 +27,16 @@ export const getDashboardData = unstable_cache(
                   targetQuarter: true,
                   adjustedTargetQuarter: true,
                   actualCompletionDate: true,
+                  phases: {
+                    select: {
+                      id: true,
+                      name: true,
+                      weight: true,
+                      sortOrder: true,
+                    },
+                    where: { archived: false },
+                    orderBy: { sortOrder: "asc" },
+                  },
                   tasks: {
                     select: {
                       id: true,
@@ -42,6 +52,7 @@ export const getDashboardData = unstable_cache(
                       attachments: true,
                       dependencies: true,
                       adjustedTargetQuarter: true,
+                      phaseId: true,
                     },
                     where: { archived: false },
                     orderBy: { sortOrder: "asc" },
@@ -60,6 +71,7 @@ export const getDashboardData = unstable_cache(
                       done: true,
                       dueQuarter: true,
                       lastUpdatedDate: true,
+                      phaseId: true,
                     },
                     where: { archived: false },
                     orderBy: { sortOrder: "asc" },
@@ -101,6 +113,16 @@ export const getProjectData = unstable_cache(
         adjustedTargetQuarter: true,
         actualCompletionDate: true,
         program: { select: { id: true, name: true } },
+        phases: {
+          select: {
+            id: true,
+            name: true,
+            weight: true,
+            sortOrder: true,
+          },
+          where: { archived: false },
+          orderBy: { sortOrder: "asc" },
+        },
         tasks: {
           select: {
             id: true,
@@ -116,6 +138,7 @@ export const getProjectData = unstable_cache(
             attachments: true,
             dependencies: true,
             notes: true,
+            phaseId: true,
           },
           orderBy: { sortOrder: "asc" },
         },
@@ -133,6 +156,7 @@ export const getProjectData = unstable_cache(
             done: true,
             dueQuarter: true,
             lastUpdatedDate: true,
+            phaseId: true,
           },
           where: { archived: false },
           orderBy: { sortOrder: "asc" },
@@ -170,6 +194,15 @@ export async function getArchivedData() {
               targetQuarter: true,
               adjustedTargetQuarter: true,
               actualCompletionDate: true,
+              phases: {
+                select: {
+                  id: true,
+                  name: true,
+                  weight: true,
+                  sortOrder: true,
+                },
+                orderBy: { sortOrder: "asc" },
+              },
               tasks: {
                 where: { archived: true },
                 select: {
@@ -186,6 +219,7 @@ export async function getArchivedData() {
                   attachments: true,
                   dependencies: true,
                   notes: true,
+                  phaseId: true,
                 },
                 orderBy: { sortOrder: "asc" },
               },

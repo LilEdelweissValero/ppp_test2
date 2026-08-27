@@ -12,12 +12,19 @@ interface Attachment {
   url: string;
 }
 
+interface Phase {
+  id: number;
+  name: string;
+  weight: number;
+}
+
 interface Props {
   open: boolean;
   onClose: () => void;
-  onSave: (task: { id: number; taskCode: string; name: string; assignee: string | null; priority: string; status: string; description: string | null; dependencies: string | null; notes: string | null; targetQuarter: string; adjustedTargetQuarter: string; deliverable: string | null; attachments: { url: string; title: string | null }[] | null; projectId: number; sortOrder: number }) => void;
-  onSaveSpecial?: (specialTask: { id: number; specialTaskCode: string; name: string; total: number; nys: number; plan: number; part: number; mostly: number; done: number; dueQuarter: string; lastUpdatedDate: string | null; projectId: number; sortOrder: number }) => void;
+  onSave: (task: { id: number; taskCode: string; name: string; assignee: string | null; priority: string; status: string; description: string | null; dependencies: string | null; notes: string | null; targetQuarter: string; adjustedTargetQuarter: string; deliverable: string | null; attachments: { url: string; title: string | null }[] | null; projectId: number; sortOrder: number; phaseId: number | null }) => void;
+  onSaveSpecial?: (specialTask: { id: number; specialTaskCode: string; name: string; total: number; nys: number; plan: number; part: number; mostly: number; done: number; dueQuarter: string; lastUpdatedDate: string | null; projectId: number; sortOrder: number; phaseId: number | null }) => void;
   projectId: number;
+  phases?: Phase[];
   initialData?: {
     id: number;
     taskCode: string;
@@ -31,6 +38,7 @@ interface Props {
     targetQuarter: string;
     deliverable: string;
     attachments: { url: string; title: string | null }[];
+    phaseId: number | null;
   };
   initialSpecialData?: {
     id: number;
@@ -38,6 +46,7 @@ interface Props {
     name: string;
     dueQuarter: string;
     lastUpdatedDate: string | null;
+    phaseId: number | null;
   };
 }
 
@@ -47,6 +56,7 @@ export default function TaskFormModal({
   onSave,
   onSaveSpecial,
   projectId,
+  phases,
   initialData,
   initialSpecialData,
 }: Props) {
@@ -89,6 +99,7 @@ export default function TaskFormModal({
   const [attachments, setAttachments] = useState<Attachment[]>(
     initialData?.attachments?.map(a => ({ title: a.title || "", url: a.url })) || [{ title: "", url: "" }]
   );
+  const [phaseId, setPhaseId] = useState<number | null>(initialData?.phaseId ?? initialSpecialData?.phaseId ?? null);
   const [serverError, setServerError] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -110,6 +121,7 @@ export default function TaskFormModal({
         setStatus(getDefaultSettings().statuses[0].name);
         setDeliverable("");
         setAttachments([{ title: "", url: "" }]);
+        setPhaseId(initialSpecialData.phaseId ?? null);
       } else if (!isEdit) {
         setTaskType("normal");
         setTaskCode("");
@@ -123,11 +135,13 @@ export default function TaskFormModal({
         setTargetQuarter("");
         setDeliverable("");
         setAttachments([{ title: "", url: "" }]);
+        setPhaseId(null);
       } else if (initialData) {
         setTaskType("normal");
         setAttachments(
           initialData.attachments?.map(a => ({ title: a.title || "", url: a.url })) || [{ title: "", url: "" }]
         );
+        setPhaseId(initialData.phaseId ?? null);
       }
       setServerError("");
       setSubmitted(false);
@@ -182,6 +196,7 @@ export default function TaskFormModal({
             specialTaskCode: taskCode,
             name,
             dueQuarter: targetQuarter,
+            phaseId: phaseId ? String(phaseId) : null,
           }),
         });
 
@@ -235,6 +250,7 @@ export default function TaskFormModal({
           targetQuarter,
           deliverable,
           attachments: attachmentsToSave.length > 0 ? attachmentsToSave : null,
+          phaseId: phaseId ? String(phaseId) : null,
         }),
       });
 
@@ -346,6 +362,26 @@ export default function TaskFormModal({
             </div>
           </div>
         </div>
+
+        {/* ── Phase (when phases exist) ── */}
+        {phases && phases.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <h3 style={sectionHeaderStyle}>Phase</h3>
+            <div>
+              <label style={labelStyle}>Phase</label>
+              <select
+                value={phaseId ?? ""}
+                onChange={(e) => setPhaseId(e.target.value ? parseInt(e.target.value) : null)}
+                style={inputStyle()}
+              >
+                <option value="">— No phase —</option>
+                {phases.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name} ({p.weight}%)</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
 
         {/* ── Section: Assignment (normal tasks only) ── */}
         {taskType === "normal" && (

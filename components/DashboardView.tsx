@@ -82,6 +82,7 @@ interface Task {
   attachments: unknown;
   dependencies: string | null;
   adjustedTargetQuarter: string;
+  phaseId: number | null;
 }
 
 interface SpecialTask {
@@ -97,6 +98,14 @@ interface SpecialTask {
   done: number;
   dueQuarter: string;
   lastUpdatedDate: string | null;
+  phaseId: number | null;
+}
+
+interface Phase {
+  id: number;
+  name: string;
+  weight: number;
+  sortOrder: number;
 }
 
 interface Project {
@@ -108,6 +117,7 @@ interface Project {
   targetQuarter: string;
   adjustedTargetQuarter: string;
   actualCompletionDate: string | null;
+  phases: Phase[];
   tasks: Task[];
   specialTasks: SpecialTask[];
   // Populated at render time from parent program
@@ -192,6 +202,7 @@ function expandSpecialTasksToVirtualTasks(specialTasks: SpecialTask[], settings?
           attachments: null,
           dependencies: null,
           adjustedTargetQuarter: st.dueQuarter,
+          phaseId: st.phaseId,
         });
       }
     }
@@ -965,7 +976,14 @@ function SortableProjectRow({
       </tr>
     );
   }
-  const pct = computeProjectPercentComplete(filteredTasks, settings);
+  const hasPhases = project.phases.length > 0;
+  const allTasksWithPhase = filteredTasks.map((t) => ({ status: t.status, phaseId: t.phaseId }));
+  const pct = computeProjectPercentComplete(
+    filteredTasks,
+    settings,
+    hasPhases ? project.phases : undefined,
+    hasPhases ? allTasksWithPhase : undefined
+  );
   const health =
     filteredTasks.length > 0
       ? computeProjectHealth(pct * 100, project.adjustedTargetQuarter, settings)
@@ -1045,6 +1063,21 @@ function SortableProjectRow({
         >
           {project.name}
         </Link>
+        {hasPhases && (
+          <span style={{
+            display: "inline-block",
+            fontSize: 9,
+            padding: "1px 5px",
+            marginLeft: 4,
+            background: "#EEF2FF",
+            color: "#6366F1",
+            borderRadius: 3,
+            fontWeight: 600,
+            verticalAlign: "middle",
+          }}>
+            {project.phases.length} phase{project.phases.length !== 1 ? "s" : ""}
+          </span>
+        )}
       </td>
 
       {/* program */}

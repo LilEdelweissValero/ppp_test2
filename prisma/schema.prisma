@@ -29,21 +29,36 @@ model Program {
 }
 
 model Project {
-  id                    Int     @id @default(autoincrement())
+  id                    Int       @id @default(autoincrement())
   name                  String
   programId             Int
-  program               Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+  program               Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
   reference             String?
   owner                 String?
-  sortOrder             Int     @default(0) @map("sort_order")
-  targetQuarter         String  @map("target_quarter")
-  adjustedTargetQuarter String  @map("adjusted_target_quarter")
-  actualCompletionDate  String? @map("actual_completion_date")
-  archived              Boolean @default(false)
+  sortOrder             Int       @default(0) @map("sort_order")
+  targetQuarter         String    @map("target_quarter")
+  adjustedTargetQuarter String    @map("adjusted_target_quarter")
+  actualCompletionDate  String?   @map("actual_completion_date")
+  archived              Boolean   @default(false)
+  phases                Phase[]
   tasks                 Task[]
   specialTasks          SpecialTask[]
 
   @@index([programId])
+}
+
+model Phase {
+  id        Int      @id @default(autoincrement())
+  name      String
+  projectId Int
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  weight    Float    @default(0)
+  sortOrder Int      @default(0) @map("sort_order")
+  archived  Boolean  @default(false)
+  tasks     Task[]
+  specialTasks SpecialTask[]
+
+  @@index([projectId])
 }
 
 model Task {
@@ -51,6 +66,8 @@ model Task {
   taskCode              String   @map("task_code")
   projectId             Int
   project               Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  phaseId               Int?     @map("phase_id")
+  phase                 Phase?   @relation(fields: [phaseId], references: [id], onDelete: SetNull)
   name                  String
   assignee              String?
   priority              String
@@ -66,26 +83,30 @@ model Task {
   archived              Boolean  @default(false)
 
   @@index([projectId])
+  @@index([phaseId])
 }
 
 model SpecialTask {
-  id                Int     @id @default(autoincrement())
-  specialTaskCode   String  @map("special_task_code")
+  id                Int      @id @default(autoincrement())
+  specialTaskCode   String   @map("special_task_code")
   projectId         Int
-  project           Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project           Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  phaseId           Int?     @map("phase_id")
+  phase             Phase?   @relation(fields: [phaseId], references: [id], onDelete: SetNull)
   name              String
-  sortOrder         Int     @default(0) @map("sort_order")
-  total             Int     @default(0)
-  nys               Int     @default(0)
-  plan              Int     @default(0)
-  part              Int     @default(0)
-  mostly            Int     @default(0)
-  done              Int     @default(0)
-  dueQuarter        String  @map("due_quarter")
-  lastUpdatedDate   String? @map("last_updated_date")
-  archived          Boolean @default(false)
+  sortOrder         Int      @default(0) @map("sort_order")
+  total             Int      @default(0)
+  nys               Int      @default(0)
+  plan              Int      @default(0)
+  part              Int      @default(0)
+  mostly            Int      @default(0)
+  done              Int      @default(0)
+  dueQuarter        String   @map("due_quarter")
+  lastUpdatedDate   String?  @map("last_updated_date")
+  archived          Boolean  @default(false)
 
   @@index([projectId])
+  @@index([phaseId])
 }
 
 model EntityChangeLog {

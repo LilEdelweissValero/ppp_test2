@@ -12,6 +12,10 @@ export async function GET(
     where: { id: parseInt(id) },
     include: {
       program: { select: { id: true, name: true } },
+      phases: {
+        where: { archived: false },
+        orderBy: { sortOrder: "asc" },
+      },
       tasks: { orderBy: { sortOrder: "asc" } },
     },
   });
@@ -32,6 +36,10 @@ export async function PATCH(
   const oldProject = await prisma.project.findUnique({ where: { id: parseInt(id) } });
 
   if (archived !== undefined && typeof archived === "boolean" && oldProject) {
+    const phases = await prisma.phase.findMany({
+      where: { projectId: parseInt(id) },
+      select: { id: true, name: true, archived: true },
+    });
     const tasks = await prisma.task.findMany({
       where: { projectId: parseInt(id) },
       select: { id: true, taskCode: true, name: true, archived: true },
@@ -46,6 +54,10 @@ export async function PATCH(
         where: { id: parseInt(id) },
         data: { archived },
       });
+      await tx.phase.updateMany({
+        where: { projectId: parseInt(id) },
+        data: { archived },
+      });
       await tx.task.updateMany({
         where: { projectId: parseInt(id) },
         data: { archived },
@@ -53,6 +65,18 @@ export async function PATCH(
     });
     const project = await prisma.project.findUnique({ where: { id: parseInt(id) } });
 
+    // Log per-phase cascade entries
+    for (const ph of phases) {
+      if (ph.archived !== archived) {
+        await logChange({
+          entityType: "Phase",
+          entityId: ph.id,
+          entityName: ph.name,
+          changeType: archived ? "archive" : "unarchive",
+          details: `Project ${archived ? "archived" : "unarchived"}: cascade`,
+        });
+      }
+    }
     // Log per-task cascade entries
     for (const t of tasks) {
       if (t.archived !== archived) {
