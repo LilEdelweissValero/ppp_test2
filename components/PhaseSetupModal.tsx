@@ -104,33 +104,27 @@ export default function PhaseSetupModal({
       }
       const createdPhases = await res.json();
 
-      // Assign tasks to phases
-      const taskUpdates: Promise<Response>[] = [];
+      // Assign tasks to phases via single batch request
+      const assignments: { taskId?: number; specialTaskId?: number; phaseId: number | null }[] = [];
       for (const [taskIdStr, phaseName] of Object.entries(taskPhaseMap)) {
         const phase = createdPhases.find((p: { name: string }) => p.name === phaseName);
-        if (phase) {
-          taskUpdates.push(
-            fetch(`/api/tasks/${taskIdStr}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ phaseId: phase.id }),
-            })
-          );
-        }
+        if (phase) assignments.push({ taskId: Number(taskIdStr), phaseId: phase.id });
       }
       for (const [stIdStr, phaseName] of Object.entries(specialTaskPhaseMap)) {
         const phase = createdPhases.find((p: { name: string }) => p.name === phaseName);
-        if (phase) {
-          taskUpdates.push(
-            fetch(`/api/special-tasks/${stIdStr}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ phaseId: phase.id }),
-            })
-          );
+        if (phase) assignments.push({ specialTaskId: Number(stIdStr), phaseId: phase.id });
+      }
+      if (assignments.length > 0) {
+        const assignRes = await fetch("/api/tasks/assign-phase", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ assignments }),
+        });
+        if (!assignRes.ok) {
+          const data = await assignRes.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to assign tasks to phases");
         }
       }
-      await Promise.all(taskUpdates);
 
       // Build updated tasks/specialTasks with phaseId
       const updatedTasks = tasks.map((t) => {
