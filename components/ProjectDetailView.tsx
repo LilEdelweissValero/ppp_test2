@@ -722,6 +722,18 @@ export default function ProjectDetailView({ project: initialProject, historicalT
             {!isHistorical && (
               <>
                 <button
+                  onClick={() => {
+                    if (phases.length === 0 && (tasks.length > 0 || specialTasks.length > 0)) {
+                      setShowPhaseSetup(true);
+                    } else {
+                      setShowAddPhase(true);
+                    }
+                  }}
+                  className="detail-button detail-button-primary"
+                >
+                  Add Phase
+                </button>
+                <button
                   onClick={() => setShowEditProject(true)}
                   className="detail-button detail-button-primary"
                 >
@@ -767,6 +779,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
         </section>
 
         {/* ── Phases Section ── */}
+        {phases.length > 0 && (
         <section className="detail-task-panel" aria-labelledby="phases-title" style={{ borderLeft: "3px solid #6366F1" }}>
           <div className="detail-task-header">
             <div>
@@ -776,20 +789,6 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                 {phases.length > 0 && " · Weights must equal 100%"}
               </p>
             </div>
-            {!isHistorical && (
-              <button
-                onClick={() => {
-                  if (phases.length === 0 && (tasks.length > 0 || specialTasks.length > 0)) {
-                    setShowPhaseSetup(true);
-                  } else {
-                    setShowAddPhase(true);
-                  }
-                }}
-                className="detail-button detail-button-primary"
-              >
-                Add Phase
-              </button>
-            )}
           </div>
 
           {phases.length === 0 ? (
@@ -861,6 +860,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
             </div>
           )}
         </section>
+        )}
 
         <section className="detail-task-panel" aria-labelledby="tasks-title">
           <div className="detail-task-header">
