@@ -167,6 +167,7 @@ export default function HistoryLogView() {
           <option value="Program">Program</option>
           <option value="Project">Project</option>
           <option value="Task">Task</option>
+          <option value="Phase">Phase</option>
           <option value="Settings">Settings</option>
           <option value="Import">Import</option>
         </select>

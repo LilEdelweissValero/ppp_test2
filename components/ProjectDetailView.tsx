@@ -838,6 +838,12 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                           {!isHistorical && (
                             <div style={{ display: "flex", gap: 4 }}>
                               <button
+                                onClick={() => setViewHistory({ type: "Phase", id: phase.id })}
+                                style={{ fontSize: 11, color: "var(--ink-secondary)", background: "none", border: "none", cursor: "pointer" }}
+                              >
+                                History
+                              </button>
+                              <button
                                 onClick={() => setEditPhase(phase)}
                                 style={{ fontSize: 11, color: "var(--accent)", background: "none", border: "none", cursor: "pointer" }}
                               >

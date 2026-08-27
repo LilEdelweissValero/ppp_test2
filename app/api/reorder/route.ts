@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { touchLastModified } from "@/lib/system-metadata";
 import { logChange } from "@/lib/audit-log";
 
-const VALID_TYPES = ["framework", "program", "project", "task"] as const;
+const VALID_TYPES = ["framework", "program", "project", "task", "phase"] as const;
 type EntityType = (typeof VALID_TYPES)[number];
 
 export async function PATCH(request: NextRequest) {
@@ -17,7 +17,7 @@ export async function PATCH(request: NextRequest) {
 
   if (!entityType || !VALID_TYPES.includes(entityType as EntityType)) {
     return NextResponse.json(
-      { error: "Valid entityType is required (framework, program, project, task)" },
+      { error: "Valid entityType is required (framework, program, project, task, phase)" },
       { status: 400 }
     );
   }
@@ -42,6 +42,7 @@ export async function PATCH(request: NextRequest) {
     program: "Program",
     project: "Project",
     task: "Task",
+    phase: "Phase",
   };
 
   try {

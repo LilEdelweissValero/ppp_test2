@@ -17,7 +17,7 @@ interface LogEntry {
 interface Props {
   open: boolean;
   onClose: () => void;
-  entityType: "Project" | "Task" | "SpecialTask";
+  entityType: "Project" | "Task" | "SpecialTask" | "Phase";
   entityId: number;
 }
 

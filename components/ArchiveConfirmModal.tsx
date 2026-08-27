@@ -14,7 +14,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onConfirm: () => void;
-  entityType: "Framework" | "Program" | "Project" | "Task" | "SpecialTask";
+  entityType: "Framework" | "Program" | "Project" | "Task" | "SpecialTask" | "Phase";
   entityName: string;
   entityId: number;
   loading?: boolean;
