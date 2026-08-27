@@ -39,6 +39,24 @@ export default function PhaseSetupModal({
   const weightValid = Math.abs(totalWeight - 100) < 0.01;
 
   function updatePhase(index: number, field: keyof PhaseEntry, value: string | number) {
+    if (field === "name") {
+      const oldName = phases[index].name;
+      const newName = value as string;
+      setTaskPhaseMap((prev) => {
+        const next = { ...prev };
+        for (const [k, v] of Object.entries(next)) {
+          if (v === oldName) next[k] = newName;
+        }
+        return next;
+      });
+      setSpecialTaskPhaseMap((prev) => {
+        const next = { ...prev };
+        for (const [k, v] of Object.entries(next)) {
+          if (v === oldName) next[k] = newName;
+        }
+        return next;
+      });
+    }
     setPhases((prev) =>
       prev.map((p, i) => (i === index ? { ...p, [field]: value } : p))
     );
