@@ -4,7 +4,12 @@ import { touchLastModified } from "@/lib/system-metadata";
 import { logChange } from "@/lib/audit-log";
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
+  let body: { projectId?: number; phases?: Array<{ name: string; weight?: number }> };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
   const { projectId, phases } = body;
 
   if (!projectId || !Array.isArray(phases) || phases.length === 0) {

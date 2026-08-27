@@ -99,7 +99,7 @@ export default function PhaseSetupModal({
         }),
       });
       if (!res.ok) {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "Failed to create phases");
       }
       const createdPhases = await res.json();

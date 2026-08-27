@@ -63,7 +63,7 @@ export default function PhaseFormModal({
       });
 
       if (!res.ok) {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "Failed to save phase");
       }
 
