@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import ProjectDetailView from "@/components/ProjectDetailView";
 import CachedProjectRoute from "@/components/CachedProjectRoute";
-import ProjectTimeTravel from "@/components/ProjectTimeTravel";
 import HeaderTimestamp from "@/components/HeaderTimestamp";
 import { getProjectData, getDashboardData } from "@/lib/portfolio-data";
 
@@ -89,18 +88,6 @@ export default async function ProjectPage({
         </div>
       </header>
 
-      <div
-        style={{
-          maxWidth: 1200,
-          margin: "0 auto",
-          padding: "0 24px",
-        }}
-      >
-        <ProjectTimeTravel
-          iso={lastModifiedAt}
-          historicalTimestamp={asOf}
-        />
-      </div>
       <ProjectDetailView project={project} historicalTimestamp={asOf} />
     </div>
   );
