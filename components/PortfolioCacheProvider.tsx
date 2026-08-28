@@ -52,6 +52,7 @@ export interface CachedProject {
   targetQuarter: string;
   adjustedTargetQuarter: string;
   actualCompletionDate: string | null;
+  phasesTableName: string | null;
   program: { id: number; name: string };
   phases: CachedPhase[];
   tasks: CachedTask[];

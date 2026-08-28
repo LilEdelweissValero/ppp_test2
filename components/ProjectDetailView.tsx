@@ -34,6 +34,7 @@ import ProjectFormModal from "@/components/ProjectFormModal";
 import TaskFormModal from "@/components/TaskFormModal";
 import PhaseFormModal from "@/components/PhaseFormModal";
 import PhaseSetupModal from "@/components/PhaseSetupModal";
+import PhaseEditModal from "@/components/PhaseEditModal";
 import ChangeDueQuarterModal from "@/components/ChangeDueQuarterModal";
 import ChangeHistoryModal from "@/components/ChangeHistoryModal";
 import ArchiveConfirmModal from "@/components/ArchiveConfirmModal";
@@ -309,6 +310,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
   const [compSettings, setCompSettings] = useState<ComputationSettings | undefined>(undefined);
   const [showPhaseSetup, setShowPhaseSetup] = useState(false);
   const [showAddPhase, setShowAddPhase] = useState(false);
+  const [showEditPhases, setShowEditPhases] = useState(false);
   const [editPhase, setEditPhase] = useState<CachedPhase | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<{
     entityType: "Project" | "Task" | "SpecialTask" | "Phase";
@@ -783,12 +785,31 @@ export default function ProjectDetailView({ project: initialProject, historicalT
         <section className="detail-task-panel" aria-labelledby="phases-title" style={{ borderLeft: "3px solid #6366F1" }}>
           <div className="detail-task-header">
             <div>
-              <h2 id="phases-title" className="detail-task-heading">Phases</h2>
+              <h2 id="phases-title" className="detail-task-heading">{project.phasesTableName || "Phases"}</h2>
               <p className="detail-task-subtitle">
                 {phases.length} phase{phases.length === 1 ? "" : "s"}
                 {phases.length > 0 && " · Weights must equal 100%"}
               </p>
             </div>
+            {!isHistorical && (
+              <button
+                onClick={() => setShowEditPhases(true)}
+                className="detail-button"
+                style={{
+                  fontSize: 12,
+                  fontWeight: 500,
+                  padding: "5px 12px",
+                  border: "1px solid var(--rule)",
+                  borderRadius: 3,
+                  background: "var(--surface)",
+                  color: "var(--ink-primary)",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Edit {project.phasesTableName || "Phases"}
+              </button>
+            )}
           </div>
 
           {phases.length === 0 ? (
@@ -842,12 +863,6 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                                 style={{ fontSize: 11, color: "var(--ink-secondary)", background: "none", border: "none", cursor: "pointer" }}
                               >
                                 History
-                              </button>
-                              <button
-                                onClick={() => setEditPhase(phase)}
-                                style={{ fontSize: 11, color: "var(--accent)", background: "none", border: "none", cursor: "pointer" }}
-                              >
-                                Edit
                               </button>
                               <button
                                 onClick={() => setArchiveTarget({ entityType: "Phase", entityId: phase.id, entityName: phase.name })}
@@ -1498,6 +1513,24 @@ export default function ProjectDetailView({ project: initialProject, historicalT
             onSaved={(updatedPhase) => {
               setPhases(phases.map((p) => p.id === updatedPhase.id ? updatedPhase : p));
               setEditPhase(null);
+            }}
+          />
+        )}
+
+        {showEditPhases && (
+          <PhaseEditModal
+            open={showEditPhases}
+            onClose={() => setShowEditPhases(false)}
+            projectId={project.id}
+            currentTableName={project.phasesTableName || null}
+            phases={phases}
+            tasks={tasks}
+            specialTasks={specialTasks}
+            compSettings={compSettings || { statuses: getDefaultSettings().statuses }}
+            onSaved={(tableName, updatedPhases) => {
+              setCurrentProject({ ...project, phasesTableName: tableName });
+              setPhases(updatedPhases);
+              setShowEditPhases(false);
             }}
           />
         )}

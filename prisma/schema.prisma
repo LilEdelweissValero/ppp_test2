@@ -39,6 +39,7 @@ model Project {
   targetQuarter         String    @map("target_quarter")
   adjustedTargetQuarter String    @map("adjusted_target_quarter")
   actualCompletionDate  String?   @map("actual_completion_date")
+  phasesTableName       String?   @map("phases_table_name")
   archived              Boolean   @default(false)
   phases                Phase[]
   tasks                 Task[]

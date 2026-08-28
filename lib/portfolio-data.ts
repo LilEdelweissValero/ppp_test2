@@ -27,6 +27,7 @@ export const getDashboardData = unstable_cache(
                   targetQuarter: true,
                   adjustedTargetQuarter: true,
                   actualCompletionDate: true,
+                  phasesTableName: true,
                   phases: {
                     select: {
                       id: true,
@@ -112,6 +113,7 @@ export const getProjectData = unstable_cache(
         targetQuarter: true,
         adjustedTargetQuarter: true,
         actualCompletionDate: true,
+        phasesTableName: true,
         program: { select: { id: true, name: true } },
         phases: {
           select: {
@@ -194,6 +196,7 @@ export async function getArchivedData() {
               targetQuarter: true,
               adjustedTargetQuarter: true,
               actualCompletionDate: true,
+              phasesTableName: true,
               phases: {
                 select: {
                   id: true,

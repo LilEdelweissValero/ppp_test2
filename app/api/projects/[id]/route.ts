@@ -31,7 +31,7 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const body = await request.json();
-  const { name, programId, reference, owner, targetQuarter, adjustedTargetQuarter, actualCompletionDate, archived } = body;
+  const { name, programId, reference, owner, targetQuarter, adjustedTargetQuarter, actualCompletionDate, phasesTableName, archived } = body;
 
   const oldProject = await prisma.project.findUnique({ where: { id: parseInt(id) } });
 
@@ -120,6 +120,7 @@ export async function PATCH(
   if (targetQuarter !== undefined) updateData.targetQuarter = targetQuarter;
   if (adjustedTargetQuarter !== undefined) updateData.adjustedTargetQuarter = adjustedTargetQuarter;
   if (actualCompletionDate !== undefined) updateData.actualCompletionDate = actualCompletionDate || null;
+  if (phasesTableName !== undefined) updateData.phasesTableName = phasesTableName || null;
   if (programId !== undefined) updateData.programId = parseInt(programId);
 
   const project = await prisma.project.update({
@@ -131,7 +132,7 @@ export async function PATCH(
     const details = diffFieldsV2(
       oldProject as Record<string, unknown>,
       updateData,
-      ["name", "reference", "owner", "targetQuarter", "adjustedTargetQuarter", "actualCompletionDate", "programId"]
+      ["name", "reference", "owner", "targetQuarter", "adjustedTargetQuarter", "actualCompletionDate", "phasesTableName", "programId"]
     );
     if (details) {
       await logChange({

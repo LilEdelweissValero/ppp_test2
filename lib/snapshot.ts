@@ -57,6 +57,7 @@ interface SnapshotProject {
   targetQuarter: string;
   adjustedTargetQuarter: string;
   actualCompletionDate: string | null;
+  phasesTableName: string | null;
   archived: boolean;
   phases: SnapshotPhase[];
   tasks: SnapshotTask[];
@@ -132,6 +133,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
                 targetQuarter: true,
                 adjustedTargetQuarter: true,
                 actualCompletionDate: true,
+                phasesTableName: true,
                 sortOrder: true,
                 archived: true,
                 phases: {
@@ -469,6 +471,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
         if (changes.targetQuarter) p.targetQuarter = changes.targetQuarter.old;
         if (changes.adjustedTargetQuarter) p.adjustedTargetQuarter = changes.adjustedTargetQuarter.old;
         if (changes.actualCompletionDate) p.actualCompletionDate = changes.actualCompletionDate.old || null;
+        if (changes.phasesTableName) p.phasesTableName = changes.phasesTableName.old || null;
         if (changes.archived) p.archived = changes.archived.old === "true";
       }
     } else if (type === "Phase") {
@@ -597,6 +600,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
           targetQuarter: pr.targetQuarter,
           adjustedTargetQuarter: pr.adjustedTargetQuarter,
           actualCompletionDate: pr.actualCompletionDate,
+          phasesTableName: pr.phasesTableName,
           archived: pr.archived,
           phases,
           tasks,
