@@ -111,7 +111,7 @@ export default function AbandonedView({ data }: Props) {
                 Abandoned Programs
               </h2>
               <div style={{ border: "1px solid var(--rule)", borderRadius: 4, overflow: "hidden" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <table className="detail-task-table">
                   <thead>
                     <tr style={{ background: "var(--ground)" }}>
                       <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "var(--ink-secondary)", borderBottom: "1px solid var(--rule)" }}>Framework</th>
@@ -257,7 +257,7 @@ export default function AbandonedView({ data }: Props) {
                 Abandoned Projects
               </h2>
               <div style={{ border: "1px solid var(--rule)", borderRadius: 4, overflow: "hidden" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <table className="detail-task-table">
                   <thead>
                     <tr style={{ background: "var(--ground)" }}>
                       <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "var(--ink-secondary)", borderBottom: "1px solid var(--rule)" }}>Framework</th>
@@ -370,13 +370,15 @@ export default function AbandonedView({ data }: Props) {
                 Abandoned Tasks
               </h2>
               <div style={{ border: "1px solid var(--rule)", borderRadius: 4, overflow: "hidden" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <table className="detail-task-table">
                   <thead>
                     <tr style={{ background: "var(--ground)" }}>
                       <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "var(--ink-secondary)", borderBottom: "1px solid var(--rule)" }}>Framework</th>
                       <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "var(--ink-secondary)", borderBottom: "1px solid var(--rule)" }}>Program</th>
                       <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "var(--ink-secondary)", borderBottom: "1px solid var(--rule)" }}>Project</th>
-                      <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "var(--ink-secondary)", borderBottom: "1px solid var(--rule)" }}>Task</th>
+                      <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "var(--ink-secondary)", borderBottom: "1px solid var(--rule)" }}>Project Owner</th>
+                      <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "var(--ink-secondary)", borderBottom: "1px solid var(--rule)" }}>Target Quarter</th>
+                      <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 600, color: "var(--ink-secondary)", borderBottom: "1px solid var(--rule)" }}>Abandoned</th>
                       <th style={{ textAlign: "right", padding: "8px 12px", fontWeight: 600, color: "var(--ink-secondary)", borderBottom: "1px solid var(--rule)", width: 100 }}></th>
                     </tr>
                   </thead>
