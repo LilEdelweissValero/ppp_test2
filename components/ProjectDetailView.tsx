@@ -129,7 +129,12 @@ function SortableTaskRow({
         )}
       </td>
       <td className="detail-task-code" style={{ width: 100 }}>{task.taskCode}</td>
-      <td style={{ width: 220 }}>{task.name}</td>
+      <td style={{ width: 220 }}>
+        {task.name}
+        {(task.description || (Array.isArray(task.attachments) && task.attachments.length > 0)) && (
+          <span title="Hover for details" style={{ marginLeft: 4, fontSize: 10, color: "var(--ink-tertiary)", cursor: "help" }}>ⓘ</span>
+        )}
+      </td>
       {phases.length > 0 && (
         <td style={{ width: 100 }}>
           <select
@@ -857,20 +862,12 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                         </td>
                         <td style={{ width: 100 }}>
                           {!isHistorical && (
-                            <div style={{ display: "flex", gap: 4 }}>
-                              <button
-                                onClick={() => setViewHistory({ type: "Phase", id: phase.id })}
-                                style={{ fontSize: 11, color: "var(--ink-secondary)", background: "none", border: "none", cursor: "pointer" }}
-                              >
-                                History
-                              </button>
-                              <button
-                                onClick={() => setArchiveTarget({ entityType: "Phase", entityId: phase.id, entityName: phase.name })}
-                                style={{ fontSize: 11, color: "var(--ink-tertiary)", background: "none", border: "none", cursor: "pointer" }}
-                              >
-                                Delete
-                              </button>
-                            </div>
+                            <button
+                              onClick={() => setViewHistory({ type: "Phase", id: phase.id })}
+                              style={{ fontSize: 11, color: "var(--ink-secondary)", background: "none", border: "none", cursor: "pointer" }}
+                            >
+                              History
+                            </button>
                           )}
                         </td>
                       </tr>
