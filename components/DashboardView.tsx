@@ -1368,7 +1368,7 @@ function ActionsMenu({
   onImportExcel,
   onHistoryLog,
   onMonthlyUpdates,
-  onViewArchive,
+  onViewAbandoned,
   onSettings,
 }: {
   onManageFrameworks: () => void;
@@ -1378,7 +1378,7 @@ function ActionsMenu({
   onImportExcel: () => void;
   onHistoryLog: () => void;
   onMonthlyUpdates: () => void;
-  onViewArchive: () => void;
+  onViewAbandoned: () => void;
   onSettings: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -1402,7 +1402,7 @@ function ActionsMenu({
     { label: "Import / Export Excel", action: onImportExcel },
     { label: "History Log", action: onHistoryLog },
     { label: "Monthly Updates", action: onMonthlyUpdates },
-    { label: "View Archive", action: onViewArchive },
+    { label: "View Abandoned", action: onViewAbandoned },
     { label: "Settings", action: onSettings },
   ];
 
@@ -2089,7 +2089,7 @@ export default function DashboardView({
               onImportExcel={() => setShowImportExcel(true)}
               onHistoryLog={() => window.open("/history", "_blank")}
               onMonthlyUpdates={() => window.open("/monthly-updates", "_blank")}
-              onViewArchive={() => router.push("/archived")}
+              onViewAbandoned={() => router.push("/abandoned")}
               onSettings={() => setShowSettings(true)}
             />
           </div>

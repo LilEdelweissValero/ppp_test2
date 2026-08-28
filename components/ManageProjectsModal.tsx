@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Modal from "./Modal";
+import AbandonConfirmModal from "./AbandonConfirmModal";
 
 interface ProjectRow {
   id: number;
@@ -22,11 +23,24 @@ interface Props {
 export default function ManageProjectsModal({ open, onClose, projects, onChangeLevel }: Props) {
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [abandonTarget, setAbandonTarget] = useState<{
+    entityId: number;
+    entityName: string;
+  } | null>(null);
+  const [abandonReasons, setAbandonReasons] = useState<string[]>([]);
+  const [abandonLoading, setAbandonLoading] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (open) {
       setSearch("");
       setSelectedIds(new Set());
+      fetch("/api/settings/computation")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.abandonmentReasons) setAbandonReasons(data.abandonmentReasons);
+        })
+        .catch(() => {});
     }
   }, [open]);
 
@@ -41,7 +55,7 @@ export default function ManageProjectsModal({ open, onClose, projects, onChangeL
         p.programName.toLowerCase().includes(q) ||
         p.frameworkName.toLowerCase().includes(q)
     );
-  }, [projects, search]);
+  }, [projects, search, refreshKey]);
 
   const allSelected = filtered.length > 0 && filtered.every((p) => selectedIds.has(p.id));
 
@@ -56,6 +70,28 @@ export default function ManageProjectsModal({ open, onClose, projects, onChangeL
 
   function toggleSelectAll() {
     setSelectedIds(allSelected ? new Set() : new Set(filtered.map((p) => p.id)));
+  }
+
+  async function handleAbandonConfirm(reason: string, remarks: string) {
+    if (!abandonTarget) return;
+    setAbandonLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${abandonTarget.entityId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          abandoned: true,
+          abandonedReason: reason,
+          abandonedRemarks: remarks || null,
+        }),
+      });
+      if (res.ok) {
+        setAbandonTarget(null);
+        setRefreshKey((k) => k + 1);
+      }
+    } finally {
+      setAbandonLoading(false);
+    }
   }
 
   return (
@@ -152,13 +188,34 @@ export default function ManageProjectsModal({ open, onClose, projects, onChangeL
                   <span style={{ fontSize: 10, color: "var(--ink-tertiary)" }}>{p.reference}</span>
                 )}
               </div>
-              <span style={{ fontSize: 10, color: "var(--ink-tertiary)", flexShrink: 0, marginLeft: 12 }}>
-                {p.programName} · {p.frameworkName}
-              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, marginLeft: 12 }}>
+                <span style={{ fontSize: 10, color: "var(--ink-tertiary)" }}>
+                  {p.programName} · {p.frameworkName}
+                </span>
+                <button
+                  onClick={() => setAbandonTarget({ entityId: p.id, entityName: p.name })}
+                  title="Abandon project"
+                  style={{ color: "#B91C1C", background: "none", border: "none", cursor: "pointer", padding: "2px 4px", fontSize: 11, fontWeight: 500 }}
+                >
+                  Abandon
+                </button>
+              </div>
             </div>
           ))}
         </div>
       </div>
+      {abandonTarget && (
+        <AbandonConfirmModal
+          open={!!abandonTarget}
+          onClose={() => setAbandonTarget(null)}
+          onConfirm={handleAbandonConfirm}
+          entityType="Project"
+          entityName={abandonTarget.entityName}
+          entityId={abandonTarget.entityId}
+          reasons={abandonReasons}
+          loading={abandonLoading}
+        />
+      )}
     </Modal>
   );
 }

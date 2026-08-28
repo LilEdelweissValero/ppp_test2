@@ -20,6 +20,7 @@ interface SnapshotTask {
   adjustedTargetQuarter: string;
   phaseId: number | null;
   archived: boolean;
+  abandoned: boolean;
 }
 
 interface SnapshotSpecialTask {
@@ -37,6 +38,7 @@ interface SnapshotSpecialTask {
   lastUpdatedDate: string | null;
   phaseId: number | null;
   archived: boolean;
+  abandoned: boolean;
 }
 
 interface SnapshotPhase {
@@ -59,6 +61,7 @@ interface SnapshotProject {
   actualCompletionDate: string | null;
   phasesTableName: string | null;
   archived: boolean;
+  abandoned: boolean;
   phases: SnapshotPhase[];
   tasks: SnapshotTask[];
   specialTasks: SnapshotSpecialTask[];
@@ -69,6 +72,7 @@ interface SnapshotProgram {
   name: string;
   frameworkId: number;
   archived: boolean;
+  abandoned: boolean;
   projects: SnapshotProject[];
 }
 
@@ -123,6 +127,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
             frameworkId: true,
             sortOrder: true,
             archived: true,
+            abandoned: true,
             projects: {
               select: {
                 id: true,
@@ -136,6 +141,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
                 phasesTableName: true,
                 sortOrder: true,
                 archived: true,
+                abandoned: true,
                 phases: {
                   select: {
                     id: true,
@@ -166,6 +172,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
                     attachments: true,
                     phaseId: true,
                     archived: true,
+                    abandoned: true,
                   },
                   orderBy: { sortOrder: "asc" },
                 },
@@ -186,6 +193,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
                     lastUpdatedDate: true,
                     phaseId: true,
                     archived: true,
+                    abandoned: true,
                   },
                   orderBy: { sortOrder: "asc" },
                 },
@@ -307,6 +315,62 @@ export async function getSnapshotAt(timestamp: string): Promise<{
           }
         } else {
           archiveEntity(log.entityType, log.entityId);
+        }
+        break;
+      }
+      case "abandon": {
+        // Entity was abandoned AFTER T → it wasn't abandoned at T
+        if (log.entityType === "Program") {
+          const p = programMap.get(log.entityId);
+          if (p) {
+            p.abandoned = false;
+            for (const pr of p.projects) {
+              pr.abandoned = false;
+              for (const t of pr.tasks) t.abandoned = false;
+              for (const st of pr.specialTasks) st.abandoned = false;
+            }
+          }
+        } else if (log.entityType === "Project") {
+          const pr = projectMap.get(log.entityId);
+          if (pr) {
+            pr.abandoned = false;
+            for (const t of pr.tasks) t.abandoned = false;
+            for (const st of pr.specialTasks) st.abandoned = false;
+          }
+        } else if (log.entityType === "Task") {
+          const t = taskMap.get(log.entityId);
+          if (t) t.abandoned = false;
+        } else if (log.entityType === "SpecialTask") {
+          const st = specialTaskMap.get(log.entityId);
+          if (st) st.abandoned = false;
+        }
+        break;
+      }
+      case "unabandon": {
+        // Entity was un-abandoned AFTER T → it was abandoned at T
+        if (log.entityType === "Program") {
+          const p = programMap.get(log.entityId);
+          if (p) {
+            p.abandoned = true;
+            for (const pr of p.projects) {
+              pr.abandoned = true;
+              for (const t of pr.tasks) t.abandoned = true;
+              for (const st of pr.specialTasks) st.abandoned = true;
+            }
+          }
+        } else if (log.entityType === "Project") {
+          const pr = projectMap.get(log.entityId);
+          if (pr) {
+            pr.abandoned = true;
+            for (const t of pr.tasks) t.abandoned = true;
+            for (const st of pr.specialTasks) st.abandoned = true;
+          }
+        } else if (log.entityType === "Task") {
+          const t = taskMap.get(log.entityId);
+          if (t) t.abandoned = true;
+        } else if (log.entityType === "SpecialTask") {
+          const st = specialTaskMap.get(log.entityId);
+          if (st) st.abandoned = true;
         }
         break;
       }
@@ -646,7 +710,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
   };
 }
 
-// ── Filter archived items (dashboard only shows non-archived) ────────────────
+// ── Filter archived/abandoned items (dashboard only shows active) ────────────
 
 function filterArchived(frameworks: SnapshotFramework[]): SnapshotFramework[] {
   return frameworks
@@ -654,16 +718,16 @@ function filterArchived(frameworks: SnapshotFramework[]): SnapshotFramework[] {
     .map((f) => ({
       ...f,
       programs: f.programs
-        .filter((p) => !p.archived)
+        .filter((p) => !p.archived && !p.abandoned)
         .map((p) => ({
           ...p,
           projects: p.projects
-            .filter((pr) => !pr.archived)
+            .filter((pr) => !pr.archived && !pr.abandoned)
             .map((pr) => ({
               ...pr,
               phases: pr.phases.filter((ph) => !ph.archived),
-              tasks: pr.tasks.filter((t) => !t.archived),
-              specialTasks: pr.specialTasks.filter((st) => !st.archived),
+              tasks: pr.tasks.filter((t) => !t.archived && !t.abandoned),
+              specialTasks: pr.specialTasks.filter((st) => !st.archived && !st.abandoned),
             })),
         })),
     }));

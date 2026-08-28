@@ -55,7 +55,7 @@ export const getDashboardData = unstable_cache(
                       adjustedTargetQuarter: true,
                       phaseId: true,
                     },
-                    where: { archived: false },
+                    where: { archived: false, abandoned: false },
                     orderBy: { sortOrder: "asc" },
                   },
                   specialTasks: {
@@ -74,15 +74,15 @@ export const getDashboardData = unstable_cache(
                       lastUpdatedDate: true,
                       phaseId: true,
                     },
-                    where: { archived: false },
+                    where: { archived: false, abandoned: false },
                     orderBy: { sortOrder: "asc" },
                   },
                 },
-                where: { archived: false },
+                where: { archived: false, abandoned: false },
                 orderBy: { sortOrder: "asc" },
               },
             },
-            where: { archived: false },
+            where: { archived: false, abandoned: false },
             orderBy: { sortOrder: "asc" },
           },
         },
@@ -142,6 +142,7 @@ export const getProjectData = unstable_cache(
             notes: true,
             phaseId: true,
           },
+          where: { abandoned: false },
           orderBy: { sortOrder: "asc" },
         },
         specialTasks: {
@@ -160,7 +161,7 @@ export const getProjectData = unstable_cache(
             lastUpdatedDate: true,
             phaseId: true,
           },
-          where: { archived: false },
+          where: { archived: false, abandoned: false },
           orderBy: { sortOrder: "asc" },
         },
       },
@@ -168,71 +169,3 @@ export const getProjectData = unstable_cache(
   ["project-data"],
   { tags: [PORTFOLIO_CACHE_TAG], revalidate: 60 }
 );
-
-export async function getArchivedData() {
-  return prisma.framework.findMany({
-    where: {
-      OR: [{ archived: true }, { programs: { some: { archived: true } } }],
-    },
-    select: {
-      id: true,
-      name: true,
-      color: true,
-      archived: true,
-      programs: {
-        where: { archived: true },
-        select: {
-          id: true,
-          name: true,
-          frameworkId: true,
-          projects: {
-            where: { archived: true },
-            select: {
-              id: true,
-              name: true,
-              programId: true,
-              reference: true,
-              owner: true,
-              targetQuarter: true,
-              adjustedTargetQuarter: true,
-              actualCompletionDate: true,
-              phasesTableName: true,
-              phases: {
-                select: {
-                  id: true,
-                  name: true,
-                  weight: true,
-                  sortOrder: true,
-                },
-                orderBy: { sortOrder: "asc" },
-              },
-              tasks: {
-                where: { archived: true },
-                select: {
-                  id: true,
-                  taskCode: true,
-                  name: true,
-                  assignee: true,
-                  priority: true,
-                  status: true,
-                  description: true,
-                  targetQuarter: true,
-                  adjustedTargetQuarter: true,
-                  deliverable: true,
-                  attachments: true,
-                  dependencies: true,
-                  notes: true,
-                  phaseId: true,
-                },
-                orderBy: { sortOrder: "asc" },
-              },
-            },
-            orderBy: { sortOrder: "asc" },
-          },
-        },
-        orderBy: { sortOrder: "asc" },
-      },
-    },
-    orderBy: { sortOrder: "asc" },
-  });
-}

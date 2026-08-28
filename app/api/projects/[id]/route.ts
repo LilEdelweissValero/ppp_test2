@@ -31,83 +31,64 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const body = await request.json();
-  const { name, programId, reference, owner, targetQuarter, adjustedTargetQuarter, actualCompletionDate, phasesTableName, archived } = body;
+  const { name, programId, reference, owner, targetQuarter, adjustedTargetQuarter, actualCompletionDate, phasesTableName, abandoned, abandonedReason, abandonedRemarks } = body;
 
   const oldProject = await prisma.project.findUnique({ where: { id: parseInt(id) } });
 
-  if (archived !== undefined && typeof archived === "boolean" && oldProject) {
-    const phases = await prisma.phase.findMany({
-      where: { projectId: parseInt(id) },
-      select: { id: true, name: true, archived: true },
-    });
+  if (abandoned !== undefined && typeof abandoned === "boolean" && oldProject) {
+    const abandonedAt = abandoned ? new Date().toISOString() : null;
     const tasks = await prisma.task.findMany({
       where: { projectId: parseInt(id) },
-      select: { id: true, taskCode: true, name: true, archived: true },
+      select: { id: true, taskCode: true, name: true },
     });
     const specialTasks = await prisma.specialTask.findMany({
       where: { projectId: parseInt(id) },
-      select: { id: true, specialTaskCode: true, name: true, archived: true },
+      select: { id: true, specialTaskCode: true, name: true },
     });
 
     await prisma.$transaction(async (tx) => {
       await tx.project.update({
         where: { id: parseInt(id) },
-        data: { archived },
-      });
-      await tx.phase.updateMany({
-        where: { projectId: parseInt(id) },
-        data: { archived },
+        data: { abandoned, abandonedAt, abandonedReason: abandoned ? abandonedReason ?? null : null, abandonedRemarks: abandoned ? abandonedRemarks ?? null : null },
       });
       await tx.task.updateMany({
         where: { projectId: parseInt(id) },
-        data: { archived },
+        data: { abandoned, abandonedAt, abandonedReason: abandoned ? abandonedReason ?? null : null, abandonedRemarks: abandoned ? abandonedRemarks ?? null : null },
+      });
+      await tx.specialTask.updateMany({
+        where: { projectId: parseInt(id) },
+        data: { abandoned, abandonedAt, abandonedReason: abandoned ? abandonedReason ?? null : null, abandonedRemarks: abandoned ? abandonedRemarks ?? null : null },
       });
     });
-    const project = await prisma.project.findUnique({ where: { id: parseInt(id) } });
 
-    // Log per-phase cascade entries
-    for (const ph of phases) {
-      if (ph.archived !== archived) {
-        await logChange({
-          entityType: "Phase",
-          entityId: ph.id,
-          entityName: ph.name,
-          changeType: archived ? "archive" : "unarchive",
-          details: `Project ${archived ? "archived" : "unarchived"}: cascade`,
-        });
-      }
-    }
     // Log per-task cascade entries
     for (const t of tasks) {
-      if (t.archived !== archived) {
-        await logChange({
-          entityType: "Task",
-          entityId: t.id,
-          entityName: `${t.taskCode}: ${t.name}`,
-          changeType: archived ? "archive" : "unarchive",
-          details: `Project ${archived ? "archived" : "unarchived"}: cascade`,
-        });
-      }
+      await logChange({
+        entityType: "Task",
+        entityId: t.id,
+        entityName: `${t.taskCode}: ${t.name}`,
+        changeType: abandoned ? "abandon" : "unabandon",
+        details: `Project ${abandoned ? "abandoned" : "unabandoned"}: cascade`,
+      });
     }
     for (const st of specialTasks) {
-      if (st.archived !== archived) {
-        await logChange({
-          entityType: "SpecialTask",
-          entityId: st.id,
-          entityName: `${st.specialTaskCode}: ${st.name}`,
-          changeType: archived ? "archive" : "unarchive",
-          details: `Project ${archived ? "archived" : "unarchived"}: cascade`,
-        });
-      }
+      await logChange({
+        entityType: "SpecialTask",
+        entityId: st.id,
+        entityName: `${st.specialTaskCode}: ${st.name}`,
+        changeType: abandoned ? "abandon" : "unabandon",
+        details: `Project ${abandoned ? "abandoned" : "unabandoned"}: cascade`,
+      });
     }
 
-    // Log the project-level archive entry
+    // Log the project-level entry
+    const project = await prisma.project.findUnique({ where: { id: parseInt(id) } });
     await logChange({
       entityType: "Project",
       entityId: parseInt(id),
       entityName: project?.name || "",
-      changeType: archived ? "archive" : "unarchive",
-      details: archived ? "Archived project and all tasks" : "Unarchived project and all tasks",
+      changeType: abandoned ? "abandon" : "unabandon",
+      details: JSON.stringify({ reason: abandonedReason, remarks: abandonedRemarks }),
     });
     await touchLastModified();
     return NextResponse.json(project);

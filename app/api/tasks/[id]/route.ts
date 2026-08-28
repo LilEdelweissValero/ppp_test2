@@ -35,7 +35,9 @@ export async function PATCH(
     adjustedTargetQuarter,
     deliverable,
     attachments,
-    archived,
+    abandoned,
+    abandonedReason,
+    abandonedRemarks,
     phaseId,
   } = body;
 
@@ -78,7 +80,13 @@ export async function PATCH(
       ? attachments
       : null;
   }
-  if (archived !== undefined && typeof archived === "boolean") updateData.archived = archived;
+  if (abandoned !== undefined && typeof abandoned === "boolean") {
+    const abandonedAt = abandoned ? new Date().toISOString() : null;
+    updateData.abandoned = abandoned;
+    updateData.abandonedAt = abandonedAt;
+    updateData.abandonedReason = abandoned ? abandonedReason ?? null : null;
+    updateData.abandonedRemarks = abandoned ? abandonedRemarks ?? null : null;
+  }
   if (phaseId !== undefined) updateData.phaseId = phaseId ? parseInt(phaseId) : null;
 
   const task = await prisma.task.update({
@@ -127,6 +135,16 @@ export async function PATCH(
       entityName: `${task.taskCode}: ${task.name}`,
       changeType: "update",
       details,
+    });
+  }
+
+  if (abandoned !== undefined && typeof abandoned === "boolean") {
+    await logChange({
+      entityType: "Task",
+      entityId: task.id,
+      entityName: `${task.taskCode}: ${task.name}`,
+      changeType: abandoned ? "abandon" : "unabandon",
+      details: JSON.stringify({ reason: abandonedReason, remarks: abandonedRemarks }),
     });
   }
 

@@ -37,7 +37,6 @@ import PhaseSetupModal from "@/components/PhaseSetupModal";
 import PhaseEditModal from "@/components/PhaseEditModal";
 import ChangeDueQuarterModal from "@/components/ChangeDueQuarterModal";
 import ChangeHistoryModal from "@/components/ChangeHistoryModal";
-import ArchiveConfirmModal from "@/components/ArchiveConfirmModal";
 import { CachedProject, CachedTask, CachedSpecialTask, CachedPhase, usePortfolioCache } from "@/components/PortfolioCacheProvider";
 
 type Task = CachedTask;
@@ -66,7 +65,6 @@ function SortableTaskRow({
   onEdit,
   onChangeQuarter,
   onViewHistory,
-  onArchive,
   onInlineSave,
   editingCell,
   setEditingCell,
@@ -83,7 +81,6 @@ function SortableTaskRow({
   onEdit: () => void;
   onChangeQuarter: () => void;
   onViewHistory: () => void;
-  onArchive: () => void;
   onInlineSave: (taskId: number, field: "status" | "priority", value: string, nextCell?: { taskId: number; field: "status" | "priority" }) => void;
   editingCell: { taskId: number; field: "status" | "priority" } | null;
   setEditingCell: (cell: { taskId: number; field: "status" | "priority" } | null) => void;
@@ -272,17 +269,6 @@ function SortableTaskRow({
           >
             History
           </button>
-          <button
-            onClick={onArchive}
-            className="detail-task-action"
-            title="Archive task"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 8v13H3V8" />
-              <path d="M1 3h22v5H1z" />
-              <path d="M10 12h4" />
-            </svg>
-          </button>
         </div>
         )}
       </td>
@@ -317,11 +303,6 @@ export default function ProjectDetailView({ project: initialProject, historicalT
   const [showAddPhase, setShowAddPhase] = useState(false);
   const [showEditPhases, setShowEditPhases] = useState(false);
   const [editPhase, setEditPhase] = useState<CachedPhase | null>(null);
-  const [archiveTarget, setArchiveTarget] = useState<{
-    entityType: "Project" | "Task" | "SpecialTask" | "Phase";
-    entityId: number;
-    entityName: string;
-  } | null>(null);
 
   useEffect(() => {
     fetch("/api/settings/computation")
@@ -334,7 +315,6 @@ export default function ProjectDetailView({ project: initialProject, historicalT
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
   const [savingOrder, setSavingOrder] = useState(false);
   const [saveOrderError, setSaveOrderError] = useState<string | null>(null);
-  const [archiveLoading, setArchiveLoading] = useState(false);
   const [hoveredTask, setHoveredTask] = useState<Task | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -473,42 +453,6 @@ export default function ProjectDetailView({ project: initialProject, historicalT
       return;
     }
     router.push("/");
-  }
-
-  async function handleArchiveConfirm() {
-    if (!archiveTarget) return;
-    setArchiveLoading(true);
-    try {
-      const endpoint =
-        archiveTarget.entityType === "Project"
-          ? `/api/projects/${archiveTarget.entityId}`
-          : archiveTarget.entityType === "SpecialTask"
-          ? `/api/special-tasks/${archiveTarget.entityId}`
-          : archiveTarget.entityType === "Phase"
-          ? `/api/phases/${archiveTarget.entityId}`
-          : `/api/tasks/${archiveTarget.entityId}`;
-      const res = await fetch(endpoint, {
-        method: archiveTarget.entityType === "Phase" ? "DELETE" : "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: archiveTarget.entityType === "Phase" ? undefined : JSON.stringify({ archived: true }),
-      });
-      if (res.ok) {
-        if (archiveTarget.entityType === "Project") {
-          router.push("/");
-        } else if (archiveTarget.entityType === "Phase") {
-          setPhases(phases.filter((p) => p.id !== archiveTarget.entityId));
-          setArchiveTarget(null);
-        } else if (archiveTarget.entityType === "SpecialTask") {
-          updateSpecialTasks(specialTasks.filter((st) => st.id !== archiveTarget.entityId));
-          setArchiveTarget(null);
-        } else {
-          setTasks(tasks.filter((t) => t.id !== archiveTarget.entityId));
-          setArchiveTarget(null);
-        }
-      }
-    } finally {
-      setArchiveLoading(false);
-    }
   }
 
   function handleSort(key: string) {
@@ -758,23 +702,6 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                 >
                   View History
                 </button>
-                <button
-                  onClick={() =>
-                    setArchiveTarget({
-                      entityType: "Project",
-                      entityId: project.id,
-                      entityName: project.name,
-                    })
-                  }
-                  className="detail-button"
-                  title="Archive project"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: "middle" }}>
-                    <path d="M21 8v13H3V8" />
-                    <path d="M1 3h22v5H1z" />
-                    <path d="M10 12h4" />
-                  </svg>
-                </button>
               </>
             )}
             {isHistorical && (
@@ -976,13 +903,6 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                           onChangeQuarter={() => setChangeTaskQuarter(task)}
                           onViewHistory={() =>
                             setViewHistory({ type: "Task", id: task.id })
-                          }
-                          onArchive={() =>
-                            setArchiveTarget({
-                              entityType: "Task",
-                              entityId: task.id,
-                              entityName: `${task.taskCode}: ${task.name}`,
-                            })
                           }
                           onInlineSave={handleInlineSave}
                           editingCell={editingCell}
@@ -1306,23 +1226,6 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                             >
                               History
                             </button>
-                            <button
-                              onClick={() =>
-                                setArchiveTarget({
-                                  entityType: "SpecialTask",
-                                  entityId: st.id,
-                                  entityName: `${st.specialTaskCode}: ${st.name}`,
-                                })
-                              }
-                              title="Archive special task"
-                              className="detail-task-action"
-                            >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M21 8v13H3V8" />
-                                <path d="M1 3h22v5H1z" />
-                                <path d="M10 12h4" />
-                              </svg>
-                            </button>
                           </div>
                           )}
                         </td>
@@ -1538,18 +1441,6 @@ export default function ProjectDetailView({ project: initialProject, historicalT
             onClose={() => setViewHistory(null)}
             entityType={viewHistory.type}
             entityId={viewHistory.id}
-          />
-        )}
-
-        {archiveTarget && (
-          <ArchiveConfirmModal
-            open={!!archiveTarget}
-            onClose={() => setArchiveTarget(null)}
-            onConfirm={handleArchiveConfirm}
-            entityType={archiveTarget.entityType}
-            entityName={archiveTarget.entityName}
-            entityId={archiveTarget.entityId}
-            loading={archiveLoading}
           />
         )}
 

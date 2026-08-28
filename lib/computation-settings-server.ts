@@ -22,7 +22,13 @@ export async function getSettings(): Promise<ComputationSettings> {
       Array.isArray(parsed.healthRules) &&
       parsed.healthRules.length === 5
     ) {
-      return parsed as ComputationSettings;
+      const defaults = getDefaultSettings();
+      return {
+        ...parsed,
+        abandonmentReasons: Array.isArray(parsed.abandonmentReasons)
+          ? parsed.abandonmentReasons
+          : defaults.abandonmentReasons,
+      } as ComputationSettings;
     }
     return getDefaultSettings();
   } catch {

@@ -32,7 +32,9 @@ export async function PATCH(
     done,
     dueQuarter,
     lastUpdatedDate,
-    archived,
+    abandoned,
+    abandonedReason,
+    abandonedRemarks,
     phaseId,
   } = body;
 
@@ -68,7 +70,13 @@ export async function PATCH(
   if (mostly !== undefined) updateData.mostly = mostly;
   if (done !== undefined) updateData.done = done;
   if (dueQuarter !== undefined) updateData.dueQuarter = dueQuarter;
-  if (archived !== undefined && typeof archived === "boolean") updateData.archived = archived;
+  if (abandoned !== undefined && typeof abandoned === "boolean") {
+    const abandonedAt = abandoned ? new Date().toISOString() : null;
+    updateData.abandoned = abandoned;
+    updateData.abandonedAt = abandonedAt;
+    updateData.abandonedReason = abandoned ? abandonedReason ?? null : null;
+    updateData.abandonedRemarks = abandoned ? abandonedRemarks ?? null : null;
+  }
   if (phaseId !== undefined) updateData.phaseId = phaseId ? parseInt(phaseId) : null;
 
   // Auto-set lastUpdatedDate when numeric fields change (unless explicitly provided)
@@ -96,6 +104,16 @@ export async function PATCH(
       entityName: `${specialTask.specialTaskCode}: ${specialTask.name}`,
       changeType: "update",
       details,
+    });
+  }
+
+  if (abandoned !== undefined && typeof abandoned === "boolean") {
+    await logChange({
+      entityType: "SpecialTask",
+      entityId: specialTask.id,
+      entityName: `${specialTask.specialTaskCode}: ${specialTask.name}`,
+      changeType: abandoned ? "abandon" : "unabandon",
+      details: JSON.stringify({ reason: abandonedReason, remarks: abandonedRemarks }),
     });
   }
 

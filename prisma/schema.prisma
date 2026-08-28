@@ -17,13 +17,17 @@ model Framework {
 }
 
 model Program {
-  id          Int       @id @default(autoincrement())
-  name        String    @unique
-  frameworkId Int
-  framework   Framework @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
-  sortOrder   Int       @default(0) @map("sort_order")
-  archived    Boolean   @default(false)
-  projects    Project[]
+  id               Int       @id @default(autoincrement())
+  name             String    @unique
+  frameworkId      Int
+  framework        Framework @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
+  sortOrder        Int       @default(0) @map("sort_order")
+  archived         Boolean   @default(false)
+  abandoned        Boolean   @default(false)
+  abandonedAt      String?   @map("abandoned_at")
+  abandonedReason  String?   @map("abandoned_reason")
+  abandonedRemarks String?   @map("abandoned_remarks")
+  projects         Project[]
 
   @@index([frameworkId])
 }
@@ -41,6 +45,10 @@ model Project {
   actualCompletionDate  String?   @map("actual_completion_date")
   phasesTableName       String?   @map("phases_table_name")
   archived              Boolean   @default(false)
+  abandoned             Boolean   @default(false)
+  abandonedAt           String?   @map("abandoned_at")
+  abandonedReason       String?   @map("abandoned_reason")
+  abandonedRemarks      String?   @map("abandoned_remarks")
   phases                Phase[]
   tasks                 Task[]
   specialTasks          SpecialTask[]
@@ -82,6 +90,10 @@ model Task {
   deliverable           String?
   attachments           Json?    @map("attachments")
   archived              Boolean  @default(false)
+  abandoned             Boolean  @default(false)
+  abandonedAt           String?  @map("abandoned_at")
+  abandonedReason       String?  @map("abandoned_reason")
+  abandonedRemarks      String?  @map("abandoned_remarks")
 
   @@index([projectId])
   @@index([phaseId])
@@ -105,6 +117,10 @@ model SpecialTask {
   dueQuarter        String   @map("due_quarter")
   lastUpdatedDate   String?  @map("last_updated_date")
   archived          Boolean  @default(false)
+  abandoned         Boolean  @default(false)
+  abandonedAt       String?  @map("abandoned_at")
+  abandonedReason   String?  @map("abandoned_reason")
+  abandonedRemarks  String?  @map("abandoned_remarks")
 
   @@index([projectId])
   @@index([phaseId])

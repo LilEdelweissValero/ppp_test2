@@ -19,7 +19,6 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import Modal from "./Modal";
-import ArchiveConfirmModal from "./ArchiveConfirmModal";
 
 const PRESET_COLORS = [
   { value: "#DBEAFE", label: "Blue" },
@@ -55,7 +54,6 @@ function SortableFramework({
   setEditName,
   setEditColor,
   handleRename,
-  handleArchive,
   loading,
   selected,
   onToggle,
@@ -68,7 +66,6 @@ function SortableFramework({
   setEditName: (name: string) => void;
   setEditColor: (color: string) => void;
   handleRename: (id: number) => void;
-  handleArchive: (id: number, name: string) => void;
   loading: boolean;
   selected: boolean;
   onToggle: (id: number) => void;
@@ -180,17 +177,6 @@ function SortableFramework({
             >
               Rename
             </button>
-            <button
-              onClick={() => handleArchive(fw.id, fw.name)}
-              title="Archive framework"
-              style={{ color: "var(--ink-tertiary)", background: "none", border: "none", cursor: "pointer", padding: "2px 4px", display: "flex", alignItems: "center" }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 8v13H3V8" />
-                <path d="M1 3h22v5H1z" />
-                <path d="M10 12h4" />
-              </svg>
-            </button>
           </div>
         </>
       )}
@@ -244,10 +230,6 @@ export default function ManageFrameworksModal({
   const [loading, setLoading] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [archiveTarget, setArchiveTarget] = useState<{
-    entityId: number;
-    entityName: string;
-  } | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -309,27 +291,6 @@ export default function ManageFrameworksModal({
     setIsDirty(true);
   }
 
-  function handleArchiveClick(id: number, name: string) {
-    setArchiveTarget({ entityId: id, entityName: name });
-  }
-
-  function handleArchiveConfirm() {
-    if (!archiveTarget) return;
-    const next = frameworks.map((item) =>
-      item.id === archiveTarget.entityId
-        ? { ...item, archived: true as unknown as string }
-        : item
-    );
-    setFrameworks(next.filter((item) => (item as unknown as { archived?: boolean }).archived !== true));
-    setSelectedIds((prev) => {
-      const nextIds = new Set(prev);
-      nextIds.delete(archiveTarget.entityId);
-      return nextIds;
-    });
-    setIsDirty(true);
-    setArchiveTarget(null);
-  }
-
   function toggleSelect(id: number) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -365,9 +326,6 @@ export default function ManageFrameworksModal({
       const orderChanged =
         reorderedIds.length === initialOrder.length &&
         reorderedIds.some((id, i) => id !== initialOrder[i]);
-      const archivedIds = frameworks
-        .filter((f) => (f as unknown as { archived?: boolean }).archived === true)
-        .map((f) => f.id);
 
       const idMap = new Map<number, number>();
 
@@ -411,18 +369,7 @@ export default function ManageFrameworksModal({
         });
       }
 
-      for (const realId of archivedIds) {
-        const mappedId = idMap.get(realId) ?? realId;
-        await fetch(`/api/frameworks/${mappedId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ archived: true }),
-        });
-      }
-
-      const finalFrameworks = frameworks
-        .filter((f) => !(f as unknown as { archived?: boolean }).archived)
-        .map((f) => ({
+      const finalFrameworks = frameworks.map((f) => ({
           id: idMap.get(f.id) ?? f.id,
           name: f.name,
           color: f.color,
@@ -574,7 +521,6 @@ export default function ManageFrameworksModal({
                   setEditName={setEditName}
                   setEditColor={setEditColor}
                   handleRename={handleRenameLocal}
-                  handleArchive={handleArchiveClick}
                   loading={loading}
                   selected={selectedIds.has(fw.id)}
                   onToggle={toggleSelect}
@@ -584,16 +530,6 @@ export default function ManageFrameworksModal({
           </SortableContext>
         </DndContext>
       </div>
-      {archiveTarget && (
-        <ArchiveConfirmModal
-          open={!!archiveTarget}
-          onClose={() => setArchiveTarget(null)}
-          onConfirm={handleArchiveConfirm}
-          entityType="Framework"
-          entityName={archiveTarget.entityName}
-          entityId={archiveTarget.entityId}
-        />
-      )}
     </Modal>
   );
 }

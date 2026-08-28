@@ -21,12 +21,13 @@ interface Props {
   onClose: () => void;
 }
 
-type Tab = "statuses" | "health" | "formulas";
+type Tab = "statuses" | "health" | "formulas" | "abandonment";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "statuses", label: "Statuses" },
   { key: "health", label: "Health Criteria" },
   { key: "formulas", label: "Formulas" },
+  { key: "abandonment", label: "Abandonment Reasons" },
 ];
 
 // ── Statuses Tab ───────────────────────────────────────────────────────────
@@ -617,6 +618,139 @@ function FormulaRow({
   );
 }
 
+// ── Abandonment Reasons Tab ────────────────────────────────────────────────
+
+function AbandonmentReasonsTab({
+  reasons,
+  onChange,
+}: {
+  reasons: string[];
+  onChange: (r: string[]) => void;
+}) {
+  const [newReason, setNewReason] = useState("");
+
+  function addReason() {
+    const trimmed = newReason.trim();
+    if (!trimmed || reasons.includes(trimmed)) return;
+    onChange([...reasons, trimmed]);
+    setNewReason("");
+  }
+
+  function removeReason(index: number) {
+    onChange(reasons.filter((_, i) => i !== index));
+  }
+
+  function updateReason(index: number, value: string) {
+    const next = [...reasons];
+    next[index] = value;
+    onChange(next);
+  }
+
+  return (
+    <div>
+      <p
+        style={{
+          fontSize: 12,
+          color: "var(--ink-secondary)",
+          marginBottom: 16,
+        }}
+      >
+        Manage the list of reasons shown in the Abandon confirmation dialog.
+        Users must select one of these when abandoning a program, project, or
+        task.
+      </p>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {reasons.map((reason, i) => (
+          <div
+            key={i}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <span
+              style={{
+                fontSize: 11,
+                color: "var(--ink-tertiary)",
+                minWidth: 24,
+                textAlign: "right",
+              }}
+            >
+              {i + 1}.
+            </span>
+            <input
+              type="text"
+              value={reason}
+              onChange={(e) => updateReason(i, e.target.value)}
+              style={{
+                flex: 1,
+                border: "1px solid var(--rule)",
+                borderRadius: 3,
+                padding: "6px 10px",
+                fontSize: 12,
+                outline: "none",
+              }}
+            />
+            <button
+              onClick={() => removeReason(i)}
+              style={{
+                fontSize: 11,
+                color: "var(--ink-tertiary)",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: "2px 6px",
+              }}
+              title="Remove reason"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <input
+          type="text"
+          value={newReason}
+          onChange={(e) => setNewReason(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") addReason();
+          }}
+          placeholder="New reason…"
+          style={{
+            flex: 1,
+            border: "1px solid var(--rule)",
+            borderRadius: 3,
+            padding: "6px 10px",
+            fontSize: 12,
+            outline: "none",
+          }}
+        />
+        <button
+          onClick={addReason}
+          disabled={!newReason.trim()}
+          style={{
+            padding: "6px 14px",
+            fontSize: 12,
+            fontWeight: 600,
+            color: "#FFFFFF",
+            background: "var(--accent)",
+            border: "none",
+            borderRadius: 3,
+            cursor: newReason.trim() ? "pointer" : "default",
+            opacity: newReason.trim() ? 1 : 0.5,
+          }}
+        >
+          Add
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Modal ─────────────────────────────────────────────────────────────
 
 export default function ComputationSettingsModal({ open, onClose }: Props) {
@@ -836,6 +970,14 @@ export default function ComputationSettingsModal({ open, onClose }: Props) {
           )}
           {tab === "formulas" && (
             <FormulasTab statuses={settings.statuses} />
+          )}
+          {tab === "abandonment" && (
+            <AbandonmentReasonsTab
+              reasons={settings.abandonmentReasons ?? []}
+              onChange={(abandonmentReasons) =>
+                setSettings({ ...settings, abandonmentReasons })
+              }
+            />
           )}
         </div>
 

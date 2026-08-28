@@ -19,7 +19,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import Modal from "./Modal";
-import ArchiveConfirmModal from "./ArchiveConfirmModal";
+import AbandonConfirmModal from "./AbandonConfirmModal";
 
 interface Framework {
   id: number;
@@ -49,7 +49,7 @@ function SortableProgram({
   setEditId,
   setEditName,
   handleRename,
-  handleArchive,
+  handleAbandon,
   loading,
   selected,
   onToggle,
@@ -60,7 +60,7 @@ function SortableProgram({
   setEditId: (id: number | null) => void;
   setEditName: (name: string) => void;
   handleRename: (id: number) => void;
-  handleArchive: (id: number, name: string) => void;
+  handleAbandon: (id: number, name: string) => void;
   loading: boolean;
   selected: boolean;
   onToggle: (id: number) => void;
@@ -168,15 +168,11 @@ function SortableProgram({
               Rename
             </button>
             <button
-              onClick={() => handleArchive(program.id, program.name)}
-              title="Archive program"
-              style={{ color: "var(--ink-tertiary)", background: "none", border: "none", cursor: "pointer", padding: "2px 4px", display: "flex", alignItems: "center" }}
+              onClick={() => handleAbandon(program.id, program.name)}
+              title="Abandon program"
+              style={{ color: "#B91C1C", background: "none", border: "none", cursor: "pointer", padding: "2px 4px", fontSize: 12, fontWeight: 500 }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 8v13H3V8" />
-                <path d="M1 3h22v5H1z" />
-                <path d="M10 12h4" />
-              </svg>
+              Abandon
             </button>
           </div>
         </>
@@ -203,10 +199,12 @@ export default function ManageProgramsModal({
   const [loading, setLoading] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [archiveTarget, setArchiveTarget] = useState<{
+  const [abandonTarget, setAbandonTarget] = useState<{
     entityId: number;
     entityName: string;
   } | null>(null);
+  const [abandonReasons, setAbandonReasons] = useState<string[]>([]);
+  const [abandonLoading, setAbandonLoading] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -226,6 +224,13 @@ export default function ManageProgramsModal({
       setError("");
       setIsDirty(false);
       setSelectedIds(new Set());
+      // Fetch abandonment reasons
+      fetch("/api/settings/computation")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.abandonmentReasons) setAbandonReasons(data.abandonmentReasons);
+        })
+        .catch(() => {});
     }
     // Only reset when modal opens/closes, not on prop changes while open
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -272,20 +277,36 @@ export default function ManageProgramsModal({
     setIsDirty(true);
   }
 
-  function handleArchiveClick(id: number, name: string) {
-    setArchiveTarget({ entityId: id, entityName: name });
+  function handleAbandonClick(id: number, name: string) {
+    setAbandonTarget({ entityId: id, entityName: name });
   }
 
-  function handleArchiveConfirmLocal() {
-    if (!archiveTarget) return;
-    setPrograms(programs.filter((p) => p.id !== archiveTarget.entityId));
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      next.delete(archiveTarget.entityId);
-      return next;
-    });
-    setIsDirty(true);
-    setArchiveTarget(null);
+  async function handleAbandonConfirm(reason: string, remarks: string) {
+    if (!abandonTarget) return;
+    setAbandonLoading(true);
+    try {
+      const res = await fetch(`/api/programs/${abandonTarget.entityId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          abandoned: true,
+          abandonedReason: reason,
+          abandonedRemarks: remarks || null,
+        }),
+      });
+      if (res.ok) {
+        setPrograms(programs.filter((p) => p.id !== abandonTarget.entityId));
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(abandonTarget.entityId);
+          return next;
+        });
+        setIsDirty(true);
+        setAbandonTarget(null);
+      }
+    } finally {
+      setAbandonLoading(false);
+    }
   }
 
   function toggleSelect(id: number) {
@@ -323,9 +344,6 @@ export default function ManageProgramsModal({
       const orderChanged =
         reorderedIds.length === initialOrder.length &&
         reorderedIds.some((id, i) => id !== initialOrder[i]);
-      const archivedIds = initialRef.current
-        .filter((p) => !programs.some((curr) => curr.id === p.id))
-        .map((p) => p.id);
 
       const idMap = new Map<number, number>();
 
@@ -366,15 +384,6 @@ export default function ManageProgramsModal({
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ entityType: "program", orderedIds: realIds }),
-        });
-      }
-
-      for (const realId of archivedIds) {
-        const mappedId = idMap.get(realId) ?? realId;
-        await fetch(`/api/programs/${mappedId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ archived: true }),
         });
       }
 
@@ -539,7 +548,7 @@ export default function ManageProgramsModal({
                   setEditId={setEditId}
                   setEditName={setEditName}
                   handleRename={handleRenameLocal}
-                  handleArchive={handleArchiveClick}
+                  handleAbandon={handleAbandonClick}
                   loading={loading}
                   selected={selectedIds.has(program.id)}
                   onToggle={toggleSelect}
@@ -549,14 +558,16 @@ export default function ManageProgramsModal({
           </SortableContext>
         </DndContext>
       </div>
-      {archiveTarget && (
-        <ArchiveConfirmModal
-          open={!!archiveTarget}
-          onClose={() => setArchiveTarget(null)}
-          onConfirm={handleArchiveConfirmLocal}
+      {abandonTarget && (
+        <AbandonConfirmModal
+          open={!!abandonTarget}
+          onClose={() => setAbandonTarget(null)}
+          onConfirm={handleAbandonConfirm}
           entityType="Program"
-          entityName={archiveTarget.entityName}
-          entityId={archiveTarget.entityId}
+          entityName={abandonTarget.entityName}
+          entityId={abandonTarget.entityId}
+          reasons={abandonReasons}
+          loading={abandonLoading}
         />
       )}
     </Modal>

@@ -19,6 +19,7 @@ export interface HealthRule {
 export interface ComputationSettings {
   statuses: ComputationStatus[];
   healthRules: HealthRule[];
+  abandonmentReasons: string[];
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -84,12 +85,24 @@ export const DEFAULT_HEALTH_RULES: HealthRule[] = [
   },
 ];
 
+export const DEFAULT_ABANDONMENT_REASONS: string[] = [
+  "No longer aligned with strategy",
+  "Budget constraints",
+  "Project cancelled",
+  "Duplicate effort",
+  "Scope no longer feasible",
+  "Resource unavailability",
+  "Regulatory or compliance change",
+  "Stakeholder withdrawal",
+];
+
 // ── Defaults ───────────────────────────────────────────────────────────────
 
 export function getDefaultSettings(): ComputationSettings {
   return {
     statuses: DEFAULT_STATUSES.map((s) => ({ ...s })),
     healthRules: DEFAULT_HEALTH_RULES.map((r) => ({ ...r })),
+    abandonmentReasons: DEFAULT_ABANDONMENT_REASONS.map((r) => r),
   };
 }
 

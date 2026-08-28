@@ -9,15 +9,16 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const body = await request.json();
-  const { name, frameworkId, archived } = body;
+  const { name, frameworkId, abandoned, abandonedReason, abandonedRemarks } = body;
 
   const oldProgram = await prisma.program.findUnique({ where: { id: parseInt(id) } });
 
-  if (archived !== undefined && typeof archived === "boolean" && oldProgram) {
+  if (abandoned !== undefined && typeof abandoned === "boolean" && oldProgram) {
+    const abandonedAt = abandoned ? new Date().toISOString() : null;
     await prisma.$transaction(async (tx) => {
       await tx.program.update({
         where: { id: parseInt(id) },
-        data: { archived },
+        data: { abandoned, abandonedAt, abandonedReason: abandoned ? abandonedReason ?? null : null, abandonedRemarks: abandoned ? abandonedRemarks ?? null : null },
       });
       const projects = await tx.project.findMany({
         where: { programId: parseInt(id) },
@@ -27,11 +28,15 @@ export async function PATCH(
       if (projectIds.length > 0) {
         await tx.project.updateMany({
           where: { id: { in: projectIds } },
-          data: { archived },
+          data: { abandoned, abandonedAt, abandonedReason: abandoned ? abandonedReason ?? null : null, abandonedRemarks: abandoned ? abandonedRemarks ?? null : null },
         });
         await tx.task.updateMany({
           where: { projectId: { in: projectIds } },
-          data: { archived },
+          data: { abandoned, abandonedAt, abandonedReason: abandoned ? abandonedReason ?? null : null, abandonedRemarks: abandoned ? abandonedRemarks ?? null : null },
+        });
+        await tx.specialTask.updateMany({
+          where: { projectId: { in: projectIds } },
+          data: { abandoned, abandonedAt, abandonedReason: abandoned ? abandonedReason ?? null : null, abandonedRemarks: abandoned ? abandonedRemarks ?? null : null },
         });
       }
     });
@@ -40,8 +45,10 @@ export async function PATCH(
       entityType: "Program",
       entityId: parseInt(id),
       entityName: program?.name || "",
-      changeType: archived ? "archive" : "unarchive",
-      details: archived ? "Archived program and all child items" : "Unarchived program and all child items",
+      changeType: abandoned ? "abandon" : "unabandon",
+      details: JSON.stringify({ reason: abandonedReason, remarks: abandonedRemarks }),
+      oldValue: abandoned ? null : program?.name,
+      newValue: abandoned ? program?.name : null,
     });
     await touchLastModified();
     return NextResponse.json(program);
