@@ -177,12 +177,6 @@ export async function GET() {
       });
     }
 
-    projects.sort((a, b) => {
-      if (a.frameworkName !== b.frameworkName) return a.frameworkName.localeCompare(b.frameworkName);
-      if (a.programName !== b.programName) return a.programName.localeCompare(b.programName);
-      return a.name.localeCompare(b.name);
-    });
-
     return NextResponse.json({ months: monthLabels, projects });
   } catch (error) {
     console.error("Monthly updates API error:", error);
