@@ -1367,6 +1367,7 @@ function ActionsMenu({
   onManageTasks,
   onImportExcel,
   onHistoryLog,
+  onMonthlyUpdates,
   onViewArchive,
   onSettings,
 }: {
@@ -1376,6 +1377,7 @@ function ActionsMenu({
   onManageTasks: () => void;
   onImportExcel: () => void;
   onHistoryLog: () => void;
+  onMonthlyUpdates: () => void;
   onViewArchive: () => void;
   onSettings: () => void;
 }) {
@@ -1399,6 +1401,7 @@ function ActionsMenu({
     { label: "Manage Tasks", action: onManageTasks },
     { label: "Import / Export Excel", action: onImportExcel },
     { label: "History Log", action: onHistoryLog },
+    { label: "Monthly Updates", action: onMonthlyUpdates },
     { label: "View Archive", action: onViewArchive },
     { label: "Settings", action: onSettings },
   ];
@@ -2085,6 +2088,7 @@ export default function DashboardView({
               onManageTasks={() => setShowManageTasks(true)}
               onImportExcel={() => setShowImportExcel(true)}
               onHistoryLog={() => window.open("/history", "_blank")}
+              onMonthlyUpdates={() => window.open("/monthly-updates", "_blank")}
               onViewArchive={() => router.push("/archived")}
               onSettings={() => setShowSettings(true)}
             />
