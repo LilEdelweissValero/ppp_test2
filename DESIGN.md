@@ -100,12 +100,12 @@ components:
 
 **Creative North Star: "The Audit Ledger"**
 
-The ITSD Project Tracker embodies the authority of a well-maintained ledger — dense, trustworthy, and unambiguous. Every element earns its place through function, not decoration. The system presents portfolio delivery data with the precision of architectural drafting: framework color spines anchor vertical rhythm, metric zones differentiate from identity zones through tonal contrast, and status communication happens through color-coded badges that read at a glance.
+The ITSD Project Tracker embodies the authority of a well-maintained ledger — dense, trustworthy, and unambiguous. Every element earns its place through function, not decoration. The system presents portfolio delivery data with the precision of architectural drafting: full-color framework header cards anchor vertical rhythm, metric zones differentiate from identity zones through tonal contrast, and status communication happens through color-coded badges that read at a glance.
 
 The aesthetic is document-forward: near-white drafting-paper ground, near-black technical ink hierarchy, and a restrained institutional blue reserved for interactive state. Density is a feature — the dashboard fits an entire portfolio in one view without losing scannability. The visual language says: this is the system of record.
 
 **Key Characteristics:**
-- Architectural drafting aesthetic with framework color spines
+- Architectural drafting aesthetic with full-color framework header cards
 - Dense data tables with metric zone / identity zone differentiation
 - Tonal layering over shadows for depth hierarchy
 - Restrained accent blue for interactive state only
@@ -177,7 +177,7 @@ The layout is a dense vertical stack optimized for large-screen desktop viewing 
 
 **Container:** Max-width 1600px, centered, with 24px horizontal padding. On mobile (below 720px), padding reduces to 14px.
 
-**Framework-Spine Grammar:** The primary layout pattern is the framework section — a vertical block anchored by a 6px left color spine. Inside: framework header (name + summary + mini status bar), then a table with project rows. The spine continues at 25% opacity through the table body.
+**Framework Card Grammar:** The primary layout pattern is the framework section — a vertical block opened by a header card filled with the framework's own color. Inside: framework header (name + summary + mini status bar) in full color, then a table with project rows on neutral ground. The color fill is scoped to the header only; it does not bleed into the table body.
 
 **Table Zones:** Data tables split into two visual zones:
 - **Identity Zone** (left): Project name, program, reference, owner. Dark header background (ink-primary), white text.
@@ -188,19 +188,20 @@ The layout is a dense vertical stack optimized for large-screen desktop viewing 
 **Spacing Rhythm:** 12px gap between framework sections. 8px gap between toolbar elements. 16px bottom margin on toolbar. Consistent 8-10px cell padding in data tables.
 
 ### Named Rules
-**The Spine Rule.** Every framework section begins with its 6px color spine. The spine is the primary visual anchor — it identifies the framework at a glance and provides vertical rhythm through the dashboard.
+**The Framework Card Rule.** Every framework section opens with a header card filled edge-to-edge in the framework's own color. The full-color fill is the primary visual anchor — it identifies the framework at a glance and provides vertical rhythm through the dashboard. The fill is confined to the header; the table body beneath stays on neutral ground/ground-metric.
 
 ## Elevation & Depth
 
 The system is flat-by-default, using tonal layering rather than shadows to convey depth hierarchy. Shadows are rare and reserved for interactive response only.
 
 ### Shadow Vocabulary
-- **Detail Hero** (`0 1px 4px rgba(15,17,23,0.07), 0 0 0 1px rgba(15,17,23,0.02)`): Project detail header panel. The only card-like element that uses a shadow — it's the focused view.
+- **Detail Hero** (`0 1px 4px rgba(15,17,23,0.07), 0 0 0 1px rgba(15,17,23,0.02)`): Project detail header panel. A focused, singular view — earns a resting lift.
+- **Framework Card** (`0 1px 4px rgba(15,17,23,0.07), 0 0 0 1px rgba(15,17,23,0.02)`): Framework section container. Shares the Detail Hero token — the full-color header card is a primary navigational surface, not a decorative panel, so it earns the same resting lift.
 - **Dropdown** (`0 4px 16px rgba(15,17,23,0.12), 0 1px 4px rgba(15,17,23,0.08)`): Actions menu and floating panels. Ephemeral overlay state.
 - **Task Panel** (`0 1px 4px rgba(15,17,23,0.05)`): Minimal lift for task tables in detail view.
 
 ### Named Rules
-**The Flat-By-Default Rule.** Surfaces are flat at rest. Tonal differentiation (ground vs. ground-metric vs. surface) does the depth work. Shadows appear only as response to state: hover, focus, or elevation change (dropdown, detail panel).
+**The Flat-By-Default Rule.** Most surfaces are flat at rest; tonal differentiation (ground vs. ground-metric vs. surface) does the depth work there. The framework card and Detail Hero are the sanctioned exceptions — both are primary navigational anchors and carry a resting shadow deliberately. Everywhere else, shadows appear only as response to state: hover, focus, or elevation change (dropdown).
 
 **The Tonal Layering Rule.** Depth is communicated through background value, not shadow. The ground → ground-metric → surface progression implies increasing lift without any shadow.
 
@@ -209,14 +210,14 @@ The system is flat-by-default, using tonal layering rather than shadows to conve
 The form language is minimal, functional, and sharp. Every radius earns its place through usability, not decoration.
 
 **Corner Strategy:**
-- **Sharp (0px):** Framework sections, table cells, color spines. The dominant silhouette — clean, architectural.
+- **Sharp (0px):** Framework sections (including the color header card), table cells. The dominant silhouette — clean, architectural.
 - **Micro (2px):** Status dots, health badges, small interactive elements. Just enough to soften a circle's edge.
 - **Small (3px):** Buttons, inputs, dropdowns. Functional rounding for click targets.
 - **Medium (4px):** Cards, panels, modal dialogs. The maximum radius in the system.
 
 **Borders:** 1px solid rule (#DDE2EA) is the default divider. rule-strong (#C4CCD8) for emphasized borders (column headers, section breaks). No decorative borders.
 
-**Clipping:** Tables use `overflow: hidden` on the framework container to clip the color spine and maintain clean edges.
+**Clipping:** Tables use `overflow: hidden` on the framework container to keep the full-color header card's corners flush with the sharp-cornered container and maintain clean edges.
 
 ## Components
 
@@ -267,7 +268,7 @@ Components are tactile and precise — crisp borders, tight padding, functional 
 ## Do's and Don'ts
 
 ### Do:
-- **Do** use the framework color spine on every framework section — it's the primary visual anchor
+- **Do** fill the framework header card in the framework's own color on every framework section — it's the primary visual anchor
 - **Do** use tabular-nums for all numeric columns in data tables
 - **Do** use label-caps style for column headers and section labels
 - **Do** use status bg+ink pairs together — never separate them
@@ -276,7 +277,8 @@ Components are tactile and precise — crisp borders, tight padding, functional 
 
 ### Don't:
 - **Don't** use accent blue for decorative purposes or section backgrounds
-- **Don't** add shadows to cards or panels at rest — keep them flat
+- **Don't** add shadows to cards or panels at rest, except the framework header card and Detail Hero — keep everything else flat
+- **Don't** let the framework header's color fill bleed past the header into the table body
 - **Don't** use body text style for headers — always use label-caps
 - **Don't** round framework sections or tables — keep them sharp
 - **Don't** use status colors for non-semantic purposes (decoration, emphasis)

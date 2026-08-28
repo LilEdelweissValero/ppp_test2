@@ -1,22 +1,22 @@
 /*
   THESIS: A portfolio delivery authority surface organized as a structured
   document — not an enterprise SaaS table. Refuses the gray-header table
-  pattern in favor of the architectural gantt-sheet grammar: framework spines
-  as left-side color bands, tracked uppercase column headers, metric zone
+  pattern in favor of the architectural gantt-sheet grammar: full-color
+  framework header cards, tracked uppercase column headers, metric zone
   contrast against identity zone, program sub-groupings as named ruled rows.
 
   OWN-WORLD: Near-white drafting-paper ground (#F7F8FA), framework color as
-  left-spine band (not header background), near-black ink hierarchy,
-  restrained accent blue for interactive state, two ground zones (identity /
-  metric) differentiated by surface value.
+  a full-fill header card (scoped to the header, not the table body),
+  near-black ink hierarchy, restrained accent blue for interactive state,
+  two ground zones (identity / metric) differentiated by surface value.
 
-  STORY: Manager arrives → selects quarter → scans framework spines for
+  STORY: Manager arrives → selects quarter → scans framework header cards for
   program health → reads project row for counts and health badge → clicks into
   detail.
 
   FIRST VIEWPORT: Toolbar (quarter filter + search left; Actions menu right)
-  then framework sections stacked vertically, each with left color spine,
-  framework name + summary, programs as ruled sub-groups, project rows.
+  then framework sections stacked vertically, each with a full-color header
+  card, framework name + summary, programs as ruled sub-groups, project rows.
 
   FORM: #5 Architectural drawing / quarterly gantt sheet, staging #3
   (directory / numbered vertical stack). Seed key: ec700935.
