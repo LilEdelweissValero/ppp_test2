@@ -87,10 +87,72 @@ export async function PATCH(
     updateData.lastUpdatedDate = lastUpdatedDate || null;
   }
 
-  const specialTask = await prisma.specialTask.update({
-    where: { id: parseInt(id) },
-    data: updateData,
-  });
+  let specialTask;
+  const isUnabandon = abandoned !== undefined && abandoned === false;
+
+  if (isUnabandon) {
+    const parentProject = await prisma.project.findUnique({
+      where: { id: existingTask.projectId },
+      select: { id: true, abandoned: true, name: true, programId: true },
+    });
+    let parentProgram: { id: number; abandoned: boolean; name: string } | null = null;
+    if (parentProject) {
+      parentProgram = await prisma.program.findUnique({
+        where: { id: parentProject.programId },
+        select: { id: true, abandoned: true, name: true },
+      });
+    }
+
+    const needsCascade = parentProject?.abandoned || parentProgram?.abandoned;
+
+    if (needsCascade) {
+      await prisma.$transaction(async (tx) => {
+        await tx.specialTask.update({ where: { id: parseInt(id) }, data: updateData });
+        if (parentProject?.abandoned) {
+          await tx.project.update({
+            where: { id: parentProject.id },
+            data: { abandoned: false, abandonedAt: null, abandonedReason: null, abandonedRemarks: null },
+          });
+        }
+        if (parentProgram?.abandoned) {
+          await tx.program.update({
+            where: { id: parentProgram.id },
+            data: { abandoned: false, abandonedAt: null, abandonedReason: null, abandonedRemarks: null },
+          });
+        }
+      });
+
+      if (parentProject?.abandoned) {
+        await logChange({
+          entityType: "Project",
+          entityId: parentProject.id,
+          entityName: parentProject.name,
+          changeType: "unabandon",
+          details: "Special task un-abandoned: cascade",
+        });
+      }
+      if (parentProgram?.abandoned) {
+        await logChange({
+          entityType: "Program",
+          entityId: parentProgram.id,
+          entityName: parentProgram.name,
+          changeType: "unabandon",
+          details: "Special task un-abandoned: cascade",
+        });
+      }
+      specialTask = await prisma.specialTask.findUnique({ where: { id: parseInt(id) } });
+    } else {
+      specialTask = await prisma.specialTask.update({
+        where: { id: parseInt(id) },
+        data: updateData,
+      });
+    }
+  } else {
+    specialTask = await prisma.specialTask.update({
+      where: { id: parseInt(id) },
+      data: updateData,
+    });
+  }
 
   const details = diffFields(
     existingTask as Record<string, unknown>,

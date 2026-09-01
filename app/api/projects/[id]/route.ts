@@ -46,6 +46,12 @@ export async function PATCH(
       select: { id: true, specialTaskCode: true, name: true },
     });
 
+    const parentProgram = await prisma.program.findUnique({
+      where: { id: oldProject.programId },
+      select: { id: true, abandoned: true, name: true },
+    });
+    const cascadeToProgram = !abandoned && parentProgram?.abandoned;
+
     await prisma.$transaction(async (tx) => {
       await tx.project.update({
         where: { id: parseInt(id) },
@@ -59,6 +65,12 @@ export async function PATCH(
         where: { projectId: parseInt(id) },
         data: { abandoned, abandonedAt, abandonedReason: abandoned ? abandonedReason ?? null : null, abandonedRemarks: abandoned ? abandonedRemarks ?? null : null },
       });
+      if (cascadeToProgram) {
+        await tx.program.update({
+          where: { id: parentProgram.id },
+          data: { abandoned: false, abandonedAt: null, abandonedReason: null, abandonedRemarks: null },
+        });
+      }
     });
 
     // Log per-task cascade entries
@@ -90,6 +102,16 @@ export async function PATCH(
       changeType: abandoned ? "abandon" : "unabandon",
       details: JSON.stringify({ reason: abandonedReason, remarks: abandonedRemarks }),
     });
+
+    if (cascadeToProgram && parentProgram) {
+      await logChange({
+        entityType: "Program",
+        entityId: parentProgram.id,
+        entityName: parentProgram.name,
+        changeType: "unabandon",
+        details: "Project un-abandoned: cascade",
+      });
+    }
     await touchLastModified();
     return NextResponse.json(project);
   }
