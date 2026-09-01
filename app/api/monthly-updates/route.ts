@@ -26,30 +26,25 @@ function getProjectStatus(
   monthKey: string
 ): string {
   const [yearStr, monthStr] = monthKey.split("-");
-  const monthDate = new Date(parseInt(yearStr), parseInt(monthStr) - 1, 1);
+  const monthNum = parseInt(monthStr);
+  const monthDate = new Date(parseInt(yearStr), monthNum - 1, 1);
   const monthQuarter = `Q${Math.floor(monthDate.getMonth() / 3) + 1} ${monthDate.getFullYear()}`;
 
-  const isCompleted =
-    actualCompletionDate !== null &&
-    actualCompletionDate !== "" &&
-    (() => {
-      try {
-        const completionMonth = new Date(actualCompletionDate);
-        const completionQuarter = `Q${Math.floor(completionMonth.getMonth() / 3) + 1} ${completionMonth.getFullYear()}`;
-        return compareQuarters(completionQuarter, monthQuarter) <= 0;
-      } catch {
-        return false;
-      }
-    })();
-
-  if (isCompleted) return "Completed";
+  if (actualCompletionDate && actualCompletionDate !== "") {
+    try {
+      const completionMonth = new Date(actualCompletionDate);
+      const completionQuarter = `Q${Math.floor(completionMonth.getMonth() / 3) + 1} ${completionMonth.getFullYear()}`;
+      if (compareQuarters(completionQuarter, monthQuarter) <= 0) return "Completed";
+    } catch { /* ignore */ }
+  }
 
   const quarterComparison = compareQuarters(adjustedTargetQuarter, monthQuarter);
+  const isQuarterEndMonth = monthNum === 3 || monthNum === 6 || monthNum === 9 || monthNum === 12;
 
   if (progressPct === 0 && quarterComparison > 0) return "Not Yet Due";
   if (progressPct === 0 && quarterComparison <= 0) return "Not Yet Started";
   if (progressPct > 0 && quarterComparison >= 0) return "In Progress";
-  if (quarterComparison < 0) return "Delayed";
+  if (isQuarterEndMonth && quarterComparison < 0) return "Delayed";
 
   return "Not Yet Started";
 }
