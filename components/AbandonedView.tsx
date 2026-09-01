@@ -367,6 +367,7 @@ function ProgramRow({
           key={`proj-${proj.id}`}
           proj={proj}
           progName={prog.name}
+          progAbandoned={prog.abandoned}
           expandedProjects={expandedProjects}
           onToggleProject={onToggleProject}
           onUnabandon={onUnabandon}
@@ -380,6 +381,7 @@ function ProgramRow({
 function ProjectRow({
   proj,
   progName,
+  progAbandoned,
   expandedProjects,
   onToggleProject,
   onUnabandon,
@@ -387,6 +389,7 @@ function ProjectRow({
 }: {
   proj: AbandonedData["programs"][number]["projects"][number];
   progName: string;
+  progAbandoned: boolean;
   expandedProjects: Set<number>;
   onToggleProject: (id: number) => void;
   onUnabandon: (
@@ -435,7 +438,7 @@ function ProjectRow({
         <td style={cellActionSmall}>
           {isAbandoned ? (
             <button
-              onClick={(e) => { e.stopPropagation(); onUnabandon("project", proj.id, proj.name, [{ type: "Program", name: progName }]); }}
+              onClick={(e) => { e.stopPropagation(); onUnabandon("project", proj.id, proj.name, progAbandoned ? [{ type: "Program", name: progName }] : []); }}
               disabled={loading === proj.id}
               style={{ ...btnSmall, opacity: loading === proj.id ? 0.5 : 1 }}
             >
@@ -471,7 +474,7 @@ function ProjectRow({
           </td>
           <td style={{ ...cellNested, textAlign: "right" }}>
             <button
-              onClick={(e) => { e.stopPropagation(); onUnabandon(task.type, task.id, task.name, [{ type: "Project", name: proj.name }, { type: "Program", name: progName }]); }}
+              onClick={(e) => { e.stopPropagation(); const parents = [...(proj.abandoned ? [{ type: "Project" as const, name: proj.name }] : []), ...(progAbandoned ? [{ type: "Program" as const, name: progName }] : [])]; onUnabandon(task.type, task.id, task.name, parents); }}
               disabled={loading === task.id}
               style={{ ...btnSmall, opacity: loading === task.id ? 0.5 : 1 }}
             >
