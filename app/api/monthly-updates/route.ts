@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSnapshotAt } from "@/lib/snapshot";
 import { compareQuarters } from "@/lib/quarters";
+import { expandSpecialTasksToVirtualTasks, computeProjectPercentComplete } from "@/lib/health";
 
 interface MonthData {
   status: string;
@@ -16,18 +17,6 @@ interface ProjectRow {
   frameworkName: string;
   frameworkColor: string;
   monthData: Record<string, MonthData>;
-}
-
-function computeHistoricalProgress(
-  specialTasks: { total: number; plan: number; part: number; mostly: number; done: number }[]
-): number {
-  const total = specialTasks.reduce((s, st) => s + st.total, 0);
-  if (total === 0) return 0;
-  const weighted = specialTasks.reduce(
-    (s, st) => s + st.plan * 25 + st.part * 50 + st.mostly * 75 + st.done * 100,
-    0
-  );
-  return Math.round((weighted / total / 100) * 100);
 }
 
 function getProjectStatus(
@@ -144,7 +133,17 @@ export async function GET() {
               });
             }
 
-            const progressPct = computeHistoricalProgress(proj.specialTasks);
+            const virtualTasks = expandSpecialTasksToVirtualTasks(proj.specialTasks, snapshot.settings);
+            const allTasks = [...proj.tasks, ...virtualTasks];
+            const hasPhases = proj.phases.length > 0;
+            const allTasksWithPhase = allTasks.map((t) => ({ status: t.status, phaseId: t.phaseId }));
+            const progressRaw = computeProjectPercentComplete(
+              allTasks,
+              snapshot.settings,
+              hasPhases ? proj.phases : undefined,
+              hasPhases ? allTasksWithPhase : undefined
+            );
+            const progressPct = Math.round(progressRaw * 100);
             const status = getProjectStatus(
               proj.adjustedTargetQuarter,
               proj.actualCompletionDate,

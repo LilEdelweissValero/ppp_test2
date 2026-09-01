@@ -71,6 +71,54 @@ export function computeProjectPercentComplete(
   return total / tasks.length;
 }
 
+// ── Expand special tasks into virtual tasks ──────────────────────────────────
+
+export interface SpecialTaskInput {
+  id: number;
+  specialTaskCode: string;
+  name: string;
+  nys: number;
+  plan: number;
+  part: number;
+  mostly: number;
+  done: number;
+  dueQuarter: string;
+  phaseId: number | null;
+}
+
+export interface VirtualTask {
+  id: number;
+  status: string;
+  phaseId: number | null;
+}
+
+export function expandSpecialTasksToVirtualTasks(
+  specialTasks: SpecialTaskInput[],
+  settings?: ComputationSettings
+): VirtualTask[] {
+  const statuses = settings?.statuses ?? DEFAULT_STATUSES;
+  const virtuals: VirtualTask[] = [];
+  for (const st of specialTasks) {
+    const counts = [
+      { count: st.nys, status: statuses[0].name },
+      { count: st.plan, status: statuses[1].name },
+      { count: st.part, status: statuses[2].name },
+      { count: st.mostly, status: statuses[3].name },
+      { count: st.done, status: statuses[4].name },
+    ];
+    for (const { count, status } of counts) {
+      for (let i = 0; i < count; i++) {
+        virtuals.push({
+          id: -(st.id * 100 + virtuals.length),
+          status,
+          phaseId: st.phaseId,
+        });
+      }
+    }
+  }
+  return virtuals;
+}
+
 export function computeProjectDerivedStatus(
   tasks: { status: string }[],
   settings?: ComputationSettings

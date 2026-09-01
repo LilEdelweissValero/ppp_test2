@@ -48,11 +48,12 @@ import {
   computeProjectPercentComplete,
   computeProjectHealth,
   computeProjectDerivedStatus,
+  expandSpecialTasksToVirtualTasks as expandSpecialTasksCore,
 } from "@/lib/health";
+import type { ComputationSettings } from "@/lib/health";
 import { countTasksByStatus, getStatusScore } from "@/lib/status";
 import { compareQuarters, parseQuarter, quarterRange } from "@/lib/quarters";
 import { getDefaultSettings } from "@/lib/computation-settings";
-import type { ComputationSettings } from "@/lib/computation-settings";
 import HealthBadge from "@/components/HealthBadge";
 import ProjectFormModal from "@/components/ProjectFormModal";
 import ManageFrameworksModal from "@/components/ManageFrameworksModal";
@@ -176,38 +177,22 @@ function filterTasksByQuarter(tasks: Task[], selectedQuarter: string): Task[] {
 }
 
 function expandSpecialTasksToVirtualTasks(specialTasks: SpecialTask[], settings?: ComputationSettings): Task[] {
-  const statuses = settings?.statuses ?? getDefaultSettings().statuses;
-  const virtuals: Task[] = [];
-  for (const st of specialTasks) {
-    const counts = [
-      { count: st.nys, status: statuses[0].name },
-      { count: st.plan, status: statuses[1].name },
-      { count: st.part, status: statuses[2].name },
-      { count: st.mostly, status: statuses[3].name },
-      { count: st.done, status: statuses[4].name },
-    ];
-    for (const { count, status } of counts) {
-      for (let i = 0; i < count; i++) {
-        virtuals.push({
-          id: -(st.id * 100 + virtuals.length),
-          taskCode: st.specialTaskCode,
-          name: st.name,
-          assignee: null,
-          priority: "Low",
-          status,
-          description: null,
-          targetQuarter: st.dueQuarter,
-          notes: null,
-          deliverable: null,
-          attachments: null,
-          dependencies: null,
-          adjustedTargetQuarter: st.dueQuarter,
-          phaseId: st.phaseId,
-        });
-      }
-    }
-  }
-  return virtuals;
+  return expandSpecialTasksCore(specialTasks, settings).map((v) => ({
+    id: v.id,
+    taskCode: "",
+    name: "",
+    assignee: null,
+    priority: "Low",
+    status: v.status,
+    description: null,
+    targetQuarter: "",
+    notes: null,
+    deliverable: null,
+    attachments: null,
+    dependencies: null,
+    adjustedTargetQuarter: "",
+    phaseId: v.phaseId,
+  }));
 }
 
 function filterSpecialTasksByQuarter(specialTasks: SpecialTask[], selectedQuarter: string): SpecialTask[] {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, Fragment } from "react";
 
 interface MonthData {
   status: string;
@@ -508,58 +508,51 @@ export default function MonthlyUpdatesView() {
                       const data = project.monthData[m.key];
                       const status = data?.status || "Not Yet Started";
                       const style = STATUS_STYLES[status] || STATUS_STYLES["Not Yet Started"];
-
-                      return (
-                        <td
-                          key={`${project.id}-${m.key}`}
-                          style={{
-                            padding: "6px 8px",
-                            fontSize: 11,
-                            borderBottom: "1px solid var(--rule)",
-                            borderRight: "1px solid var(--rule)",
-                            verticalAlign: "top",
-                            width: 80,
-                          }}
-                        >
-                          <span
-                            style={{
-                              display: "inline-block",
-                              fontSize: 10,
-                              fontWeight: 600,
-                              padding: "2px 6px",
-                              borderRadius: 3,
-                              background: style.bg,
-                              color: style.ink,
-                              whiteSpace: "nowrap",
-                              marginBottom: 4,
-                            }}
-                          >
-                            {status}
-                          </span>
-                        </td>
-                      );
-                    })}
-                    {months.map((m) => {
-                      const data = project.monthData[m.key];
                       const remarks = data?.remarks || `Project progress: ${data?.progressPct ?? 0}%`;
 
                       return (
-                        <td
-                          key={`${project.id}-${m.key}-remarks`}
-                          style={{
-                            padding: "6px 8px",
-                            fontSize: 11,
-                            borderBottom: "1px solid var(--rule)",
-                            borderRight: "1px solid var(--rule)",
-                            verticalAlign: "top",
-                            minWidth: 140,
-                          }}
-                        >
-                          <EditableRemarks
-                            value={remarks}
-                            onSave={(val) => handleRemarksSave(project.id, m.key, val)}
-                          />
-                        </td>
+                        <Fragment key={`${project.id}-${m.key}`}>
+                          <td
+                            style={{
+                              padding: "6px 8px",
+                              fontSize: 11,
+                              borderBottom: "1px solid var(--rule)",
+                              borderRight: "1px solid var(--rule)",
+                              verticalAlign: "top",
+                              width: 80,
+                            }}
+                          >
+                            <span
+                              style={{
+                                display: "inline-block",
+                                fontSize: 10,
+                                fontWeight: 600,
+                                padding: "2px 6px",
+                                borderRadius: 3,
+                                background: style.bg,
+                                color: style.ink,
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {status}
+                            </span>
+                          </td>
+                          <td
+                            style={{
+                              padding: "6px 8px",
+                              fontSize: 11,
+                              borderBottom: "1px solid var(--rule)",
+                              borderRight: "1px solid var(--rule)",
+                              verticalAlign: "top",
+                              minWidth: 140,
+                            }}
+                          >
+                            <EditableRemarks
+                              value={remarks}
+                              onSave={(val) => handleRemarksSave(project.id, m.key, val)}
+                            />
+                          </td>
+                        </Fragment>
                       );
                     })}
                   </tr>
