@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Modal from "./Modal";
 import QuarterSelect from "./QuarterSelect";
+import AbandonConfirmModal from "./AbandonConfirmModal";
 import { PRIORITY_LABELS, getStatusList } from "@/lib/status";
 import { getDefaultSettings } from "@/lib/computation-settings";
 import type { ComputationSettings } from "@/lib/computation-settings";
@@ -48,6 +49,8 @@ interface Props {
     lastUpdatedDate: string | null;
     phaseId: number | null;
   };
+  abandonReasons?: string[];
+  onAbandon?: () => void;
 }
 
 export default function TaskFormModal({
@@ -59,6 +62,8 @@ export default function TaskFormModal({
   phases,
   initialData,
   initialSpecialData,
+  abandonReasons = [],
+  onAbandon,
 }: Props) {
   const isEdit = !!initialData;
   const isSpecialEdit = !!initialSpecialData;
@@ -105,6 +110,8 @@ export default function TaskFormModal({
   const [submitted, setSubmitted] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [showAdditional, setShowAdditional] = useState(false);
+  const [abandonTarget, setAbandonTarget] = useState<{ id: number; name: string; type: "task" | "special-task" } | null>(null);
+  const [abandonLoading, setAbandonLoading] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -301,6 +308,7 @@ export default function TaskFormModal({
   };
 
   return (
+    <>
     <Modal
       open={open}
       onClose={onClose}
@@ -672,46 +680,110 @@ export default function TaskFormModal({
         {/* ── Actions ── */}
         <div style={{
           display: "flex",
-          justifyContent: "flex-end",
-          gap: 8,
+          justifyContent: "space-between",
+          alignItems: "center",
           paddingTop: 12,
           borderTop: "1px solid var(--rule)",
         }}>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              padding: "7px 12px",
-              fontSize: 12,
-              fontWeight: 500,
-              color: "var(--ink-primary)",
-              background: "var(--surface)",
-              border: "1px solid var(--rule-strong)",
-              borderRadius: 3,
-              cursor: "pointer",
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              padding: "7px 12px",
-              fontSize: 12,
-              fontWeight: 600,
-              color: "#FFFFFF",
-              background: "var(--accent)",
-              border: "none",
-              borderRadius: 3,
-              cursor: "pointer",
-              opacity: loading ? 0.5 : 1,
-            }}
-          >
-            {loading ? "Saving..." : "Save"}
-          </button>
+          <div>
+            {(isEdit || isSpecialEdit) && (
+              <button
+                type="button"
+                onClick={() => {
+                  const taskType = isSpecialEdit ? "special-task" : "task";
+                  const taskName = isSpecialEdit
+                    ? `${initialSpecialData?.specialTaskCode}: ${initialSpecialData?.name}`
+                    : `${initialData?.taskCode}: ${initialData?.name}`;
+                  const taskId = isSpecialEdit ? initialSpecialData!.id : initialData!.id;
+                  setAbandonTarget({ id: taskId, name: taskName, type: taskType });
+                }}
+                style={{
+                  padding: "7px 12px",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: "#B91C1C",
+                  background: "none",
+                  border: "1px solid #B91C1C",
+                  borderRadius: 3,
+                  cursor: "pointer",
+                }}
+              >
+                Abandon
+              </button>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                padding: "7px 12px",
+                fontSize: 12,
+                fontWeight: 500,
+                color: "var(--ink-primary)",
+                background: "var(--surface)",
+                border: "1px solid var(--rule-strong)",
+                borderRadius: 3,
+                cursor: "pointer",
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                padding: "7px 12px",
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#FFFFFF",
+                background: "var(--accent)",
+                border: "none",
+                borderRadius: 3,
+                cursor: "pointer",
+                opacity: loading ? 0.5 : 1,
+              }}
+            >
+              {loading ? "Saving..." : "Save"}
+            </button>
+          </div>
         </div>
       </form>
     </Modal>
+
+    {abandonTarget && (
+      <AbandonConfirmModal
+        open={!!abandonTarget}
+        onClose={() => setAbandonTarget(null)}
+        onConfirm={async (reason, remarks) => {
+          setAbandonLoading(true);
+          try {
+            const endpoint = abandonTarget.type === "special-task" ? "special-tasks" : "tasks";
+            const res = await fetch(`/api/${endpoint}/${abandonTarget.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                abandoned: true,
+                abandonedReason: reason,
+                abandonedRemarks: remarks || null,
+              }),
+            });
+            if (res.ok) {
+              setAbandonTarget(null);
+              onAbandon?.();
+              onClose();
+            }
+          } finally {
+            setAbandonLoading(false);
+          }
+        }}
+        entityType={abandonTarget.type === "special-task" ? "SpecialTask" : "Task"}
+        entityName={abandonTarget.name}
+        entityId={abandonTarget.id}
+        reasons={abandonReasons}
+        loading={abandonLoading}
+      />
+    )}
+    </>
   );
 }

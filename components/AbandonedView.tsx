@@ -50,6 +50,12 @@ const cellSmall: React.CSSProperties = {
   fontSize: 11,
 };
 
+const cellNested: React.CSSProperties = {
+  padding: "4px 12px",
+  borderBottom: "1px solid var(--rule)",
+  fontSize: 11,
+};
+
 const cellAction: React.CSSProperties = {
   ...cellBase,
   textAlign: "right",
@@ -58,24 +64,6 @@ const cellAction: React.CSSProperties = {
 const cellActionSmall: React.CSSProperties = {
   ...cellAction,
   padding: "6px 12px",
-};
-
-const cellNested: React.CSSProperties = {
-  padding: "4px 12px",
-  borderBottom: "1px solid var(--rule)",
-  fontSize: 11,
-};
-
-const cellNestedLeft: React.CSSProperties = {
-  ...cellNested,
-  paddingLeft: 56,
-  color: "var(--ink-tertiary)",
-};
-
-const cellNestedLeft2: React.CSSProperties = {
-  ...cellNested,
-  paddingLeft: 32,
-  color: "var(--ink-tertiary)",
 };
 
 const btnSmall: React.CSSProperties = {
@@ -122,11 +110,11 @@ export default function AbandonedView({ data }: Props) {
     parents: Array<{ type: "Project" | "Program"; name: string }>;
   } | null>(null);
 
-  const totalProjects = data.programs.reduce((sum, p) => sum + p.projects.length, 0) + data.projects.length;
-  const totalTasks = data.programs.reduce((sum, p) => sum + p.projects.reduce((s, pr) => s + pr.tasks.length + pr.specialTasks.length, 0), 0)
-    + data.projects.reduce((sum, p) => sum + p.tasks.length + p.specialTasks.length, 0)
-    + data.tasks.length
-    + data.specialTasks.length;
+  const totalProjects = data.programs.reduce((sum, p) => sum + p.projects.length, 0);
+  const totalTasks = data.programs.reduce(
+    (sum, p) => sum + p.projects.reduce((s, pr) => s + pr.tasks.length, 0),
+    0,
+  );
 
   function toggleProgram(id: number) {
     setExpandedPrograms((prev) => {
@@ -183,9 +171,13 @@ export default function AbandonedView({ data }: Props) {
     doUnabandon(entityType, entityId);
   }
 
-  function reasonCell(entity: { abandonedReason: string | null; abandonedRemarks: string | null }) {
+  function renderReasonCell(
+    entity: { abandonedReason: string | null; abandonedRemarks: string | null },
+    nested = false,
+  ) {
+    const style = nested ? cellNested : cellSmall;
     return (
-      <td style={{ ...cellSmall, fontSize: 11 }}>
+      <td style={{ ...style, fontSize: 11 }}>
         {entity.abandonedReason ? (
           <div style={{ fontWeight: 500 }}>{entity.abandonedReason}</div>
         ) : null}
@@ -201,35 +193,10 @@ export default function AbandonedView({ data }: Props) {
     );
   }
 
-  function dateCell(entity: { abandonedAt: string | null }) {
+  function renderDateCell(entity: { abandonedAt: string | null }, nested = false) {
+    const style = nested ? cellNested : cellSmall;
     return (
-      <td style={{ ...cellSmall, whiteSpace: "nowrap" }}>
-        {entity.abandonedAt ? formatDate(entity.abandonedAt) : "—"}
-      </td>
-    );
-  }
-
-  function reasonCellNested(entity: { abandonedReason: string | null; abandonedRemarks: string | null }) {
-    return (
-      <td style={{ ...cellNested, fontSize: 11 }}>
-        {entity.abandonedReason ? (
-          <div style={{ fontWeight: 500 }}>{entity.abandonedReason}</div>
-        ) : null}
-        {entity.abandonedRemarks ? (
-          <div style={{ color: "var(--ink-tertiary)", fontSize: 10, marginTop: 2 }}>
-            {entity.abandonedRemarks}
-          </div>
-        ) : null}
-        {!entity.abandonedReason && !entity.abandonedRemarks ? (
-          <span style={{ color: "var(--ink-tertiary)" }}>—</span>
-        ) : null}
-      </td>
-    );
-  }
-
-  function dateCellNested(entity: { abandonedAt: string | null }) {
-    return (
-      <td style={{ ...cellNested, whiteSpace: "nowrap" }}>
+      <td style={{ ...style, whiteSpace: "nowrap" }}>
         {entity.abandonedAt ? formatDate(entity.abandonedAt) : "—"}
       </td>
     );
@@ -268,7 +235,7 @@ export default function AbandonedView({ data }: Props) {
         </div>
       </div>
 
-      {data.programs.length === 0 && data.projects.length === 0 && data.tasks.length === 0 && data.specialTasks.length === 0 ? (
+      {data.programs.length === 0 ? (
         <div
           style={{
             padding: "48px 32px",
@@ -283,294 +250,33 @@ export default function AbandonedView({ data }: Props) {
           </p>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          {/* ═══════════ Abandoned Programs ═══════════ */}
-          {data.programs.length > 0 && (
-            <section>
-              <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--ink-primary)", margin: "0 0 8px" }}>
-                Abandoned Programs
-              </h2>
-              <div style={{ border: "1px solid var(--rule)", borderRadius: 4, overflow: "hidden" }}>
-                <table className="detail-task-table">
-                  <thead>
-                    <tr style={{ background: "var(--ground)" }}>
-                      <th style={thBase}>Framework</th>
-                      <th style={thBase}>Program</th>
-                      <th style={thBase}>Reason</th>
-                      <th style={thBase}>Abandoned At</th>
-                      <th style={thRight}></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.programs.map((prog) => (
-                      <>
-                        <tr
-                          key={prog.id}
-                          style={{ cursor: "pointer", background: expandedPrograms.has(prog.id) ? "var(--ground)" : "var(--surface)" }}
-                          onClick={() => toggleProgram(prog.id)}
-                        >
-                          <td style={cellBase}>
-                            <span style={{ fontSize: 10, marginRight: 6, transition: "transform 0.15s", transform: expandedPrograms.has(prog.id) ? "rotate(90deg)" : "rotate(0deg)", display: "inline-block" }}>▶</span>
-                            {prog.framework.name}
-                          </td>
-                          <td style={{ ...cellBase, fontWeight: 500 }}>{prog.name}</td>
-                          {reasonCell(prog)}
-                          {dateCell(prog)}
-                          <td style={cellAction}>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleUnabandon("program", prog.id, prog.name, []); }}
-                              disabled={loading === prog.id}
-                              style={{ ...btnNormal, opacity: loading === prog.id ? 0.5 : 1 }}
-                            >
-                              {loading === prog.id ? "..." : "Unabandon"}
-                            </button>
-                          </td>
-                        </tr>
-                        {expandedPrograms.has(prog.id) && prog.projects.map((proj) => (
-                          <>
-                            <tr
-                              key={`proj-${proj.id}`}
-                              style={{ cursor: "pointer", background: expandedProjects.has(proj.id) ? "var(--ground)" : "var(--surface)" }}
-                              onClick={() => toggleProject(proj.id)}
-                            >
-                              <td style={{ ...cellSmall, paddingLeft: 32 }}>
-                                <span style={{ fontSize: 9, marginRight: 6, transition: "transform 0.15s", transform: expandedProjects.has(proj.id) ? "rotate(90deg)" : "rotate(0deg)", display: "inline-block" }}>▶</span>
-                                {proj.name}
-                              </td>
-                              <td style={{ ...cellSmall, color: "var(--ink-tertiary)" }}>
-                                {proj.tasks.length + proj.specialTasks.length} task{(proj.tasks.length + proj.specialTasks.length) !== 1 ? "s" : ""}
-                              </td>
-                              {reasonCell(proj)}
-                              {dateCell(proj)}
-                              <td style={cellActionSmall}>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); handleUnabandon("project", proj.id, proj.name, [{ type: "Program", name: prog.name }]); }}
-                                  disabled={loading === proj.id}
-                                  style={{ ...btnSmall, opacity: loading === proj.id ? 0.5 : 1 }}
-                                >
-                                  {loading === proj.id ? "..." : "Unabandon"}
-                                </button>
-                              </td>
-                            </tr>
-                            {expandedProjects.has(proj.id) && proj.tasks.map((task) => (
-                              <tr key={`task-${task.id}`}>
-                                <td style={cellNestedLeft}>
-                                  {task.taskCode}
-                                </td>
-                                <td style={cellNested}>
-                                  {task.name}
-                                </td>
-                                {reasonCellNested(task)}
-                                {dateCellNested(task)}
-                                <td style={{ ...cellNested, textAlign: "right" }}>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); handleUnabandon("task", task.id, task.name, [{ type: "Project", name: proj.name }, { type: "Program", name: prog.name }]); }}
-                                    disabled={loading === task.id}
-                                    style={{ ...btnSmall, opacity: loading === task.id ? 0.5 : 1 }}
-                                  >
-                                    {loading === task.id ? "..." : "Unabandon"}
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                            {expandedProjects.has(proj.id) && proj.specialTasks.map((st) => (
-                              <tr key={`st-${st.id}`}>
-                                <td style={cellNestedLeft}>
-                                  {st.specialTaskCode}
-                                </td>
-                                <td style={cellNested}>
-                                  {st.name}
-                                </td>
-                                {reasonCellNested(st)}
-                                {dateCellNested(st)}
-                                <td style={{ ...cellNested, textAlign: "right" }}>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); handleUnabandon("special-task", st.id, st.name, [{ type: "Project", name: proj.name }, { type: "Program", name: prog.name }]); }}
-                                    disabled={loading === st.id}
-                                    style={{ ...btnSmall, opacity: loading === st.id ? 0.5 : 1 }}
-                                  >
-                                    {loading === st.id ? "..." : "Unabandon"}
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </>
-                        ))}
-                      </>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          )}
-
-          {/* ═══════════ Abandoned Projects (not under abandoned program) ═══════════ */}
-          {data.projects.length > 0 && (
-            <section>
-              <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--ink-primary)", margin: "0 0 8px" }}>
-                Abandoned Projects
-              </h2>
-              <div style={{ border: "1px solid var(--rule)", borderRadius: 4, overflow: "hidden" }}>
-                <table className="detail-task-table">
-                  <thead>
-                    <tr style={{ background: "var(--ground)" }}>
-                      <th style={thBase}>Framework</th>
-                      <th style={thBase}>Program</th>
-                      <th style={thBase}>Project</th>
-                      <th style={thBase}>Reason</th>
-                      <th style={thBase}>Abandoned At</th>
-                      <th style={thRight}></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.projects.map((proj) => (
-                      <>
-                        <tr
-                          key={proj.id}
-                          style={{ cursor: "pointer", background: expandedProjects.has(proj.id) ? "var(--ground)" : "var(--surface)" }}
-                          onClick={() => toggleProject(proj.id)}
-                        >
-                          <td style={cellBase}>
-                            <span style={{ fontSize: 10, marginRight: 6, transition: "transform 0.15s", transform: expandedProjects.has(proj.id) ? "rotate(90deg)" : "rotate(0deg)", display: "inline-block" }}>▶</span>
-                            {proj.program.name}
-                            <span style={badgeStyle}>NOT ABANDONED</span>
-                          </td>
-                          <td style={cellBase}>{proj.program.name}</td>
-                          <td style={{ ...cellBase, fontWeight: 500 }}>{proj.name}</td>
-                          {reasonCell(proj)}
-                          {dateCell(proj)}
-                          <td style={cellAction}>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleUnabandon("project", proj.id, proj.name, []); }}
-                              disabled={loading === proj.id}
-                              style={{ ...btnNormal, opacity: loading === proj.id ? 0.5 : 1 }}
-                            >
-                              {loading === proj.id ? "..." : "Unabandon"}
-                            </button>
-                          </td>
-                        </tr>
-                        {expandedProjects.has(proj.id) && proj.tasks.map((task) => (
-                          <tr key={`task-${task.id}`}>
-                            <td style={cellNestedLeft2} colSpan={2}>
-                              {task.taskCode}
-                            </td>
-                            <td style={cellNested}>
-                              {task.name}
-                            </td>
-                            {reasonCellNested(task)}
-                            {dateCellNested(task)}
-                            <td style={{ ...cellNested, textAlign: "right" }}>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); handleUnabandon("task", task.id, task.name, [{ type: "Project", name: proj.name }]); }}
-                                disabled={loading === task.id}
-                                style={{ ...btnSmall, opacity: loading === task.id ? 0.5 : 1 }}
-                              >
-                                {loading === task.id ? "..." : "Unabandon"}
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                        {expandedProjects.has(proj.id) && proj.specialTasks.map((st) => (
-                          <tr key={`st-${st.id}`}>
-                            <td style={cellNestedLeft2} colSpan={2}>
-                              {st.specialTaskCode}
-                            </td>
-                            <td style={cellNested}>
-                              {st.name}
-                            </td>
-                            {reasonCellNested(st)}
-                            {dateCellNested(st)}
-                            <td style={{ ...cellNested, textAlign: "right" }}>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); handleUnabandon("special-task", st.id, st.name, [{ type: "Project", name: proj.name }]); }}
-                                disabled={loading === st.id}
-                                style={{ ...btnSmall, opacity: loading === st.id ? 0.5 : 1 }}
-                              >
-                                {loading === st.id ? "..." : "Unabandon"}
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          )}
-
-          {/* ═══════════ Abandoned Tasks (not under abandoned project/program) ═══════════ */}
-          {(data.tasks.length > 0 || data.specialTasks.length > 0) && (
-            <section>
-              <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--ink-primary)", margin: "0 0 8px" }}>
-                Abandoned Tasks
-              </h2>
-              <div style={{ border: "1px solid var(--rule)", borderRadius: 4, overflow: "hidden" }}>
-                <table className="detail-task-table">
-                  <thead>
-                    <tr style={{ background: "var(--ground)" }}>
-                      <th style={thBase}>Framework</th>
-                      <th style={thBase}>Program</th>
-                      <th style={thBase}>Project</th>
-                      <th style={thBase}>Reason</th>
-                      <th style={thBase}>Abandoned At</th>
-                      <th style={thRight}></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.tasks.map((task) => (
-                      <tr key={task.id}>
-                        <td style={cellBase}>{task.project.program.framework.name}</td>
-                        <td style={cellBase}>
-                          {task.project.program.name}
-                          <span style={badgeStyle}>NOT ABANDONED</span>
-                        </td>
-                        <td style={cellBase}>
-                          {task.project.name}
-                          <span style={badgeStyle}>NOT ABANDONED</span>
-                        </td>
-                        {reasonCell(task)}
-                        {dateCell(task)}
-                        <td style={cellAction}>
-                          <button
-                            onClick={() => handleUnabandon("task", task.id, task.name, [])}
-                            disabled={loading === task.id}
-                            style={{ ...btnNormal, opacity: loading === task.id ? 0.5 : 1 }}
-                          >
-                            {loading === task.id ? "..." : "Unabandon"}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                    {data.specialTasks.map((st) => (
-                      <tr key={`st-${st.id}`}>
-                        <td style={cellBase}>{st.project.program.framework.name}</td>
-                        <td style={cellBase}>
-                          {st.project.program.name}
-                          <span style={badgeStyle}>NOT ABANDONED</span>
-                        </td>
-                        <td style={cellBase}>
-                          {st.project.name}
-                          <span style={badgeStyle}>NOT ABANDONED</span>
-                        </td>
-                        {reasonCell(st)}
-                        {dateCell(st)}
-                        <td style={cellAction}>
-                          <button
-                            onClick={() => handleUnabandon("special-task", st.id, st.name, [])}
-                            disabled={loading === st.id}
-                            style={{ ...btnNormal, opacity: loading === st.id ? 0.5 : 1 }}
-                          >
-                            {loading === st.id ? "..." : "Unabandon"}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          )}
+        <div style={{ border: "1px solid var(--rule)", borderRadius: 4, overflow: "hidden" }}>
+          <table className="detail-task-table">
+            <thead>
+              <tr style={{ background: "var(--ground)" }}>
+                <th style={thBase}>Framework</th>
+                <th style={thBase}>Program</th>
+                <th style={thBase}>Project</th>
+                <th style={thBase}>Reason</th>
+                <th style={thBase}>Abandoned At</th>
+                <th style={thRight}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.programs.map((prog) => (
+                <ProgramRow
+                  key={prog.id}
+                  prog={prog}
+                  expanded={expandedPrograms.has(prog.id)}
+                  expandedProjects={expandedProjects}
+                  onToggleProgram={() => toggleProgram(prog.id)}
+                  onToggleProject={toggleProject}
+                  onUnabandon={handleUnabandon}
+                  loading={loading}
+                />
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -586,5 +292,194 @@ export default function AbandonedView({ data }: Props) {
         />
       )}
     </div>
+  );
+}
+
+function ProgramRow({
+  prog,
+  expanded,
+  expandedProjects,
+  onToggleProgram,
+  onToggleProject,
+  onUnabandon,
+  loading,
+}: {
+  prog: AbandonedData["programs"][number];
+  expanded: boolean;
+  expandedProjects: Set<number>;
+  onToggleProgram: () => void;
+  onToggleProject: (id: number) => void;
+  onUnabandon: (
+    entityType: string,
+    entityId: number,
+    entityName: string,
+    parents: Array<{ type: "Project" | "Program"; name: string }>,
+  ) => void;
+  loading: number | null;
+}) {
+  const isAbandoned = prog.abandoned;
+
+  return (
+    <>
+      <tr
+        style={{ cursor: "pointer", background: expanded ? "var(--ground)" : "var(--surface)" }}
+        onClick={onToggleProgram}
+      >
+        <td style={cellBase}>
+          <span style={{ fontSize: 10, marginRight: 6, transition: "transform 0.15s", transform: expanded ? "rotate(90deg)" : "rotate(0deg)", display: "inline-block" }}>▶</span>
+          {prog.framework.name}
+        </td>
+        <td style={{ ...cellBase, fontWeight: 500 }}>
+          {prog.name}
+          {!isAbandoned && <span style={badgeStyle}>NOT ABANDONED</span>}
+        </td>
+        <td style={cellBase}></td>
+        <td style={{ ...cellBase, fontSize: 11 }}>
+          {prog.abandonedReason ? (
+            <div style={{ fontWeight: 500 }}>{prog.abandonedReason}</div>
+          ) : null}
+          {prog.abandonedRemarks ? (
+            <div style={{ color: "var(--ink-tertiary)", fontSize: 10, marginTop: 2 }}>
+              {prog.abandonedRemarks}
+            </div>
+          ) : null}
+          {!prog.abandonedReason && !prog.abandonedRemarks ? (
+            <span style={{ color: "var(--ink-tertiary)" }}>—</span>
+          ) : null}
+        </td>
+        <td style={{ ...cellSmall, whiteSpace: "nowrap" }}>
+          {prog.abandonedAt ? formatDate(prog.abandonedAt) : "—"}
+        </td>
+        <td style={cellAction}>
+          {isAbandoned ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); onUnabandon("program", prog.id, prog.name, []); }}
+              disabled={loading === prog.id}
+              style={{ ...btnNormal, opacity: loading === prog.id ? 0.5 : 1 }}
+            >
+              {loading === prog.id ? "..." : "Unabandon"}
+            </button>
+          ) : null}
+        </td>
+      </tr>
+      {expanded && prog.projects.map((proj) => (
+        <ProjectRow
+          key={`proj-${proj.id}`}
+          proj={proj}
+          progName={prog.name}
+          expandedProjects={expandedProjects}
+          onToggleProject={onToggleProject}
+          onUnabandon={onUnabandon}
+          loading={loading}
+        />
+      ))}
+    </>
+  );
+}
+
+function ProjectRow({
+  proj,
+  progName,
+  expandedProjects,
+  onToggleProject,
+  onUnabandon,
+  loading,
+}: {
+  proj: AbandonedData["programs"][number]["projects"][number];
+  progName: string;
+  expandedProjects: Set<number>;
+  onToggleProject: (id: number) => void;
+  onUnabandon: (
+    entityType: string,
+    entityId: number,
+    entityName: string,
+    parents: Array<{ type: "Project" | "Program"; name: string }>,
+  ) => void;
+  loading: number | null;
+}) {
+  const isAbandoned = proj.abandoned;
+  const expanded = expandedProjects.has(proj.id);
+
+  return (
+    <>
+      <tr
+        key={`proj-${proj.id}`}
+        style={{ cursor: "pointer", background: expanded ? "var(--ground)" : "var(--surface)" }}
+        onClick={() => onToggleProject(proj.id)}
+      >
+        <td style={{ ...cellSmall, paddingLeft: 32 }}></td>
+        <td style={{ ...cellSmall, color: "var(--ink-tertiary)" }}>
+          {proj.tasks.length} task{proj.tasks.length !== 1 ? "s" : ""}
+        </td>
+        <td style={{ ...cellSmall, fontWeight: 500 }}>
+          <span style={{ fontSize: 9, marginRight: 6, transition: "transform 0.15s", transform: expanded ? "rotate(90deg)" : "rotate(0deg)", display: "inline-block" }}>▶</span>
+          {proj.name}
+          {!isAbandoned && <span style={badgeStyle}>NOT ABANDONED</span>}
+        </td>
+        <td style={{ ...cellSmall, fontSize: 11 }}>
+          {proj.abandonedReason ? (
+            <div style={{ fontWeight: 500 }}>{proj.abandonedReason}</div>
+          ) : null}
+          {proj.abandonedRemarks ? (
+            <div style={{ color: "var(--ink-tertiary)", fontSize: 10, marginTop: 2 }}>
+              {proj.abandonedRemarks}
+            </div>
+          ) : null}
+          {!proj.abandonedReason && !proj.abandonedRemarks ? (
+            <span style={{ color: "var(--ink-tertiary)" }}>—</span>
+          ) : null}
+        </td>
+        <td style={{ ...cellSmall, whiteSpace: "nowrap" }}>
+          {proj.abandonedAt ? formatDate(proj.abandonedAt) : "—"}
+        </td>
+        <td style={cellActionSmall}>
+          {isAbandoned ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); onUnabandon("project", proj.id, proj.name, [{ type: "Program", name: progName }]); }}
+              disabled={loading === proj.id}
+              style={{ ...btnSmall, opacity: loading === proj.id ? 0.5 : 1 }}
+            >
+              {loading === proj.id ? "..." : "Unabandon"}
+            </button>
+          ) : null}
+        </td>
+      </tr>
+      {expanded && proj.tasks.map((task) => (
+        <tr key={`task-${task.id}`}>
+          <td style={{ ...cellNested, paddingLeft: 56, color: "var(--ink-tertiary)" }}>
+            {task.code}
+          </td>
+          <td style={cellNested}></td>
+          <td style={cellNested}>
+            {task.name}
+          </td>
+          <td style={{ ...cellNested, fontSize: 11 }}>
+            {task.abandonedReason ? (
+              <div style={{ fontWeight: 500 }}>{task.abandonedReason}</div>
+            ) : null}
+            {task.abandonedRemarks ? (
+              <div style={{ color: "var(--ink-tertiary)", fontSize: 10, marginTop: 2 }}>
+                {task.abandonedRemarks}
+              </div>
+            ) : null}
+            {!task.abandonedReason && !task.abandonedRemarks ? (
+              <span style={{ color: "var(--ink-tertiary)" }}>—</span>
+            ) : null}
+          </td>
+          <td style={{ ...cellNested, whiteSpace: "nowrap" }}>
+            {task.abandonedAt ? formatDate(task.abandonedAt) : "—"}
+          </td>
+          <td style={{ ...cellNested, textAlign: "right" }}>
+            <button
+              onClick={(e) => { e.stopPropagation(); onUnabandon(task.type, task.id, task.name, [{ type: "Project", name: proj.name }, { type: "Program", name: progName }]); }}
+              disabled={loading === task.id}
+              style={{ ...btnSmall, opacity: loading === task.id ? 0.5 : 1 }}
+            >
+              {loading === task.id ? "..." : "Unabandon"}
+            </button>
+          </td>
+        </tr>
+      ))}
+    </>
   );
 }

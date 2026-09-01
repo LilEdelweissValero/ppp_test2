@@ -299,6 +299,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
   const [specialTasks, setSpecialTasks] = useState<CachedSpecialTask[]>(initialProject.specialTasks || []);
   const [phases, setPhases] = useState<CachedPhase[]>(initialProject.phases || []);
   const [compSettings, setCompSettings] = useState<ComputationSettings | undefined>(undefined);
+  const abandonReasons = compSettings?.abandonmentReasons ?? [];
   const [showPhaseSetup, setShowPhaseSetup] = useState(false);
   const [showAddPhase, setShowAddPhase] = useState(false);
   const [showEditPhases, setShowEditPhases] = useState(false);
@@ -1287,6 +1288,10 @@ export default function ProjectDetailView({ project: initialProject, historicalT
             }}
             projectId={project.id}
             phases={phases}
+            abandonReasons={abandonReasons}
+            onAbandon={() => {
+              setEditTask(null);
+            }}
             initialData={{
               id: editTask.id,
               taskCode: editTask.taskCode,
@@ -1347,6 +1352,10 @@ export default function ProjectDetailView({ project: initialProject, historicalT
             }}
             projectId={project.id}
             phases={phases}
+            abandonReasons={abandonReasons}
+            onAbandon={() => {
+              setEditSpecialTask(null);
+            }}
             initialSpecialData={{
               id: editSpecialTask.id,
               specialTaskCode: editSpecialTask.specialTaskCode,
