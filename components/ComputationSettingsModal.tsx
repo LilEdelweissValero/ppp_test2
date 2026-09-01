@@ -21,12 +21,12 @@ interface Props {
   onClose: () => void;
 }
 
-type Tab = "statuses" | "health" | "formulas" | "abandonment";
+type Tab = "statuses" | "health" | "completionRates" | "abandonment";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "statuses", label: "Statuses" },
   { key: "health", label: "Health Criteria" },
-  { key: "formulas", label: "Formulas" },
+  { key: "completionRates", label: "Completion Rates" },
   { key: "abandonment", label: "Abandonment Reasons" },
 ];
 
@@ -524,9 +524,9 @@ function HealthCriteriaTab({
   );
 }
 
-// ── Formulas Tab ───────────────────────────────────────────────────────────
+// ── Completion Rates Tab ────────────────────────────────────────────────────
 
-function FormulasTab({
+function CompletionRatesTab({
   statuses,
 }: {
   statuses: ComputationStatus[];
@@ -541,7 +541,7 @@ function FormulasTab({
           marginBottom: 16,
         }}
       >
-        How completion rates and health are calculated at each level.
+        How completion rates are calculated at each level.
       </p>
       <div
         style={{
@@ -553,9 +553,15 @@ function FormulasTab({
         }}
       >
         <FormulaRow label="Task" formula={`status → score (${statuses.map((s) => s.score).join("/")})`} />
+        <FormulaRow label="Phase" formula="mean of its tasks' scores" />
         <FormulaRow
           label="Project"
-          formula="mean of its tasks' scores"
+          formula="mean of all tasks' scores"
+        />
+        <FormulaRow
+          label="Project"
+          formula="Σ (phase mean × phase weight)  —  when phases exist"
+          highlight
         />
         <FormulaRow
           label="Program"
@@ -586,9 +592,11 @@ function FormulasTab({
 function FormulaRow({
   label,
   formula,
+  highlight,
 }: {
   label: string;
   formula: string;
+  highlight?: boolean;
 }) {
   return (
     <div
@@ -613,7 +621,7 @@ function FormulaRow({
       >
         {label}
       </span>
-      <span style={{ color: "var(--ink-primary)" }}>{formula}</span>
+      <span style={{ color: highlight ? "var(--accent)" : "var(--ink-primary)", fontWeight: highlight ? 500 : 400 }}>{formula}</span>
     </div>
   );
 }
@@ -968,8 +976,8 @@ export default function ComputationSettingsModal({ open, onClose }: Props) {
               }
             />
           )}
-          {tab === "formulas" && (
-            <FormulasTab statuses={settings.statuses} />
+          {tab === "completionRates" && (
+            <CompletionRatesTab statuses={settings.statuses} />
           )}
           {tab === "abandonment" && (
             <AbandonmentReasonsTab
