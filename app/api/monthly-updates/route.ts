@@ -43,8 +43,8 @@ function getProjectStatus(
 
   if (progressPct === 0 && quarterComparison > 0) return "Not Yet Due";
   if (progressPct === 0 && quarterComparison <= 0) return "Not Yet Started";
-  if (progressPct > 0 && quarterComparison >= 0) return "In Progress";
-  if (isQuarterEndMonth && quarterComparison < 0) return "Delayed";
+  if (progressPct > 0 && quarterComparison < 0 && isQuarterEndMonth) return "Delayed";
+  if (progressPct > 0) return "In Progress";
 
   return "Not Yet Started";
 }
