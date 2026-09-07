@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 interface LogEntry {
@@ -248,8 +249,24 @@ export default function HistoryLogView() {
                         background: i % 2 === 0 ? "var(--surface)" : "var(--ground)",
                       }}
                     >
-                      <td style={{ ...tdStyle, whiteSpace: "nowrap", color: "var(--ink-tertiary)" }}>
-                        {formatDate(log.createdAt)}
+                      <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>
+                        <Link
+                          href={`/?asOf=${encodeURIComponent(log.createdAt)}`}
+                          style={{
+                            color: "var(--ink-tertiary)",
+                            textDecoration: "none",
+                          }}
+                          onMouseEnter={(e) => {
+                            (e.currentTarget as HTMLAnchorElement).style.textDecoration = "underline";
+                            (e.currentTarget as HTMLAnchorElement).style.color = "var(--accent)";
+                          }}
+                          onMouseLeave={(e) => {
+                            (e.currentTarget as HTMLAnchorElement).style.textDecoration = "none";
+                            (e.currentTarget as HTMLAnchorElement).style.color = "var(--ink-tertiary)";
+                          }}
+                        >
+                          {formatDate(log.createdAt)}
+                        </Link>
                       </td>
                       <td style={tdStyle}>
                         <span style={badgeStyle(style.bg, style.ink)}>

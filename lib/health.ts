@@ -135,7 +135,7 @@ export interface SuchTaskInput {
 export function computeSuchTaskPercent(sv: number, snv: number, nsv: number): number {
   const denominator = sv + snv;
   if (denominator === 0) return 0;
-  return Math.round(((sv + nsv) / denominator) * 100);
+  return Math.min(Math.round(((sv + nsv) / denominator) * 100), 100);
 }
 
 export function expandSuchTasksToVirtualTasks(
