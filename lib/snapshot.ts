@@ -244,7 +244,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
     }),
     prisma.entityChangeLog.findMany({
       where: { createdAt: { gt: revertAfter.toISOString() } },
-      orderBy: { id: "asc" },
+      orderBy: { id: "desc" },
     }),
     prisma.entityChangeLog.findMany({
       where: {
@@ -307,7 +307,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
   // Track entities that were created after the target timestamp (to hide them)
   const createdAfter = new Set<string>();
 
-  // Process changes in chronological order (oldest first)
+  // Process changes in reverse chronological order (newest first) to correctly undo them
   for (const log of allLogs) {
     const entityKey = `${log.entityType}:${log.entityId}`;
 
