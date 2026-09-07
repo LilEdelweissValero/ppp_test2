@@ -24,6 +24,8 @@ import {
   computeProjectHealth,
   computeTaskPercentDone,
   computePhasePercentComplete,
+  computeSuchTaskPercent,
+  expandSuchTasksToVirtualTasks,
 } from "@/lib/health";
 import { PRIORITY_LABELS, getStatusList, getStatusScore } from "@/lib/status";
 import { getDefaultSettings } from "@/lib/computation-settings";
@@ -37,7 +39,7 @@ import PhaseSetupModal from "@/components/PhaseSetupModal";
 import PhaseEditModal from "@/components/PhaseEditModal";
 import ChangeDueQuarterModal from "@/components/ChangeDueQuarterModal";
 import ChangeHistoryModal from "@/components/ChangeHistoryModal";
-import { CachedProject, CachedTask, CachedSpecialTask, CachedPhase, usePortfolioCache } from "@/components/PortfolioCacheProvider";
+import { CachedProject, CachedTask, CachedSpecialTask, CachedSuchTask, CachedPhase, usePortfolioCache } from "@/components/PortfolioCacheProvider";
 
 type Task = CachedTask;
 type Project = CachedProject;
@@ -287,7 +289,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
   const [changeProjectQuarter, setChangeProjectQuarter] = useState(false);
   const [changeTaskQuarter, setChangeTaskQuarter] = useState<Task | null>(null);
   const [viewHistory, setViewHistory] = useState<{
-    type: "Project" | "Task" | "SpecialTask" | "Phase";
+    type: "Project" | "Task" | "SpecialTask" | "SuchTask" | "Phase";
     id: number;
   } | null>(null);
   const [editingCell, setEditingCell] = useState<{
@@ -297,6 +299,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
   const selectRef = useRef<HTMLSelectElement>(null);
   const [tasks, setTasks] = useState<Task[]>(initialProject.tasks);
   const [specialTasks, setSpecialTasks] = useState<CachedSpecialTask[]>(initialProject.specialTasks || []);
+  const [suchTasks, setSuchTasks] = useState<CachedSuchTask[]>(initialProject.suchTasks || []);
   const [phases, setPhases] = useState<CachedPhase[]>(initialProject.phases || []);
   const [compSettings, setCompSettings] = useState<ComputationSettings | undefined>(undefined);
   const abandonReasons = compSettings?.abandonmentReasons ?? [];
@@ -326,12 +329,16 @@ export default function ProjectDetailView({ project: initialProject, historicalT
     taskId: number;
     field: string;
   } | null>(null);
+  const [editSuchTask, setEditSuchTask] = useState<CachedSuchTask | null>(null);
+  const [changeSuchTaskQuarter, setChangeSuchTaskQuarter] = useState<CachedSuchTask | null>(null);
+  const [editingSuchCell, setEditingSuchCell] = useState<{ taskId: number; field: string } | null>(null);
   const specialSelectRef = useRef<HTMLSelectElement>(null);
 
   useEffect(() => {
     setCurrentProject(initialProject);
     setTasks(initialProject.tasks);
     setSpecialTasks(initialProject.specialTasks || []);
+    setSuchTasks(initialProject.suchTasks || []);
     setPhases(initialProject.phases || []);
   }, [initialProject]);
 
@@ -359,6 +366,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                 setCurrentProject({ ...project, ...pr });
                 setTasks(pr.tasks as Task[]);
                 setSpecialTasks(pr.specialTasks as CachedSpecialTask[]);
+                setSuchTasks(pr.suchTasks as CachedSuchTask[]);
                 break;
               }
             }
@@ -387,6 +395,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
     setCurrentProject(next);
     setTasks(next.tasks);
     setSpecialTasks(next.specialTasks || []);
+    setSuchTasks(next.suchTasks || []);
     if (!isHistorical) setProject(next);
   }
 
@@ -404,6 +413,13 @@ export default function ProjectDetailView({ project: initialProject, historicalT
     if (!isHistorical) setProject(nextProject);
   }
 
+  function updateSuchTasks(nextSuchTasks: CachedSuchTask[]) {
+    setSuchTasks(nextSuchTasks);
+    const nextProject = { ...project, suchTasks: nextSuchTasks };
+    setCurrentProject(nextProject);
+    if (!isHistorical) setProject(nextProject);
+  }
+
   function updatePhases(nextPhases: CachedPhase[]) {
     setPhases(nextPhases);
     const nextProject = { ...project, phases: nextPhases };
@@ -412,8 +428,9 @@ export default function ProjectDetailView({ project: initialProject, historicalT
   }
 
   const virtualTasks = expandSpecialTasksToVirtualTasks(specialTasks, compSettings);
-  const allTasksWithPhase = [...tasks.map((t) => ({ status: t.status, phaseId: t.phaseId })), ...virtualTasks];
-  const allTasksForPct = [...tasks, ...virtualTasks];
+  const virtualSuchTasks = expandSuchTasksToVirtualTasks(suchTasks, compSettings);
+  const allTasksWithPhase = [...tasks.map((t) => ({ status: t.status, phaseId: t.phaseId })), ...virtualTasks, ...virtualSuchTasks];
+  const allTasksForPct = [...tasks, ...virtualTasks, ...virtualSuchTasks];
   const hasPhases = phases.length > 0;
   const pct = computeProjectPercentComplete(
     allTasksForPct,
@@ -547,6 +564,35 @@ export default function ProjectDetailView({ project: initialProject, historicalT
     }
   }
 
+  async function handleSuchInlineSave(
+    taskId: number,
+    field: string,
+    value: number | string,
+    nextCell?: { taskId: number; field: string }
+  ) {
+    const previousSuchTasks = suchTasks;
+    setEditingSuchCell(nextCell ?? null);
+    updateSuchTasks(suchTasks.map((st) => (st.id === taskId ? { ...st, [field]: value } : st)));
+    try {
+      const task = suchTasks.find((st) => st.id === taskId);
+      const patch: Record<string, number | string> = { [field]: value };
+      if (task && ["sv", "snv", "nsv"].includes(field)) {
+        const updated = { ...task, [field]: value };
+        patch.totalScheduled = updated.sv + updated.snv;
+      }
+      const response = await fetch(`/api/such-tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (!response.ok) throw new Error("Update failed");
+      const updated = await response.json();
+      updateSuchTasks(suchTasks.map((st) => (st.id === taskId ? { ...st, ...updated } : st)));
+    } catch {
+      updateSuchTasks(previousSuchTasks);
+    }
+  }
+
   async function handleSaveOrder() {
     console.log("[SAVE ORDER] Button clicked — starting handleSaveOrder");
     console.log("[SAVE ORDER] sortConfig:", sortConfig);
@@ -675,7 +721,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
               <>
                 <button
                   onClick={() => {
-                    if (phases.length === 0 && (tasks.length > 0 || specialTasks.length > 0)) {
+                    if (phases.length === 0 && (tasks.length > 0 || specialTasks.length > 0 || suchTasks.length > 0)) {
                       setShowPhaseSetup(true);
                     } else {
                       setShowAddPhase(true);
@@ -931,9 +977,9 @@ export default function ProjectDetailView({ project: initialProject, historicalT
         <section className="detail-task-panel" aria-labelledby="special-tasks-title">
           <div className="detail-task-header">
             <div>
-              <h2 id="special-tasks-title" className="detail-task-heading">Special Tasks</h2>
+              <h2 id="special-tasks-title" className="detail-task-heading">Helpdesk Tickets</h2>
               <p className="detail-task-subtitle">
-                {specialTasks.length} special task{specialTasks.length === 1 ? "" : "s"}
+                {specialTasks.length} helpdesk ticket{specialTasks.length === 1 ? "" : "s"}
                 {!isHistorical && " · Click cells to edit inline"}
               </p>
             </div>
@@ -1239,6 +1285,245 @@ export default function ProjectDetailView({ project: initialProject, historicalT
         </section>
         )}
 
+        {/* ── SUCH Tasks Section ── */}
+        {suchTasks.length > 0 && (
+        <section className="detail-task-panel" aria-labelledby="such-tasks-title">
+          <div className="detail-task-header">
+            <div>
+              <h2 id="such-tasks-title" className="detail-task-heading">SUCH Tasks</h2>
+              <p className="detail-task-subtitle">
+                {suchTasks.length} SUCH task{suchTasks.length === 1 ? "" : "s"}
+                {!isHistorical && " · Click cells to edit inline"}
+              </p>
+            </div>
+          </div>
+
+            <div className="overflow-x-auto">
+              <table className="detail-task-table">
+                <thead>
+                  <tr>
+                    {[
+                      { label: "Code", key: "suchTaskCode", width: 100 },
+                      { label: "Name", key: "name", width: 180 },
+                      ...(hasPhases ? [{ label: "Phase", key: "phaseId", width: 100 }] : []),
+                      { label: "Total Scheduled", key: "totalScheduled", width: 80 },
+                      { label: "S V", key: "sv", width: 50 },
+                      { label: "S nV", key: "snv", width: 50 },
+                      { label: "nS V", key: "nsv", width: 50 },
+                      { label: "DUE Q", key: "dueQuarter", width: 80 },
+                      { label: "LAST UPDATED", key: "lastUpdatedDate", width: 100 },
+                      { label: "%", key: "pct", width: 50 },
+                    ].map(({ label, key, width }) => (
+                      <th key={key} style={{ width, userSelect: "none" }}>
+                        {label}
+                      </th>
+                    ))}
+                    <th style={{ width: 120 }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {suchTasks.map((st) => {
+                    const totalScheduled = st.sv + st.snv;
+                    const pctVal = computeSuchTaskPercent(st.sv, st.snv, st.nsv);
+                    return (
+                      <tr key={st.id} className="detail-task-row">
+                        <td className="detail-task-code" style={{ width: 100 }}>{st.suchTaskCode}</td>
+                        <td style={{ width: 180 }}>{st.name}</td>
+                        {hasPhases && (
+                          <td style={{ width: 100 }}>
+                            <select
+                              defaultValue={st.phaseId ?? ""}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                const phaseId = val ? parseInt(val) : null;
+                                fetch(`/api/such-tasks/${st.id}`, {
+                                  method: "PATCH",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ phaseId: phaseId ? String(phaseId) : null }),
+                                }).then(() => {
+                                  setSuchTasks((prev) =>
+                                    prev.map((s) => (s.id === st.id ? { ...s, phaseId } : s))
+                                  );
+                                });
+                              }}
+                              disabled={isHistorical}
+                              style={{
+                                fontSize: 11,
+                                padding: "2px 4px",
+                                border: "1px solid var(--rule)",
+                                borderRadius: 3,
+                                background: "var(--surface)",
+                                color: "var(--ink-primary)",
+                                width: "100%",
+                              }}
+                            >
+                              <option value="">—</option>
+                              {phases.map((p) => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                              ))}
+                            </select>
+                          </td>
+                        )}
+                        {/* Total Scheduled */}
+                        <td style={{ width: 80, textAlign: "center", fontSize: 11 }}>
+                          {totalScheduled}
+                        </td>
+                        {/* S V */}
+                        <td
+                          className="detail-inline-cell"
+                          style={{ width: 50, textAlign: "center", cursor: isHistorical ? "default" : undefined }}
+                          onClick={() => !isHistorical && setEditingSuchCell({ taskId: st.id, field: "sv" })}
+                        >
+                          {editingSuchCell?.taskId === st.id && editingSuchCell.field === "sv" ? (
+                            <input
+                              type="number"
+                              defaultValue={st.sv}
+                              autoFocus
+                              className="detail-inline-input"
+                              onBlur={(e) => {
+                                if (!tabTransitioning.current) handleSuchInlineSave(st.id, "sv", parseInt(e.target.value) || 0);
+                                else tabTransitioning.current = false;
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Escape") setEditingSuchCell(null);
+                                if (e.key === "Enter") handleSuchInlineSave(st.id, "sv", parseInt((e.target as HTMLInputElement).value) || 0);
+                                if (e.key === "Tab" && !e.shiftKey) {
+                                  e.preventDefault();
+                                  tabTransitioning.current = true;
+                                  handleSuchInlineSave(st.id, "sv", parseInt((e.target as HTMLInputElement).value) || 0, { taskId: st.id, field: "snv" });
+                                }
+                                if (e.key === "Tab" && e.shiftKey) {
+                                  e.preventDefault();
+                                  tabTransitioning.current = true;
+                                  handleSuchInlineSave(st.id, "sv", parseInt((e.target as HTMLInputElement).value) || 0);
+                                }
+                              }}
+                              style={{ width: 45, fontSize: 11, textAlign: "center" }}
+                            />
+                          ) : (
+                            st.sv
+                          )}
+                        </td>
+                        {/* S nV */}
+                        <td
+                          className="detail-inline-cell"
+                          style={{ width: 50, textAlign: "center", cursor: isHistorical ? "default" : undefined }}
+                          onClick={() => !isHistorical && setEditingSuchCell({ taskId: st.id, field: "snv" })}
+                        >
+                          {editingSuchCell?.taskId === st.id && editingSuchCell.field === "snv" ? (
+                            <input
+                              type="number"
+                              defaultValue={st.snv}
+                              autoFocus
+                              className="detail-inline-input"
+                              onBlur={(e) => {
+                                if (!tabTransitioning.current) handleSuchInlineSave(st.id, "snv", parseInt(e.target.value) || 0);
+                                else tabTransitioning.current = false;
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Escape") setEditingSuchCell(null);
+                                if (e.key === "Enter") handleSuchInlineSave(st.id, "snv", parseInt((e.target as HTMLInputElement).value) || 0);
+                                if (e.key === "Tab" && !e.shiftKey) {
+                                  e.preventDefault();
+                                  tabTransitioning.current = true;
+                                  handleSuchInlineSave(st.id, "snv", parseInt((e.target as HTMLInputElement).value) || 0, { taskId: st.id, field: "nsv" });
+                                }
+                                if (e.key === "Tab" && e.shiftKey) {
+                                  e.preventDefault();
+                                  tabTransitioning.current = true;
+                                  handleSuchInlineSave(st.id, "snv", parseInt((e.target as HTMLInputElement).value) || 0, { taskId: st.id, field: "sv" });
+                                }
+                              }}
+                              style={{ width: 45, fontSize: 11, textAlign: "center" }}
+                            />
+                          ) : (
+                            st.snv
+                          )}
+                        </td>
+                        {/* nS V */}
+                        <td
+                          className="detail-inline-cell"
+                          style={{ width: 50, textAlign: "center", cursor: isHistorical ? "default" : undefined }}
+                          onClick={() => !isHistorical && setEditingSuchCell({ taskId: st.id, field: "nsv" })}
+                        >
+                          {editingSuchCell?.taskId === st.id && editingSuchCell.field === "nsv" ? (
+                            <input
+                              type="number"
+                              defaultValue={st.nsv}
+                              autoFocus
+                              className="detail-inline-input"
+                              onBlur={(e) => {
+                                if (!tabTransitioning.current) handleSuchInlineSave(st.id, "nsv", parseInt(e.target.value) || 0);
+                                else tabTransitioning.current = false;
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Escape") setEditingSuchCell(null);
+                                if (e.key === "Enter") handleSuchInlineSave(st.id, "nsv", parseInt((e.target as HTMLInputElement).value) || 0);
+                                if (e.key === "Tab" && !e.shiftKey) {
+                                  e.preventDefault();
+                                  tabTransitioning.current = true;
+                                  handleSuchInlineSave(st.id, "nsv", parseInt((e.target as HTMLInputElement).value) || 0);
+                                }
+                                if (e.key === "Tab" && e.shiftKey) {
+                                  e.preventDefault();
+                                  tabTransitioning.current = true;
+                                  handleSuchInlineSave(st.id, "nsv", parseInt((e.target as HTMLInputElement).value) || 0, { taskId: st.id, field: "snv" });
+                                }
+                              }}
+                              style={{ width: 45, fontSize: 11, textAlign: "center" }}
+                            />
+                          ) : (
+                            st.nsv
+                          )}
+                        </td>
+                        <td className="detail-muted" style={{ width: 80 }}>{st.dueQuarter}</td>
+                        <td className="detail-muted" style={{ width: 100, fontSize: 11 }}>
+                          {st.lastUpdatedDate || "—"}
+                        </td>
+                        <td style={{ textAlign: "center", width: 50 }}>
+                          <span style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: pctVal === 100 ? "var(--health-completed-ink)" : "var(--ink-primary)",
+                          }}>
+                            {pctVal}%
+                          </span>
+                        </td>
+                        <td style={{ width: 120 }}>
+                          {!isHistorical && (
+                          <div className="detail-task-actions">
+                            <button
+                              onClick={() => setEditSuchTask(st)}
+                              className="detail-task-action"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => setChangeSuchTaskQuarter(st)}
+                              className="detail-task-action"
+                            >
+                              Qtr
+                            </button>
+                            <button
+                              onClick={() =>
+                                setViewHistory({ type: "SuchTask", id: st.id })
+                              }
+                              className="detail-task-action"
+                            >
+                              History
+                            </button>
+                          </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+        </section>
+        )}
+
         {!isHistorical && (
         <>
         <ProjectFormModal
@@ -1384,6 +1669,52 @@ export default function ProjectDetailView({ project: initialProject, historicalT
             currentQuarter={changeSpecialTaskQuarter.dueQuarter}
           />
         )}
+
+        {editSuchTask && (
+          <TaskFormModal
+            open={!!editSuchTask}
+            onClose={() => setEditSuchTask(null)}
+            onSave={() => {}}
+            onSaveSpecial={(savedSuchTask) => {
+              updateSuchTasks(suchTasks.map((st) =>
+                st.id === savedSuchTask.id ? savedSuchTask : st
+              ));
+              setEditSuchTask(null);
+            }}
+            projectId={project.id}
+            phases={phases}
+            abandonReasons={abandonReasons}
+            onAbandon={() => {
+              setEditSuchTask(null);
+            }}
+            initialSpecialData={{
+              id: editSuchTask.id,
+              specialTaskCode: editSuchTask.suchTaskCode,
+              name: editSuchTask.name,
+              dueQuarter: editSuchTask.dueQuarter,
+              lastUpdatedDate: editSuchTask.lastUpdatedDate,
+              phaseId: editSuchTask.phaseId,
+            }}
+          />
+        )}
+
+        {changeSuchTaskQuarter && (
+          <ChangeDueQuarterModal
+            open={!!changeSuchTaskQuarter}
+            onClose={() => setChangeSuchTaskQuarter(null)}
+            onSave={({ newQuarter }) => {
+              updateSuchTasks(suchTasks.map((st) =>
+                st.id === changeSuchTaskQuarter.id
+                  ? { ...st, dueQuarter: newQuarter }
+                  : st
+              ));
+              setChangeSuchTaskQuarter(null);
+            }}
+            entityType="SuchTask"
+            entityId={changeSuchTaskQuarter.id}
+            currentQuarter={changeSuchTaskQuarter.dueQuarter}
+          />
+        )}
         </>
         )}
 
@@ -1394,10 +1725,12 @@ export default function ProjectDetailView({ project: initialProject, historicalT
             projectId={project.id}
             tasks={tasks}
             specialTasks={specialTasks}
-            onSaved={(createdPhases, updatedTasks, updatedSpecialTasks) => {
+            suchTasks={suchTasks}
+            onSaved={(createdPhases, updatedTasks, updatedSpecialTasks, updatedSuchTasks) => {
               setPhases(createdPhases);
               setTasks(updatedTasks);
               setSpecialTasks(updatedSpecialTasks);
+              setSuchTasks(updatedSuchTasks);
             }}
           />
         )}

@@ -35,6 +35,20 @@ export interface CachedSpecialTask {
   phaseId: number | null;
 }
 
+export interface CachedSuchTask {
+  id: number;
+  suchTaskCode: string;
+  name: string;
+  sortOrder: number;
+  totalScheduled: number;
+  sv: number;
+  snv: number;
+  nsv: number;
+  dueQuarter: string;
+  lastUpdatedDate: string | null;
+  phaseId: number | null;
+}
+
 export interface CachedPhase {
   id: number;
   name: string;
@@ -57,6 +71,7 @@ export interface CachedProject {
   phases: CachedPhase[];
   tasks: CachedTask[];
   specialTasks: CachedSpecialTask[];
+  suchTasks: CachedSuchTask[];
 }
 
 interface PortfolioSeed {

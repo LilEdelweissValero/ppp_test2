@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSnapshotAt } from "@/lib/snapshot";
 import { compareQuarters } from "@/lib/quarters";
-import { expandSpecialTasksToVirtualTasks, computeProjectPercentComplete } from "@/lib/health";
+import { expandSpecialTasksToVirtualTasks, expandSuchTasksToVirtualTasks, computeProjectPercentComplete } from "@/lib/health";
 
 interface MonthData {
   status: string;
@@ -131,7 +131,8 @@ export async function GET() {
             }
 
             const virtualTasks = expandSpecialTasksToVirtualTasks(proj.specialTasks, snapshot.settings);
-            const allTasks = [...proj.tasks, ...virtualTasks];
+            const virtualSuchTasks = expandSuchTasksToVirtualTasks(proj.suchTasks, snapshot.settings);
+            const allTasks = [...proj.tasks, ...virtualTasks, ...virtualSuchTasks];
             const hasPhases = proj.phases.length > 0;
             const allTasksWithPhase = allTasks.map((t) => ({ status: t.status, phaseId: t.phaseId }));
             const progressRaw = computeProjectPercentComplete(

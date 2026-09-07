@@ -39,6 +39,22 @@ export interface SpecialTask {
   archived: boolean;
 }
 
+export interface SuchTask {
+  id: number;
+  suchTaskCode: string;
+  projectId: number;
+  phaseId: number | null;
+  name: string;
+  sortOrder: number;
+  totalScheduled: number;
+  sv: number;
+  snv: number;
+  nsv: number;
+  dueQuarter: string;
+  lastUpdatedDate: string | null;
+  archived: boolean;
+}
+
 export interface ProjectWithTasks {
   id: number;
   name: string;
@@ -51,6 +67,7 @@ export interface ProjectWithTasks {
   phases: Phase[];
   tasks: Task[];
   specialTasks: SpecialTask[];
+  suchTasks: SuchTask[];
 }
 
 export interface Task {

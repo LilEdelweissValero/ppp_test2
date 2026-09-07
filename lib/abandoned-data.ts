@@ -18,7 +18,7 @@ export interface AbandonedData {
       abandonedRemarks: string | null;
       tasks: Array<{
         id: number;
-        type: "task" | "special-task";
+        type: "task" | "special-task" | "such-task";
         code: string;
         name: string;
         abandonedAt: string | null;
@@ -50,7 +50,7 @@ interface ProjectEntry {
   abandonedRemarks: string | null;
   tasks: Array<{
     id: number;
-    type: "task" | "special-task";
+    type: "task" | "special-task" | "such-task";
     code: string;
     name: string;
     abandonedAt: string | null;
@@ -61,7 +61,7 @@ interface ProjectEntry {
 }
 
 export async function fetchAbandonedData(): Promise<AbandonedData> {
-  const [abandonedPrograms, abandonedProjects, abandonedTasks, abandonedSpecialTasks] = await Promise.all([
+  const [abandonedPrograms, abandonedProjects, abandonedTasks, abandonedSpecialTasks, abandonedSuchTasks] = await Promise.all([
     prisma.program.findMany({
       where: { abandoned: true },
       select: {
@@ -98,6 +98,18 @@ export async function fetchAbandonedData(): Promise<AbandonedData> {
               select: {
                 id: true,
                 specialTaskCode: true,
+                name: true,
+                abandonedAt: true,
+                abandonedReason: true,
+                abandonedRemarks: true,
+                sortOrder: true,
+              },
+            },
+            suchTasks: {
+              where: { abandoned: true },
+              select: {
+                id: true,
+                suchTaskCode: true,
                 name: true,
                 abandonedAt: true,
                 abandonedReason: true,
@@ -151,6 +163,18 @@ export async function fetchAbandonedData(): Promise<AbandonedData> {
           select: {
             id: true,
             specialTaskCode: true,
+            name: true,
+            abandonedAt: true,
+            abandonedReason: true,
+            abandonedRemarks: true,
+            sortOrder: true,
+          },
+        },
+        suchTasks: {
+          where: { abandoned: true },
+          select: {
+            id: true,
+            suchTaskCode: true,
             name: true,
             abandonedAt: true,
             abandonedReason: true,
@@ -235,6 +259,43 @@ export async function fetchAbandonedData(): Promise<AbandonedData> {
       },
       orderBy: { sortOrder: "asc" },
     }),
+    prisma.suchTask.findMany({
+      where: {
+        abandoned: true,
+        project: { abandoned: false },
+      },
+      select: {
+        id: true,
+        suchTaskCode: true,
+        name: true,
+        abandonedAt: true,
+        abandonedReason: true,
+        abandonedRemarks: true,
+        sortOrder: true,
+        project: {
+          select: {
+            id: true,
+            name: true,
+            abandonedAt: true,
+            abandonedReason: true,
+            abandonedRemarks: true,
+            sortOrder: true,
+            program: {
+              select: {
+                id: true,
+                name: true,
+                abandonedAt: true,
+                abandonedReason: true,
+                abandonedRemarks: true,
+                sortOrder: true,
+                framework: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { sortOrder: "asc" },
+    }),
   ]);
 
   const programMap = new Map<number, ProgramEntry>();
@@ -266,6 +327,15 @@ export async function fetchAbandonedData(): Promise<AbandonedData> {
           id: st.id,
           type: "special-task" as const,
           code: st.specialTaskCode,
+          name: st.name,
+          abandonedAt: st.abandonedAt,
+          abandonedReason: st.abandonedReason,
+          abandonedRemarks: st.abandonedRemarks,
+        })),
+        ...proj.suchTasks.map((st) => ({
+          id: st.id,
+          type: "such-task" as const,
+          code: st.suchTaskCode,
           name: st.name,
           abandonedAt: st.abandonedAt,
           abandonedReason: st.abandonedReason,
@@ -317,6 +387,15 @@ export async function fetchAbandonedData(): Promise<AbandonedData> {
         id: st.id,
         type: "special-task" as const,
         code: st.specialTaskCode,
+        name: st.name,
+        abandonedAt: st.abandonedAt,
+        abandonedReason: st.abandonedReason,
+        abandonedRemarks: st.abandonedRemarks,
+      })),
+      ...proj.suchTasks.map((st) => ({
+        id: st.id,
+        type: "such-task" as const,
+        code: st.suchTaskCode,
         name: st.name,
         abandonedAt: st.abandonedAt,
         abandonedReason: st.abandonedReason,
@@ -415,6 +494,49 @@ export async function fetchAbandonedData(): Promise<AbandonedData> {
       id: st.id,
       type: "special-task",
       code: st.specialTaskCode,
+      name: st.name,
+      abandonedAt: st.abandonedAt,
+      abandonedReason: st.abandonedReason,
+      abandonedRemarks: st.abandonedRemarks,
+    });
+  }
+
+  for (const st of abandonedSuchTasks) {
+    let program = programMap.get(st.project.program.id);
+    if (!program) {
+      program = {
+        id: st.project.program.id,
+        name: st.project.program.name,
+        abandoned: false,
+        abandonedAt: st.project.program.abandonedAt,
+        abandonedReason: st.project.program.abandonedReason,
+        abandonedRemarks: st.project.program.abandonedRemarks,
+        framework: st.project.program.framework,
+        projects: new Map(),
+        sortOrder: st.project.program.sortOrder,
+      };
+      programMap.set(st.project.program.id, program);
+    }
+
+    let project = program.projects.get(st.project.id);
+    if (!project) {
+      project = {
+        id: st.project.id,
+        name: st.project.name,
+        abandoned: false,
+        abandonedAt: st.project.abandonedAt,
+        abandonedReason: st.project.abandonedReason,
+        abandonedRemarks: st.project.abandonedRemarks,
+        tasks: [],
+        sortOrder: st.project.sortOrder,
+      };
+      program.projects.set(st.project.id, project);
+    }
+
+    project.tasks.push({
+      id: st.id,
+      type: "such-task",
+      code: st.suchTaskCode,
       name: st.name,
       abandonedAt: st.abandonedAt,
       abandonedReason: st.abandonedReason,

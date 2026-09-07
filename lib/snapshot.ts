@@ -41,6 +41,22 @@ interface SnapshotSpecialTask {
   abandoned: boolean;
 }
 
+interface SnapshotSuchTask {
+  id: number;
+  suchTaskCode: string;
+  name: string;
+  sortOrder: number;
+  totalScheduled: number;
+  sv: number;
+  snv: number;
+  nsv: number;
+  dueQuarter: string;
+  lastUpdatedDate: string | null;
+  phaseId: number | null;
+  archived: boolean;
+  abandoned: boolean;
+}
+
 interface SnapshotPhase {
   id: number;
   projectId: number;
@@ -65,6 +81,7 @@ interface SnapshotProject {
   phases: SnapshotPhase[];
   tasks: SnapshotTask[];
   specialTasks: SnapshotSpecialTask[];
+  suchTasks: SnapshotSuchTask[];
 }
 
 interface SnapshotProgram {
@@ -197,6 +214,25 @@ export async function getSnapshotAt(timestamp: string): Promise<{
                   },
                   orderBy: { sortOrder: "asc" },
                 },
+                suchTasks: {
+                  select: {
+                    id: true,
+                    projectId: true,
+                    suchTaskCode: true,
+                    name: true,
+                    sortOrder: true,
+                    totalScheduled: true,
+                    sv: true,
+                    snv: true,
+                    nsv: true,
+                    dueQuarter: true,
+                    lastUpdatedDate: true,
+                    phaseId: true,
+                    archived: true,
+                    abandoned: true,
+                  },
+                  orderBy: { sortOrder: "asc" },
+                },
               },
               orderBy: { sortOrder: "asc" },
             },
@@ -235,7 +271,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
   const projectMap = new Map(
     currentFrameworks.flatMap((f) =>
       f.programs.flatMap((p) =>
-        p.projects.map((pr) => [pr.id, { ...pr, phases: [...pr.phases], tasks: [...pr.tasks], specialTasks: [...pr.specialTasks] }])
+        p.projects.map((pr) => [pr.id, { ...pr, phases: [...pr.phases], tasks: [...pr.tasks], specialTasks: [...pr.specialTasks], suchTasks: [...pr.suchTasks] }])
       )
     )
   );
@@ -257,6 +293,13 @@ export async function getSnapshotAt(timestamp: string): Promise<{
     currentFrameworks.flatMap((f) =>
       f.programs.flatMap((p) =>
         p.projects.flatMap((pr) => pr.specialTasks.map((st) => [st.id, { ...st }]))
+      )
+    )
+  );
+  const suchTaskMap = new Map(
+    currentFrameworks.flatMap((f) =>
+      f.programs.flatMap((p) =>
+        p.projects.flatMap((pr) => pr.suchTasks.map((st) => [st.id, { ...st }]))
       )
     )
   );
@@ -293,6 +336,9 @@ export async function getSnapshotAt(timestamp: string): Promise<{
             for (const st of pr.specialTasks) {
               unarchiveEntity("SpecialTask", st.id);
             }
+            for (const st of pr.suchTasks) {
+              unarchiveEntity("SuchTask", st.id);
+            }
           }
         } else {
           unarchiveEntity(log.entityType, log.entityId);
@@ -312,6 +358,9 @@ export async function getSnapshotAt(timestamp: string): Promise<{
             for (const st of pr.specialTasks) {
               archiveEntity("SpecialTask", st.id);
             }
+            for (const st of pr.suchTasks) {
+              archiveEntity("SuchTask", st.id);
+            }
           }
         } else {
           archiveEntity(log.entityType, log.entityId);
@@ -328,6 +377,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
               pr.abandoned = false;
               for (const t of pr.tasks) t.abandoned = false;
               for (const st of pr.specialTasks) st.abandoned = false;
+              for (const st of pr.suchTasks) st.abandoned = false;
             }
           }
         } else if (log.entityType === "Project") {
@@ -336,12 +386,16 @@ export async function getSnapshotAt(timestamp: string): Promise<{
             pr.abandoned = false;
             for (const t of pr.tasks) t.abandoned = false;
             for (const st of pr.specialTasks) st.abandoned = false;
+            for (const st of pr.suchTasks) st.abandoned = false;
           }
         } else if (log.entityType === "Task") {
           const t = taskMap.get(log.entityId);
           if (t) t.abandoned = false;
         } else if (log.entityType === "SpecialTask") {
           const st = specialTaskMap.get(log.entityId);
+          if (st) st.abandoned = false;
+        } else if (log.entityType === "SuchTask") {
+          const st = suchTaskMap.get(log.entityId);
           if (st) st.abandoned = false;
         }
         break;
@@ -356,6 +410,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
               pr.abandoned = true;
               for (const t of pr.tasks) t.abandoned = true;
               for (const st of pr.specialTasks) st.abandoned = true;
+              for (const st of pr.suchTasks) st.abandoned = true;
             }
           }
         } else if (log.entityType === "Project") {
@@ -364,12 +419,16 @@ export async function getSnapshotAt(timestamp: string): Promise<{
             pr.abandoned = true;
             for (const t of pr.tasks) t.abandoned = true;
             for (const st of pr.specialTasks) st.abandoned = true;
+            for (const st of pr.suchTasks) st.abandoned = true;
           }
         } else if (log.entityType === "Task") {
           const t = taskMap.get(log.entityId);
           if (t) t.abandoned = true;
         } else if (log.entityType === "SpecialTask") {
           const st = specialTaskMap.get(log.entityId);
+          if (st) st.abandoned = true;
+        } else if (log.entityType === "SuchTask") {
+          const st = suchTaskMap.get(log.entityId);
           if (st) st.abandoned = true;
         }
         break;
@@ -409,6 +468,11 @@ export async function getSnapshotAt(timestamp: string): Promise<{
           if (st && log.oldValue) {
             st.dueQuarter = log.oldValue;
           }
+        } else if (log.entityType === "SuchTask") {
+          const st = suchTaskMap.get(log.entityId);
+          if (st && log.oldValue) {
+            st.dueQuarter = log.oldValue;
+          }
         } else if (log.entityType === "Task") {
           const task = taskMap.get(log.entityId);
           if (task && log.oldValue) {
@@ -436,6 +500,11 @@ export async function getSnapshotAt(timestamp: string): Promise<{
             } else if (tableType === "SpecialTask") {
               for (let i = 0; i < prevOrder.length; i++) {
                 const st = specialTaskMap.get(prevOrder[i]);
+                if (st) st.sortOrder = i;
+              }
+            } else if (tableType === "SuchTask") {
+              for (let i = 0; i < prevOrder.length; i++) {
+                const st = suchTaskMap.get(prevOrder[i]);
                 if (st) st.sortOrder = i;
               }
             } else if (tableType === "Phase") {
@@ -488,6 +557,9 @@ export async function getSnapshotAt(timestamp: string): Promise<{
     } else if (type === "SpecialTask") {
       const st = specialTaskMap.get(id);
       if (st) st.archived = false;
+    } else if (type === "SuchTask") {
+      const st = suchTaskMap.get(id);
+      if (st) st.archived = false;
     }
   }
 
@@ -509,6 +581,9 @@ export async function getSnapshotAt(timestamp: string): Promise<{
       if (t) t.archived = true;
     } else if (type === "SpecialTask") {
       const st = specialTaskMap.get(id);
+      if (st) st.archived = true;
+    } else if (type === "SuchTask") {
+      const st = suchTaskMap.get(id);
       if (st) st.archived = true;
     }
   }
@@ -572,6 +647,19 @@ export async function getSnapshotAt(timestamp: string): Promise<{
         if (changes.part) st.part = parseInt(changes.part.old) || 0;
         if (changes.mostly) st.mostly = parseInt(changes.mostly.old) || 0;
         if (changes.done) st.done = parseInt(changes.done.old) || 0;
+        if (changes.dueQuarter) st.dueQuarter = changes.dueQuarter.old;
+        if (changes.lastUpdatedDate) st.lastUpdatedDate = changes.lastUpdatedDate.old || null;
+        if (changes.archived) st.archived = changes.archived.old === "true";
+      }
+    } else if (type === "SuchTask") {
+      const st = suchTaskMap.get(id);
+      if (st) {
+        if (changes.suchTaskCode) st.suchTaskCode = changes.suchTaskCode.old;
+        if (changes.name) st.name = changes.name.old;
+        if (changes.totalScheduled) st.totalScheduled = parseInt(changes.totalScheduled.old) || 0;
+        if (changes.sv) st.sv = parseInt(changes.sv.old) || 0;
+        if (changes.snv) st.snv = parseInt(changes.snv.old) || 0;
+        if (changes.nsv) st.nsv = parseInt(changes.nsv.old) || 0;
         if (changes.dueQuarter) st.dueQuarter = changes.dueQuarter.old;
         if (changes.lastUpdatedDate) st.lastUpdatedDate = changes.lastUpdatedDate.old || null;
         if (changes.archived) st.archived = changes.archived.old === "true";
@@ -641,6 +729,26 @@ export async function getSnapshotAt(timestamp: string): Promise<{
           });
         }
 
+        const suchTasks: SnapshotSuchTask[] = [];
+        for (const [stid, st] of suchTaskMap) {
+          if (st.projectId !== prid) continue;
+          if (createdAfter.has(`SuchTask:${stid}`)) continue;
+          suchTasks.push({
+            id: st.id,
+            suchTaskCode: st.suchTaskCode,
+            name: st.name,
+            sortOrder: st.sortOrder,
+            totalScheduled: st.totalScheduled,
+            sv: st.sv,
+            snv: st.snv,
+            nsv: st.nsv,
+            dueQuarter: st.dueQuarter,
+            lastUpdatedDate: st.lastUpdatedDate,
+            phaseId: st.phaseId,
+            archived: st.archived,
+          });
+        }
+
         const phases: SnapshotPhase[] = [];
         for (const [phid, ph] of phaseMap) {
           if (ph.projectId !== prid) continue;
@@ -669,6 +777,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
           phases,
           tasks,
           specialTasks,
+          suchTasks,
         });
       }
 
@@ -728,6 +837,7 @@ function filterArchived(frameworks: SnapshotFramework[]): SnapshotFramework[] {
               phases: pr.phases.filter((ph) => !ph.archived),
               tasks: pr.tasks.filter((t) => !t.archived && !t.abandoned),
               specialTasks: pr.specialTasks.filter((st) => !st.archived && !st.abandoned),
+              suchTasks: pr.suchTasks.filter((st) => !st.archived && !st.abandoned),
             })),
         })),
     }));

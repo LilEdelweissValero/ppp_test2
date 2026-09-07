@@ -150,7 +150,7 @@ export default function AbandonedView({ data }: Props) {
   async function doUnabandon(entityType: string, entityId: number) {
     setLoading(entityId);
     try {
-      const endpoint = entityType === "SpecialTask" ? "special-tasks" : entityType.toLowerCase() + "s";
+      const endpoint = entityType === "SpecialTask" ? "special-tasks" : entityType === "SuchTask" ? "such-tasks" : entityType.toLowerCase() + "s";
       const res = await fetch(`/api/${endpoint}/${entityId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -285,7 +285,7 @@ export default function AbandonedView({ data }: Props) {
           open={!!unabandonTarget}
           onClose={() => setUnabandonTarget(null)}
           onConfirm={handleUnabandonConfirm}
-          entityType={unabandonTarget.entityType as "task" | "special-task" | "project"}
+          entityType={unabandonTarget.entityType as "task" | "special-task" | "such-task" | "project"}
           entityName={unabandonTarget.entityName}
           parentsToUnabandon={unabandonTarget.parents}
           loading={loading !== null}

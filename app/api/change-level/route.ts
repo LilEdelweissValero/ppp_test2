@@ -29,7 +29,7 @@ const ALLOWED_MOVES = new Set([
 ]);
 
 interface AllocEntry {
-  itemType: "task" | "specialTask";
+  itemType: "task" | "specialTask" | "suchTask";
   itemId: number;
   projectId: number;
 }
@@ -90,7 +90,7 @@ function parseAllocs(v: unknown): AllocEntry[] {
     const projectId = intOrNull((a as AllocEntry).projectId);
     const itemType = (a as AllocEntry).itemType;
     if (itemId === null || projectId === null) continue;
-    if (itemType !== "task" && itemType !== "specialTask") continue;
+    if (itemType !== "task" && itemType !== "specialTask" && itemType !== "suchTask") continue;
     out.push({ itemType, itemId, projectId });
   }
   return out;
@@ -155,7 +155,7 @@ async function validateTaskCodes(
 }
 
 interface DisplacedRef {
-  itemType: "task" | "specialTask";
+  itemType: "task" | "specialTask" | "suchTask";
   id: number;
   archived: boolean;
   groupId: number;
@@ -163,12 +163,19 @@ interface DisplacedRef {
 
 function buildDisplaced(
   tasks: { id: number; archived: boolean; projectId: number }[],
-  specials: { id: number; archived: boolean; projectId: number }[]
+  specials: { id: number; archived: boolean; projectId: number }[],
+  suchTasks?: { id: number; archived: boolean; projectId: number }[]
 ): DisplacedRef[] {
   return [
     ...tasks.map((t) => ({ itemType: "task" as const, id: t.id, archived: t.archived, groupId: t.projectId })),
     ...specials.map((s) => ({
       itemType: "specialTask" as const,
+      id: s.id,
+      archived: s.archived,
+      groupId: s.projectId,
+    })),
+    ...(suchTasks ?? []).map((s) => ({
+      itemType: "suchTask" as const,
       id: s.id,
       archived: s.archived,
       groupId: s.projectId,
@@ -213,8 +220,8 @@ async function reallocateDisplaced(
   allocList: AllocEntry[],
   resolveTarget: (projectId: number) => number | undefined,
   fallbackTargetId: () => number | undefined
-): Promise<{ tasksReassigned: number; specialTasksReassigned: number }> {
-  if (displaced.length === 0) return { tasksReassigned: 0, specialTasksReassigned: 0 };
+): Promise<{ tasksReassigned: number; specialTasksReassigned: number; suchTasksReassigned: number }> {
+  if (displaced.length === 0) return { tasksReassigned: 0, specialTasksReassigned: 0, suchTasksReassigned: 0 };
 
   const allocByItem = new Map(allocList.map((a) => [`${a.itemType}:${a.itemId}`, a]));
   const groupTargets = new Map<number, number>();
@@ -242,7 +249,7 @@ async function reallocateDisplaced(
       if (fallback === undefined) fallback = fallbackTargetId();
       target = fallback;
     }
-    if (target === undefined) return { tasksReassigned: 0, specialTasksReassigned: 0 };
+    if (target === undefined) return { tasksReassigned: 0, specialTasksReassigned: 0, suchTasksReassigned: 0 };
     assigned.set(d, target);
   }
 
@@ -262,16 +269,25 @@ async function reallocateDisplaced(
   for (const row of stMaxes) {
     nextSort.set(-row.projectId, (row._max.sortOrder ?? 0) + 1);
   }
+  const suchMaxes = await tx.suchTask.groupBy({
+    by: ["projectId"],
+    _max: { sortOrder: true },
+    where: { projectId: { in: targetIds } },
+  });
+  for (const row of suchMaxes) {
+    nextSort.set(-(row.projectId * 10000), (row._max.sortOrder ?? 0) + 1);
+  }
 
   let tasksReassigned = 0;
   let specialTasksReassigned = 0;
+  let suchTasksReassigned = 0;
   for (const [d, target] of assigned) {
     if (d.itemType === "task") {
       const sort = nextSort.get(target) ?? 1;
       nextSort.set(target, sort + 1);
       await tx.task.update({ where: { id: d.id }, data: { projectId: target, sortOrder: sort } });
       tasksReassigned++;
-    } else {
+    } else if (d.itemType === "specialTask") {
       const sortKey = -target;
       const sort = nextSort.get(sortKey) ?? 1;
       nextSort.set(sortKey, sort + 1);
@@ -280,9 +296,18 @@ async function reallocateDisplaced(
         data: { projectId: target, sortOrder: sort },
       });
       specialTasksReassigned++;
+    } else if (d.itemType === "suchTask") {
+      const sortKey = -(target * 10000);
+      const sort = nextSort.get(sortKey) ?? 1;
+      nextSort.set(sortKey, sort + 1);
+      await tx.suchTask.update({
+        where: { id: d.id },
+        data: { projectId: target, sortOrder: sort },
+      });
+      suchTasksReassigned++;
     }
   }
-  return { tasksReassigned, specialTasksReassigned };
+  return { tasksReassigned, specialTasksReassigned, suchTasksReassigned };
 }
 
 export async function POST(request: NextRequest) {
@@ -364,6 +389,10 @@ async function frameworkToProgram(
     ? await prisma.specialTask.findMany({ where: { projectId: { in: projectIds } } })
     : [];
 
+  const suchTasks = projectIds.length
+    ? await prisma.suchTask.findMany({ where: { projectId: { in: projectIds } } })
+    : [];
+
   const settings = await getSettings();
   const validStatuses = new Set(settings.statuses.map((s) => s.name));
 
@@ -407,7 +436,7 @@ async function frameworkToProgram(
   const allProjects = await prisma.project.findMany({ select: { id: true } });
   const deletedProjectIds = new Set(projectIds);
   const survivorIds = new Set(allProjects.map((p) => p.id).filter((id) => !deletedProjectIds.has(id)));
-  const displaced = buildDisplaced(tasks, specials);
+  const displaced = buildDisplaced(tasks, specials, suchTasks);
   validateAllocations(displaced, allocList, (pid) => survivorIds.has(pid) || programIds.includes(pid), conflicts);
 
   if (conflicts.length > 0) return bad("Validation failed", 409, conflicts);
@@ -425,7 +454,7 @@ async function frameworkToProgram(
     projectsByProgram.set(p.programId, list);
   }
 
-  let summary = { tasksReassigned: 0, specialTasksReassigned: 0 };
+  let summary = { tasksReassigned: 0, specialTasksReassigned: 0, suchTasksReassigned: 0 };
   const rootResults: {
     newId: number;
     name: string;
@@ -536,7 +565,7 @@ async function frameworkToProgram(
         convertedPrograms: r.convertedPrograms,
         convertedProjects: r.convertedProjects,
         tasksReassigned: summary.tasksReassigned,
-        specialTasksReassigned: summary.specialTasksReassigned,
+        specialTasksReassigned: summary.specialTasksReassigned, suchTasksReassigned: summary.suchTasksReassigned,
       }),
     });
   }
@@ -566,6 +595,9 @@ async function programToFramework(
   const specials = projectIds.length
     ? await prisma.specialTask.findMany({ where: { projectId: { in: projectIds } } })
     : [];
+  const suchTasks = projectIds.length
+    ? await prisma.suchTask.findMany({ where: { projectId: { in: projectIds } } })
+    : [];
 
   const conflicts: string[] = [];
   const existingFws = await prisma.framework.findMany({
@@ -586,7 +618,7 @@ async function programToFramework(
   const deletedProjectIds = new Set(projectIds);
   const survivorIds = new Set(allProjects.map((p) => p.id).filter((id) => !deletedProjectIds.has(id)));
   const newProjectFromTaskIds = new Set(tasks.map((t) => t.id));
-  const displaced = buildDisplaced([], specials);
+  const displaced = buildDisplaced([], specials, suchTasks);
   validateAllocations(displaced, allocList, (pid) => survivorIds.has(pid) || newProjectFromTaskIds.has(pid), conflicts);
 
   if (conflicts.length > 0) return bad("Validation failed", 409, conflicts);
@@ -604,7 +636,7 @@ async function programToFramework(
     tasksByProject.set(t.projectId, list);
   }
 
-  let summary = { tasksReassigned: 0, specialTasksReassigned: 0 };
+  let summary = { tasksReassigned: 0, specialTasksReassigned: 0, suchTasksReassigned: 0 };
   const rootResults: { newId: number; name: string; convertedProjects: number; convertedTasks: number }[] = [];
 
   await prisma.$transaction(async (tx) => {
@@ -692,7 +724,7 @@ async function programToFramework(
         to: "Framework",
         convertedProjects: r.convertedProjects,
         convertedTasks: r.convertedTasks,
-        specialTasksReassigned: summary.specialTasksReassigned,
+        specialTasksReassigned: summary.specialTasksReassigned, suchTasksReassigned: summary.suchTasksReassigned,
       }),
     });
   }
@@ -729,6 +761,9 @@ async function programToProject(
   const specials = projectIds.length
     ? await prisma.specialTask.findMany({ where: { projectId: { in: projectIds } } })
     : [];
+  const suchTasks = projectIds.length
+    ? await prisma.suchTask.findMany({ where: { projectId: { in: projectIds } } })
+    : [];
 
   const settings = await getSettings();
   const validStatuses = new Set(settings.statuses.map((s) => s.name));
@@ -763,7 +798,7 @@ async function programToProject(
   const allProjects = await prisma.project.findMany({ select: { id: true } });
   const deletedProjectIds = new Set(projectIds);
   const survivorIds = new Set(allProjects.map((p) => p.id).filter((id) => !deletedProjectIds.has(id)));
-  const displaced = buildDisplaced(tasks, specials);
+  const displaced = buildDisplaced(tasks, specials, suchTasks);
   validateAllocations(displaced, allocList, (pid) => survivorIds.has(pid) || itemIds.includes(pid), conflicts);
 
   if (conflicts.length > 0) return bad("Validation failed", 409, conflicts);
@@ -781,7 +816,7 @@ async function programToProject(
     tasksByProject.set(t.projectId, list);
   }
 
-  let summary = { tasksReassigned: 0, specialTasksReassigned: 0 };
+  let summary = { tasksReassigned: 0, specialTasksReassigned: 0, suchTasksReassigned: 0 };
   const rootResults: { newId: number; name: string; convertedProjects: number }[] = [];
 
   await prisma.$transaction(async (tx) => {
@@ -870,7 +905,7 @@ async function programToProject(
         destination: destProgram.name,
         convertedProjects: r.convertedProjects,
         tasksReassigned: summary.tasksReassigned,
-        specialTasksReassigned: summary.specialTasksReassigned,
+        specialTasksReassigned: summary.specialTasksReassigned, suchTasksReassigned: summary.suchTasksReassigned,
       }),
     });
   }
@@ -900,6 +935,7 @@ async function projectToProgram(
     orderBy: { sortOrder: "asc" },
   });
   const specials = await prisma.specialTask.findMany({ where: { projectId: { in: itemIds } } });
+  const suchTasks = await prisma.suchTask.findMany({ where: { projectId: { in: itemIds } } });
 
   const conflicts: string[] = [];
   const existingProgs = await prisma.program.findMany({
@@ -921,7 +957,7 @@ async function projectToProgram(
   const deletedProjectIds = new Set(itemIds);
   const survivorIds = new Set(allProjects.map((p) => p.id).filter((id) => !deletedProjectIds.has(id)));
   const newProjectFromTaskIds = new Set(tasks.map((t) => t.id));
-  const displaced = buildDisplaced([], specials);
+  const displaced = buildDisplaced([], specials, suchTasks);
   validateAllocations(displaced, allocList, (pid) => survivorIds.has(pid) || newProjectFromTaskIds.has(pid), conflicts);
 
   if (conflicts.length > 0) return bad("Validation failed", 409, conflicts);
@@ -933,7 +969,7 @@ async function projectToProgram(
     tasksByProject.set(t.projectId, list);
   }
 
-  let summary = { tasksReassigned: 0, specialTasksReassigned: 0 };
+  let summary = { tasksReassigned: 0, specialTasksReassigned: 0, suchTasksReassigned: 0 };
   const rootResults: { newId: number; name: string; convertedTasks: number }[] = [];
 
   await prisma.$transaction(async (tx) => {
@@ -1007,7 +1043,7 @@ async function projectToProgram(
         to: "Program",
         destination: destFramework.name,
         convertedTasks: r.convertedTasks,
-        specialTasksReassigned: summary.specialTasksReassigned,
+        specialTasksReassigned: summary.specialTasksReassigned, suchTasksReassigned: summary.suchTasksReassigned,
       }),
     });
   }
@@ -1038,6 +1074,7 @@ async function projectToTask(
     orderBy: { sortOrder: "asc" },
   });
   const specials = await prisma.specialTask.findMany({ where: { projectId: { in: itemIds } } });
+  const suchTasks = await prisma.suchTask.findMany({ where: { projectId: { in: itemIds } } });
 
   const settings = await getSettings();
   const validStatuses = new Set(settings.statuses.map((s) => s.name));
@@ -1066,7 +1103,7 @@ async function projectToTask(
   const allProjects = await prisma.project.findMany({ select: { id: true } });
   const deletedProjectIds = new Set(itemIds);
   const survivorIds = new Set(allProjects.map((p) => p.id).filter((id) => !deletedProjectIds.has(id)));
-  const displaced = buildDisplaced(tasks, specials);
+  const displaced = buildDisplaced(tasks, specials, suchTasks);
   validateAllocations(displaced, allocList, (pid) => survivorIds.has(pid), conflicts);
 
   if (conflicts.length > 0) return bad("Validation failed", 409, conflicts);
@@ -1078,7 +1115,7 @@ async function projectToTask(
     tasksByProject.set(t.projectId, list);
   }
 
-  let summary = { tasksReassigned: 0, specialTasksReassigned: 0 };
+  let summary = { tasksReassigned: 0, specialTasksReassigned: 0, suchTasksReassigned: 0 };
   const rootResults: { newId: number; name: string; reassignedFromHere: number }[] = [];
 
   await prisma.$transaction(async (tx) => {
@@ -1144,7 +1181,7 @@ async function projectToTask(
         to: "Task",
         destination: destProject.name,
         tasksReassigned: summary.tasksReassigned,
-        specialTasksReassigned: summary.specialTasksReassigned,
+        specialTasksReassigned: summary.specialTasksReassigned, suchTasksReassigned: summary.suchTasksReassigned,
       }),
     });
   }

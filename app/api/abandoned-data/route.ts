@@ -46,6 +46,18 @@ export async function GET() {
             },
             orderBy: { sortOrder: "asc" },
           },
+          suchTasks: {
+            where: { abandoned: true },
+            select: {
+              id: true,
+              suchTaskCode: true,
+              name: true,
+              abandonedAt: true,
+              abandonedReason: true,
+              abandonedRemarks: true,
+            },
+            orderBy: { sortOrder: "asc" },
+          },
         },
         orderBy: { sortOrder: "asc" },
       },
@@ -85,6 +97,18 @@ export async function GET() {
         select: {
           id: true,
           specialTaskCode: true,
+          name: true,
+          abandonedAt: true,
+          abandonedReason: true,
+          abandonedRemarks: true,
+        },
+        orderBy: { sortOrder: "asc" },
+      },
+      suchTasks: {
+        where: { abandoned: true },
+        select: {
+          id: true,
+          suchTaskCode: true,
           name: true,
           abandonedAt: true,
           abandonedReason: true,
@@ -146,10 +170,35 @@ export async function GET() {
     orderBy: { sortOrder: "asc" },
   });
 
+  // Fetch abandoned such tasks NOT under an abandoned project
+  const abandonedSuchTasks = await prisma.suchTask.findMany({
+    where: {
+      abandoned: true,
+      project: { abandoned: false },
+    },
+    select: {
+      id: true,
+      suchTaskCode: true,
+      name: true,
+      abandonedAt: true,
+      abandonedReason: true,
+      abandonedRemarks: true,
+      project: {
+        select: {
+          id: true,
+          name: true,
+          program: { select: { id: true, name: true, framework: { select: { id: true, name: true } } } },
+        },
+      },
+    },
+    orderBy: { sortOrder: "asc" },
+  });
+
   return NextResponse.json({
     programs: abandonedPrograms,
     projects: abandonedProjects,
     tasks: abandonedTasks,
     specialTasks: abandonedSpecialTasks,
+    suchTasks: abandonedSuchTasks,
   });
 }

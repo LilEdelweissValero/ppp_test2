@@ -45,6 +45,10 @@ export async function PATCH(
       where: { projectId: parseInt(id) },
       select: { id: true, specialTaskCode: true, name: true },
     });
+    const suchTasks = await prisma.suchTask.findMany({
+      where: { projectId: parseInt(id) },
+      select: { id: true, suchTaskCode: true, name: true },
+    });
 
     const parentProgram = await prisma.program.findUnique({
       where: { id: oldProject.programId },
@@ -62,6 +66,10 @@ export async function PATCH(
         data: { abandoned, abandonedAt, abandonedReason: abandoned ? abandonedReason ?? null : null, abandonedRemarks: abandoned ? abandonedRemarks ?? null : null },
       });
       await tx.specialTask.updateMany({
+        where: { projectId: parseInt(id) },
+        data: { abandoned, abandonedAt, abandonedReason: abandoned ? abandonedReason ?? null : null, abandonedRemarks: abandoned ? abandonedRemarks ?? null : null },
+      });
+      await tx.suchTask.updateMany({
         where: { projectId: parseInt(id) },
         data: { abandoned, abandonedAt, abandonedReason: abandoned ? abandonedReason ?? null : null, abandonedRemarks: abandoned ? abandonedRemarks ?? null : null },
       });
@@ -88,6 +96,15 @@ export async function PATCH(
         entityType: "SpecialTask",
         entityId: st.id,
         entityName: `${st.specialTaskCode}: ${st.name}`,
+        changeType: abandoned ? "abandon" : "unabandon",
+        details: `Project ${abandoned ? "abandoned" : "unabandoned"}: cascade`,
+      });
+    }
+    for (const st of suchTasks) {
+      await logChange({
+        entityType: "SuchTask",
+        entityId: st.id,
+        entityName: `${st.suchTaskCode}: ${st.name}`,
         changeType: abandoned ? "abandon" : "unabandon",
         details: `Project ${abandoned ? "abandoned" : "unabandoned"}: cascade`,
       });

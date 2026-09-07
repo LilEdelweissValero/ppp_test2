@@ -47,8 +47,28 @@ const SPECIAL_TASK_COLUMNS = [
   "phase_weight",
 ];
 
+const SUCH_TASK_COLUMNS = [
+  "framework_name",
+  "program_name",
+  "project_name",
+  "project_reference",
+  "project_owner",
+  "project_target_quarter",
+  "such_task_code",
+  "such_task_name",
+  "total_scheduled",
+  "sv",
+  "snv",
+  "nsv",
+  "due_quarter",
+  "last_updated_date",
+  "archived",
+  "phase_name",
+  "phase_weight",
+];
+
 export async function GET() {
-  const [tasks, specialTasks] = await Promise.all([
+  const [tasks, specialTasks, suchTasks] = await Promise.all([
     prisma.task.findMany({
       select: {
         taskCode: true,
@@ -95,6 +115,39 @@ export async function GET() {
         part: true,
         mostly: true,
         done: true,
+        dueQuarter: true,
+        lastUpdatedDate: true,
+        archived: true,
+        phase: {
+          select: { name: true, weight: true },
+        },
+        project: {
+          select: {
+            name: true,
+            reference: true,
+            owner: true,
+            targetQuarter: true,
+            program: {
+              select: {
+                name: true,
+                framework: {
+                  select: { name: true },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { sortOrder: "asc" },
+    }),
+    prisma.suchTask.findMany({
+      select: {
+        suchTaskCode: true,
+        name: true,
+        totalScheduled: true,
+        sv: true,
+        snv: true,
+        nsv: true,
         dueQuarter: true,
         lastUpdatedDate: true,
         archived: true,
@@ -169,6 +222,26 @@ export async function GET() {
     st.phase?.weight ?? "",
   ]);
 
+  const suchTaskRows = suchTasks.map((st) => [
+    st.project.program.framework.name,
+    st.project.program.name,
+    st.project.name,
+    st.project.reference ?? "",
+    st.project.owner ?? "",
+    st.project.targetQuarter,
+    st.suchTaskCode,
+    st.name,
+    st.totalScheduled,
+    st.sv,
+    st.snv,
+    st.nsv,
+    st.dueQuarter,
+    st.lastUpdatedDate ?? "",
+    st.archived ? "TRUE" : "FALSE",
+    st.phase?.name ?? "",
+    st.phase?.weight ?? "",
+  ]);
+
   const wb = XLSX.utils.book_new();
 
   const ws1 = XLSX.utils.aoa_to_sheet([TASK_COLUMNS, ...taskRows]);
@@ -177,7 +250,11 @@ export async function GET() {
 
   const ws2 = XLSX.utils.aoa_to_sheet([SPECIAL_TASK_COLUMNS, ...specialTaskRows]);
   ws2["!cols"] = SPECIAL_TASK_COLUMNS.map((c) => ({ wch: Math.max(c.length + 2, 16) }));
-  XLSX.utils.book_append_sheet(wb, ws2, "Special Tasks");
+  XLSX.utils.book_append_sheet(wb, ws2, "Helpdesk Tickets");
+
+  const ws3 = XLSX.utils.aoa_to_sheet([SUCH_TASK_COLUMNS, ...suchTaskRows]);
+  ws3["!cols"] = SUCH_TASK_COLUMNS.map((c) => ({ wch: Math.max(c.length + 2, 16) }));
+  XLSX.utils.book_append_sheet(wb, ws3, "SUCH Tasks");
 
   const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
 

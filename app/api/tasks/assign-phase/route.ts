@@ -6,7 +6,7 @@ import { logChange } from "@/lib/audit-log";
 export async function PATCH(request: NextRequest) {
   const body = await request.json();
   const { assignments } = body as {
-    assignments: { taskId?: number; specialTaskId?: number; phaseId: number | null }[];
+    assignments: { taskId?: number; specialTaskId?: number; suchTaskId?: number; phaseId: number | null }[];
   };
 
   if (!Array.isArray(assignments) || assignments.length === 0) {
@@ -48,6 +48,23 @@ export async function PATCH(request: NextRequest) {
           entityType: "SpecialTask",
           entityId: st.id,
           entityName: `${st.specialTaskCode}: ${st.name}`,
+          changeType: "update",
+          details: JSON.stringify({ phaseId: { old: String(st.phaseId ?? ""), new: String(a.phaseId ?? "") } }),
+        });
+      } else if (a.suchTaskId) {
+        const st = await prisma.suchTask.findUnique({ where: { id: a.suchTaskId } });
+        if (!st) {
+          errors.push(`SuchTask ${a.suchTaskId} not found`);
+          continue;
+        }
+        await prisma.suchTask.update({
+          where: { id: a.suchTaskId },
+          data: { phaseId: a.phaseId },
+        });
+        await logChange({
+          entityType: "SuchTask",
+          entityId: st.id,
+          entityName: `${st.suchTaskCode}: ${st.name}`,
           changeType: "update",
           details: JSON.stringify({ phaseId: { old: String(st.phaseId ?? ""), new: String(a.phaseId ?? "") } }),
         });

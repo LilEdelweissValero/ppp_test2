@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Modal from "./Modal";
-import type { CachedTask, CachedSpecialTask } from "./PortfolioCacheProvider";
+import type { CachedTask, CachedSpecialTask, CachedSuchTask } from "./PortfolioCacheProvider";
 
 interface PhaseEntry {
   name: string;
@@ -15,7 +15,8 @@ interface Props {
   projectId: number;
   tasks: CachedTask[];
   specialTasks: CachedSpecialTask[];
-  onSaved: (phases: { id: number; name: string; weight: number; sortOrder: number }[], updatedTasks: CachedTask[], updatedSpecialTasks: CachedSpecialTask[]) => void;
+  suchTasks: CachedSuchTask[];
+  onSaved: (phases: { id: number; name: string; weight: number; sortOrder: number }[], updatedTasks: CachedTask[], updatedSpecialTasks: CachedSpecialTask[], updatedSuchTasks: CachedSuchTask[]) => void;
 }
 
 export default function PhaseSetupModal({
@@ -24,6 +25,7 @@ export default function PhaseSetupModal({
   projectId,
   tasks,
   specialTasks,
+  suchTasks,
   onSaved,
 }: Props) {
   const [phases, setPhases] = useState<PhaseEntry[]>([
@@ -32,6 +34,7 @@ export default function PhaseSetupModal({
   ]);
   const [taskPhaseMap, setTaskPhaseMap] = useState<Record<number, string>>({});
   const [specialTaskPhaseMap, setSpecialTaskPhaseMap] = useState<Record<number, string>>({});
+  const [suchTaskPhaseMap, setSuchTaskPhaseMap] = useState<Record<number, string>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,6 +53,13 @@ export default function PhaseSetupModal({
         return next;
       });
       setSpecialTaskPhaseMap((prev) => {
+        const next = { ...prev };
+        for (const [k, v] of Object.entries(next)) {
+          if (v === oldName) next[k] = newName;
+        }
+        return next;
+      });
+      setSuchTaskPhaseMap((prev) => {
         const next = { ...prev };
         for (const [k, v] of Object.entries(next)) {
           if (v === oldName) next[k] = newName;
@@ -80,7 +90,7 @@ export default function PhaseSetupModal({
       setError("All phases must have a name.");
       return;
     }
-    if (unassignedTasks.length > 0 || unassignedSpecialTasks.length > 0) {
+    if (unassignedTasks.length > 0 || unassignedSpecialTasks.length > 0 || unassignedSuchTasks.length > 0) {
       setError("All tasks must be assigned to a phase.");
       return;
     }
@@ -105,7 +115,7 @@ export default function PhaseSetupModal({
       const createdPhases = await res.json();
 
       // Assign tasks to phases via single batch request
-      const assignments: { taskId?: number; specialTaskId?: number; phaseId: number | null }[] = [];
+      const assignments: { taskId?: number; specialTaskId?: number; suchTaskId?: number; phaseId: number | null }[] = [];
       for (const [taskIdStr, phaseName] of Object.entries(taskPhaseMap)) {
         const phase = createdPhases.find((p: { name: string }) => p.name === phaseName);
         if (phase) assignments.push({ taskId: Number(taskIdStr), phaseId: phase.id });
@@ -113,6 +123,10 @@ export default function PhaseSetupModal({
       for (const [stIdStr, phaseName] of Object.entries(specialTaskPhaseMap)) {
         const phase = createdPhases.find((p: { name: string }) => p.name === phaseName);
         if (phase) assignments.push({ specialTaskId: Number(stIdStr), phaseId: phase.id });
+      }
+      for (const [stIdStr, phaseName] of Object.entries(suchTaskPhaseMap)) {
+        const phase = createdPhases.find((p: { name: string }) => p.name === phaseName);
+        if (phase) assignments.push({ suchTaskId: Number(stIdStr), phaseId: phase.id });
       }
       if (assignments.length > 0) {
         const assignRes = await fetch("/api/tasks/assign-phase", {
@@ -143,8 +157,16 @@ export default function PhaseSetupModal({
         }
         return st;
       });
+      const updatedSuchTasks = suchTasks.map((st) => {
+        const phaseName = suchTaskPhaseMap[st.id];
+        if (phaseName) {
+          const phase = createdPhases.find((p: { name: string }) => p.name === phaseName);
+          return phase ? { ...st, phaseId: phase.id } : st;
+        }
+        return st;
+      });
 
-      onSaved(createdPhases, updatedTasks, updatedSpecialTasks);
+      onSaved(createdPhases, updatedTasks, updatedSpecialTasks, updatedSuchTasks);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");
@@ -155,6 +177,7 @@ export default function PhaseSetupModal({
 
   const unassignedTasks = tasks.filter((t) => !taskPhaseMap[t.id]);
   const unassignedSpecialTasks = specialTasks.filter((st) => !specialTaskPhaseMap[st.id]);
+  const unassignedSuchTasks = suchTasks.filter((st) => !suchTaskPhaseMap[st.id]);
 
   return (
     <Modal open={open} onClose={onClose} title="Set Up Phases" wide>
@@ -243,7 +266,7 @@ export default function PhaseSetupModal({
       </div>
 
       {/* Task assignment */}
-      {(tasks.length > 0 || specialTasks.length > 0) && (
+      {(tasks.length > 0 || specialTasks.length > 0 || suchTasks.length > 0) && (
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-primary)", marginBottom: 8 }}>
             Assign Tasks to Phases (required)
@@ -295,7 +318,7 @@ export default function PhaseSetupModal({
           {specialTasks.length > 0 && (
             <div>
               <div style={{ fontSize: 11, color: "var(--ink-tertiary)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                Special Tasks
+                Helpdesk Tickets
               </div>
               {specialTasks.map((st) => (
                 <div key={st.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
@@ -334,10 +357,53 @@ export default function PhaseSetupModal({
               ))}
             </div>
           )}
+
+          {suchTasks.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, color: "var(--ink-tertiary)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                SUCH Tasks
+              </div>
+              {suchTasks.map((st) => (
+                <div key={st.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <span style={{ fontSize: 12, color: "var(--ink-secondary)", fontFamily: "var(--font-mono)", minWidth: 70 }}>
+                    {st.suchTaskCode}
+                  </span>
+                  <span style={{ fontSize: 12, color: "var(--ink-primary)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {st.name}
+                  </span>
+                  <select
+                    value={suchTaskPhaseMap[st.id] || ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSuchTaskPhaseMap((prev) => {
+                        const next = { ...prev };
+                        if (val) next[st.id] = val;
+                        else delete next[st.id];
+                        return next;
+                      });
+                    }}
+                    style={{
+                      fontSize: 12,
+                      padding: "3px 6px",
+                      border: "1px solid var(--rule)",
+                      borderRadius: 3,
+                      background: "var(--surface)",
+                      color: "var(--ink-primary)",
+                    }}
+                  >
+                    <option value="">-- Select phase --</option>
+                    {phases.filter((p) => p.name.trim()).map((p) => (
+                      <option key={p.name} value={p.name}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {tasks.length === 0 && specialTasks.length === 0 && (
+      {tasks.length === 0 && specialTasks.length === 0 && suchTasks.length === 0 && (
         <p style={{ fontSize: 12, color: "var(--ink-tertiary)", fontStyle: "italic", marginBottom: 16 }}>
           No tasks in this project yet. Tasks created later can be assigned to phases.
         </p>
@@ -364,15 +430,15 @@ export default function PhaseSetupModal({
         </button>
         <button
           onClick={handleSave}
-          disabled={saving || !weightValid || unassignedTasks.length > 0 || unassignedSpecialTasks.length > 0}
+          disabled={saving || !weightValid || unassignedTasks.length > 0 || unassignedSpecialTasks.length > 0 || unassignedSuchTasks.length > 0}
           style={{
             padding: "8px 16px",
             fontSize: 13,
             border: "none",
             borderRadius: 3,
-            background: saving || !weightValid || unassignedTasks.length > 0 || unassignedSpecialTasks.length > 0 ? "var(--ink-tertiary)" : "var(--accent)",
+            background: saving || !weightValid || unassignedTasks.length > 0 || unassignedSpecialTasks.length > 0 || unassignedSuchTasks.length > 0 ? "var(--ink-tertiary)" : "var(--accent)",
             color: "#fff",
-            cursor: saving || !weightValid || unassignedTasks.length > 0 || unassignedSpecialTasks.length > 0 ? "not-allowed" : "pointer",
+            cursor: saving || !weightValid || unassignedTasks.length > 0 || unassignedSpecialTasks.length > 0 || unassignedSuchTasks.length > 0 ? "not-allowed" : "pointer",
             fontWeight: 600,
           }}
         >

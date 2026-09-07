@@ -119,6 +119,48 @@ export function expandSpecialTasksToVirtualTasks(
   return virtuals;
 }
 
+// ── SUCH task computation ────────────────────────────────────────────────────
+
+export interface SuchTaskInput {
+  id: number;
+  suchTaskCode: string;
+  name: string;
+  sv: number;
+  snv: number;
+  nsv: number;
+  dueQuarter: string;
+  phaseId: number | null;
+}
+
+export function computeSuchTaskPercent(sv: number, snv: number, nsv: number): number {
+  const denominator = sv + snv;
+  if (denominator === 0) return 0;
+  return Math.round(((sv + nsv) / denominator) * 100);
+}
+
+export function expandSuchTasksToVirtualTasks(
+  suchTasks: SuchTaskInput[],
+  settings?: ComputationSettings
+): VirtualTask[] {
+  const statuses = settings?.statuses ?? DEFAULT_STATUSES;
+  const virtuals: VirtualTask[] = [];
+  for (const st of suchTasks) {
+    const pct = computeSuchTaskPercent(st.sv, st.snv, st.nsv);
+    let statusName: string;
+    if (pct === 100) statusName = statuses[4].name;
+    else if (pct >= 75) statusName = statuses[3].name;
+    else if (pct >= 50) statusName = statuses[2].name;
+    else if (pct > 0) statusName = statuses[1].name;
+    else statusName = statuses[0].name;
+    virtuals.push({
+      id: -(st.id * 1000 + virtuals.length),
+      status: statusName,
+      phaseId: st.phaseId,
+    });
+  }
+  return virtuals;
+}
+
 export function computeProjectDerivedStatus(
   tasks: { status: string }[],
   settings?: ComputationSettings

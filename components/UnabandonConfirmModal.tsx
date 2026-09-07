@@ -12,7 +12,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onConfirm: () => void;
-  entityType: "task" | "special-task" | "project";
+  entityType: "task" | "special-task" | "such-task" | "project";
   entityName: string;
   parentsToUnabandon: ParentInfo[];
   loading?: boolean;
@@ -56,7 +56,7 @@ export default function UnabandonConfirmModal({
           </div>
           <div>
             <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--ink-primary)" }}>
-              Unabandon {entityType === "project" ? "Project" : entityType === "task" ? "Task" : "Special Task"}
+              Unabandon {entityType === "project" ? "Project" : entityType === "task" ? "Task" : entityType === "such-task" ? "SUCH Task" : "Helpdesk Ticket"}
             </p>
             <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--ink-secondary)" }}>
               You&apos;re about to un-abandon <strong>{entityName}</strong>.

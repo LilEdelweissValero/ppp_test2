@@ -24,6 +24,7 @@ interface Props {
   onClose: () => void;
   onSave: (task: { id: number; taskCode: string; name: string; assignee: string | null; priority: string; status: string; description: string | null; dependencies: string | null; notes: string | null; targetQuarter: string; adjustedTargetQuarter: string; deliverable: string | null; attachments: { url: string; title: string | null }[] | null; projectId: number; sortOrder: number; phaseId: number | null }) => void;
   onSaveSpecial?: (specialTask: { id: number; specialTaskCode: string; name: string; total: number; nys: number; plan: number; part: number; mostly: number; done: number; dueQuarter: string; lastUpdatedDate: string | null; projectId: number; sortOrder: number; phaseId: number | null }) => void;
+  onSaveSuch?: (suchTask: { id: number; suchTaskCode: string; name: string; totalScheduled: number; sv: number; snv: number; nsv: number; dueQuarter: string; lastUpdatedDate: string | null; projectId: number; sortOrder: number; phaseId: number | null }) => void;
   projectId: number;
   phases?: Phase[];
   initialData?: {
@@ -49,6 +50,14 @@ interface Props {
     lastUpdatedDate: string | null;
     phaseId: number | null;
   };
+  initialSuchData?: {
+    id: number;
+    suchTaskCode: string;
+    name: string;
+    dueQuarter: string;
+    lastUpdatedDate: string | null;
+    phaseId: number | null;
+  };
   abandonReasons?: string[];
   onAbandon?: () => void;
 }
@@ -58,16 +67,19 @@ export default function TaskFormModal({
   onClose,
   onSave,
   onSaveSpecial,
+  onSaveSuch,
   projectId,
   phases,
   initialData,
   initialSpecialData,
+  initialSuchData,
   abandonReasons = [],
   onAbandon,
 }: Props) {
   const isEdit = !!initialData;
   const isSpecialEdit = !!initialSpecialData;
-  const isSpecialMode = isSpecialEdit || false;
+  const isSuchEdit = !!initialSuchData;
+  const isSpecialMode = isSpecialEdit || isSuchEdit || false;
 
   const [compSettings, setCompSettings] = useState<ComputationSettings | undefined>(undefined);
 
@@ -80,8 +92,8 @@ export default function TaskFormModal({
       .catch(() => {});
   }, []);
 
-  const [taskType, setTaskType] = useState<"normal" | "special">(isSpecialEdit ? "special" : "normal");
-  const [taskCode, setTaskCode] = useState(initialData?.taskCode || initialSpecialData?.specialTaskCode || "");
+  const [taskType, setTaskType] = useState<"normal" | "special" | "such">(isSpecialEdit ? "special" : isSuchEdit ? "such" : "normal");
+  const [taskCode, setTaskCode] = useState(initialData?.taskCode || initialSpecialData?.specialTaskCode || initialSuchData?.suchTaskCode || "");
   const [name, setName] = useState(initialData?.name || initialSpecialData?.name || "");
   const [assignee, setAssignee] = useState(initialData?.assignee || "");
   const [priority, setPriority] = useState(initialData?.priority || "Low");
@@ -110,7 +122,7 @@ export default function TaskFormModal({
   const [submitted, setSubmitted] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [showAdditional, setShowAdditional] = useState(false);
-  const [abandonTarget, setAbandonTarget] = useState<{ id: number; name: string; type: "task" | "special-task" } | null>(null);
+  const [abandonTarget, setAbandonTarget] = useState<{ id: number; name: string; type: "task" | "special-task" | "such-task" } | null>(null);
   const [abandonLoading, setAbandonLoading] = useState(false);
 
   useEffect(() => {
@@ -129,6 +141,20 @@ export default function TaskFormModal({
         setDeliverable("");
         setAttachments([{ title: "", url: "" }]);
         setPhaseId(initialSpecialData.phaseId ?? null);
+      } else if (isSuchEdit && initialSuchData) {
+        setTaskType("such");
+        setTaskCode(initialSuchData.suchTaskCode);
+        setName(initialSuchData.name);
+        setTargetQuarter(initialSuchData.dueQuarter);
+        setAssignee("");
+        setPriority("Low");
+        setDescription("");
+        setDependencies("");
+        setNotes("");
+        setStatus(getDefaultSettings().statuses[0].name);
+        setDeliverable("");
+        setAttachments([{ title: "", url: "" }]);
+        setPhaseId(initialSuchData.phaseId ?? null);
       } else if (!isEdit) {
         setTaskType("normal");
         setTaskCode("");
@@ -217,6 +243,40 @@ export default function TaskFormModal({
         }
       } catch {
         setServerError("Failed to save special task");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    if (taskType === "such") {
+      setLoading(true);
+      try {
+        const url = isSuchEdit ? `/api/such-tasks/${initialSuchData?.id}` : "/api/such-tasks";
+        const method = isSuchEdit ? "PATCH" : "POST";
+
+        const res = await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId,
+            suchTaskCode: taskCode,
+            name,
+            dueQuarter: targetQuarter,
+            phaseId: phaseId ? String(phaseId) : null,
+          }),
+        });
+
+        if (res.ok) {
+          const suchTask = await res.json();
+          if (onSaveSuch) onSaveSuch(suchTask);
+          onClose();
+        } else {
+          const data = await res.json();
+          setServerError(data.error || "Failed to save SUCH task");
+        }
+      } catch {
+        setServerError("Failed to save SUCH task");
       } finally {
         setLoading(false);
       }
@@ -312,7 +372,7 @@ export default function TaskFormModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={isEdit ? "Edit Task" : isSpecialEdit ? "Edit Special Task" : "Add Task"}
+      title={isEdit ? "Edit Task" : isSpecialEdit ? "Edit Helpdesk Ticket" : isSuchEdit ? "Edit SUCH Task" : "Add Task"}
       wide
     >
       <form onSubmit={handleSubmit}>
@@ -322,18 +382,19 @@ export default function TaskFormModal({
             <h3 style={sectionHeaderStyle}>
               Type
             </h3>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
               <div>
                 <label style={labelStyle}>
                   Task Type
                 </label>
                 <select
                   value={taskType}
-                  onChange={(e) => setTaskType(e.target.value as "normal" | "special")}
+                  onChange={(e) => setTaskType(e.target.value as "normal" | "special" | "such")}
                   style={inputStyle()}
                 >
                   <option value="normal">Normal</option>
-                  <option value="special">Special</option>
+                  <option value="special">Helpdesk Ticket</option>
+                  <option value="such">SUCH</option>
                 </select>
               </div>
             </div>
@@ -348,7 +409,7 @@ export default function TaskFormModal({
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
               <label style={labelStyle}>
-                {taskType === "special" ? "Special Task Code *" : "Task Code *"}
+                {taskType === "special" ? "Helpdesk Ticket Code *" : taskType === "such" ? "SUCH Task Code *" : "Task Code *"}
               </label>
               <input
                 type="text"
@@ -453,8 +514,8 @@ export default function TaskFormModal({
           </div>
         )}
 
-        {/* ── Section: Due Quarter (special tasks only) ── */}
-        {taskType === "special" && (
+        {/* ── Section: Due Quarter (special/such tasks only) ── */}
+        {(taskType === "special" || taskType === "such") && (
           <div style={{ marginBottom: 16 }}>
             <h3 style={sectionHeaderStyle}>
               Schedule
@@ -686,16 +747,18 @@ export default function TaskFormModal({
           borderTop: "1px solid var(--rule)",
         }}>
           <div>
-            {(isEdit || isSpecialEdit) && (
+            {(isEdit || isSpecialEdit || isSuchEdit) && (
               <button
                 type="button"
                 onClick={() => {
-                  const taskType = isSpecialEdit ? "special-task" : "task";
-                  const taskName = isSpecialEdit
+                  const abandonType = isSuchEdit ? "such-task" : isSpecialEdit ? "special-task" : "task";
+                  const taskName = isSuchEdit
+                    ? `${initialSuchData?.suchTaskCode}: ${initialSuchData?.name}`
+                    : isSpecialEdit
                     ? `${initialSpecialData?.specialTaskCode}: ${initialSpecialData?.name}`
                     : `${initialData?.taskCode}: ${initialData?.name}`;
-                  const taskId = isSpecialEdit ? initialSpecialData!.id : initialData!.id;
-                  setAbandonTarget({ id: taskId, name: taskName, type: taskType });
+                  const taskId = isSuchEdit ? initialSuchData!.id : isSpecialEdit ? initialSpecialData!.id : initialData!.id;
+                  setAbandonTarget({ id: taskId, name: taskName, type: abandonType });
                 }}
                 style={{
                   padding: "7px 12px",
@@ -758,7 +821,7 @@ export default function TaskFormModal({
         onConfirm={async (reason, remarks) => {
           setAbandonLoading(true);
           try {
-            const endpoint = abandonTarget.type === "special-task" ? "special-tasks" : "tasks";
+            const endpoint = abandonTarget.type === "special-task" ? "special-tasks" : abandonTarget.type === "such-task" ? "such-tasks" : "tasks";
             const res = await fetch(`/api/${endpoint}/${abandonTarget.id}`, {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
@@ -777,7 +840,7 @@ export default function TaskFormModal({
             setAbandonLoading(false);
           }
         }}
-        entityType={abandonTarget.type === "special-task" ? "SpecialTask" : "Task"}
+        entityType={abandonTarget.type === "special-task" ? "SpecialTask" : abandonTarget.type === "such-task" ? "SuchTask" : "Task"}
         entityName={abandonTarget.name}
         entityId={abandonTarget.id}
         reasons={abandonReasons}

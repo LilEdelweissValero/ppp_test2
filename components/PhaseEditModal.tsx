@@ -27,6 +27,15 @@ interface CachedSpecialTask {
   done: number;
 }
 
+interface CachedSuchTask {
+  id: number;
+  phaseId: number | null;
+  totalScheduled: number;
+  sv: number;
+  snv: number;
+  nsv: number;
+}
+
 interface ComputationStatus {
   id: string;
   name: string;
@@ -45,6 +54,7 @@ interface Props {
   phases: Phase[];
   tasks: CachedTask[];
   specialTasks: CachedSpecialTask[];
+  suchTasks: CachedSuchTask[];
   compSettings: ComputationSettings;
   onSaved: (tableName: string, updatedPhases: Phase[]) => void;
 }
@@ -58,10 +68,12 @@ function computePhaseProgress(
   phaseId: number,
   tasks: CachedTask[],
   specialTasks: CachedSpecialTask[],
+  suchTasks: CachedSuchTask[],
   compSettings: ComputationSettings
 ): number {
   const phaseTasks = tasks.filter((t) => t.phaseId === phaseId);
   const phaseSpecial = specialTasks.filter((st) => st.phaseId === phaseId);
+  const phaseSuch = suchTasks.filter((st) => st.phaseId === phaseId);
 
   const virtualTasks = phaseSpecial.flatMap((st) => {
     const statuses = compSettings.statuses;
@@ -80,7 +92,21 @@ function computePhaseProgress(
     return result;
   });
 
-  const allTasks = [...phaseTasks.map((t) => ({ status: t.status })), ...virtualTasks];
+  const suchVirtualTasks = phaseSuch.flatMap((st) => {
+    const statuses = compSettings.statuses;
+    const denominator = st.sv + st.snv;
+    if (denominator === 0) return [];
+    const pct = ((st.sv + st.nsv) / denominator) * 100;
+    let statusName: string;
+    if (pct === 100) statusName = statuses[4]?.name ?? "Complete or Verified";
+    else if (pct >= 75) statusName = statuses[3]?.name ?? "In Progress, Mostly Done or Testing";
+    else if (pct >= 50) statusName = statuses[2]?.name ?? "In Progress, Partial";
+    else if (pct > 0) statusName = statuses[1]?.name ?? "In Progress, Planning or Initiated";
+    else statusName = statuses[0]?.name ?? "Not Yet Started";
+    return [{ status: statusName }];
+  });
+
+  const allTasks = [...phaseTasks.map((t) => ({ status: t.status })), ...virtualTasks, ...suchVirtualTasks];
   if (allTasks.length === 0) return 0;
   const total = allTasks.reduce((s, t) => s + computeTaskPercentDone(t.status, compSettings.statuses), 0);
   return Math.round((total / allTasks.length) * 100);
@@ -94,6 +120,7 @@ export default function PhaseEditModal({
   phases,
   tasks,
   specialTasks,
+  suchTasks,
   compSettings,
   onSaved,
 }: Props) {
@@ -284,7 +311,7 @@ export default function PhaseEditModal({
           {/* Rows */}
           {editPhases.map((phase, idx) => {
             const progress = phase.id > 0
-              ? computePhaseProgress(phase.id, tasks, specialTasks, compSettings)
+              ? computePhaseProgress(phase.id, tasks, specialTasks, suchTasks, compSettings)
               : 0;
 
             return (

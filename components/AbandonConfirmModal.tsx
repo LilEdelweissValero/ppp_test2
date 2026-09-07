@@ -7,7 +7,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onConfirm: (reason: string, remarks: string) => void;
-  entityType: "Program" | "Project" | "Task" | "SpecialTask";
+  entityType: "Program" | "Project" | "Task" | "SpecialTask" | "SuchTask";
   entityName: string;
   entityId: number;
   reasons: string[];

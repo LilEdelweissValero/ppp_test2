@@ -384,7 +384,7 @@ export default function ImportExcelModal({ open, onClose, onSave }: Props) {
                   or <span style={{ color: "var(--accent)", textDecoration: "underline" }}>browse</span> to choose
                 </span>
                 <span style={{ fontSize: 11, color: "var(--ink-tertiary)", fontStyle: "italic", marginTop: 2 }}>
-                  .xlsx / .xls · two sheets: {`"Export"`} and {`"Special Tasks"`}
+                  .xlsx / .xls · two sheets: {`"Export"`} and {`"Helpdesk Tickets"`}
                 </span>
               </div>
             )}
@@ -549,7 +549,7 @@ export default function ImportExcelModal({ open, onClose, onSave }: Props) {
                     { label: "Programs", value: preview.programs },
                     { label: "Projects", value: preview.projects },
                     { label: "Tasks", value: preview.tasks },
-                    { label: "Special tasks", value: preview.specialTasks },
+                    { label: "Helpdesk tickets", value: preview.specialTasks },
                   ].map((item) => (
                     <div
                       key={item.label}
@@ -583,7 +583,7 @@ export default function ImportExcelModal({ open, onClose, onSave }: Props) {
                 )}
                 {!preview.hasSpecialTasksSheet && preview.specialTasks === 0 && (
                   <p style={{ margin: 0, fontSize: 11, color: "var(--ink-tertiary)", fontStyle: "italic" }}>
-                    No &lsquo;Special Tasks&rsquo; rows found in file
+                    No &lsquo;Helpdesk Tickets&rsquo; rows found in file
                   </p>
                 )}
 
@@ -730,11 +730,11 @@ export default function ImportExcelModal({ open, onClose, onSave }: Props) {
                   {result.programsCreated > 0 && <p style={{ margin: 0 }}>Programs created: {result.programsCreated}</p>}
                   {result.projectsCreated > 0 && <p style={{ margin: 0 }}>Projects created: {result.projectsCreated}</p>}
                   {result.tasksCreated > 0 && <p style={{ margin: 0 }}>Tasks created: {result.tasksCreated}</p>}
-                  {result.specialTasksCreated > 0 && <p style={{ margin: 0 }}>Special tasks created: {result.specialTasksCreated}</p>}
+                  {result.specialTasksCreated > 0 && <p style={{ margin: 0 }}>Helpdesk tickets created: {result.specialTasksCreated}</p>}
                 </div>
 
                 {result.tasksSkipped > 0 && <p style={{ margin: 0, color: "#92400E" }}>Tasks skipped (duplicates): {result.tasksSkipped}</p>}
-                {result.specialTasksSkipped > 0 && <p style={{ margin: 0, color: "#92400E" }}>Special tasks skipped (duplicates): {result.specialTasksSkipped}</p>}
+                {result.specialTasksSkipped > 0 && <p style={{ margin: 0, color: "#92400E" }}>Helpdesk tickets skipped (duplicates): {result.specialTasksSkipped}</p>}
                 {result.rowsSkipped > 0 && <p style={{ margin: 0, color: "#92400E" }}>Rows skipped (errors): {result.rowsSkipped}</p>}
 
                 {result.errors.length > 0 && (
@@ -828,7 +828,7 @@ export default function ImportExcelModal({ open, onClose, onSave }: Props) {
                   </div>
                   <div style={{ fontSize: 12, color: "var(--ink-secondary)" }}>
                     <span style={{ fontFamily: "var(--font-mono, monospace)", fontVariantNumeric: "tabular-nums", fontWeight: 600, color: "var(--ink-primary)" }}>{exportCounts.specialTasks}</span>{" "}
-                    special task{exportCounts.specialTasks !== 1 ? "s" : ""}
+                    helpdesk ticket{exportCounts.specialTasks !== 1 ? "s" : ""}
                   </div>
                 </>
               ) : (

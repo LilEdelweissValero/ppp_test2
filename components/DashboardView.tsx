@@ -49,6 +49,7 @@ import {
   computeProjectHealth,
   computeProjectDerivedStatus,
   expandSpecialTasksToVirtualTasks as expandSpecialTasksCore,
+  expandSuchTasksToVirtualTasks as expandSuchTasksCore,
 } from "@/lib/health";
 import type { ComputationSettings } from "@/lib/health";
 import { countTasksByStatus, getStatusScore } from "@/lib/status";
@@ -102,6 +103,20 @@ interface SpecialTask {
   phaseId: number | null;
 }
 
+interface SuchTask {
+  id: number;
+  suchTaskCode: string;
+  name: string;
+  sortOrder: number;
+  totalScheduled: number;
+  sv: number;
+  snv: number;
+  nsv: number;
+  dueQuarter: string;
+  lastUpdatedDate: string | null;
+  phaseId: number | null;
+}
+
 interface Phase {
   id: number;
   name: string;
@@ -121,6 +136,7 @@ interface Project {
   phases: Phase[];
   tasks: Task[];
   specialTasks: SpecialTask[];
+  suchTasks: SuchTask[];
   // Populated at render time from parent program
   programName?: string;
 }
@@ -195,16 +211,42 @@ function expandSpecialTasksToVirtualTasks(specialTasks: SpecialTask[], settings?
   }));
 }
 
+function expandSuchTasksToVirtualTasks(suchTasks: SuchTask[], settings?: ComputationSettings): Task[] {
+  return expandSuchTasksCore(suchTasks, settings).map((v) => ({
+    id: v.id,
+    taskCode: "",
+    name: "",
+    assignee: null,
+    priority: "Low",
+    status: v.status,
+    description: null,
+    targetQuarter: "",
+    notes: null,
+    deliverable: null,
+    attachments: null,
+    dependencies: null,
+    adjustedTargetQuarter: "",
+    phaseId: v.phaseId,
+  }));
+}
+
 function filterSpecialTasksByQuarter(specialTasks: SpecialTask[], selectedQuarter: string): SpecialTask[] {
   if (selectedQuarter === ALL_TIME) return specialTasks;
   return specialTasks.filter((st) => st.dueQuarter === selectedQuarter);
 }
 
+function filterSuchTasksByQuarter(suchTasks: SuchTask[], selectedQuarter: string): SuchTask[] {
+  if (selectedQuarter === ALL_TIME) return suchTasks;
+  return suchTasks.filter((st) => st.dueQuarter === selectedQuarter);
+}
+
 function getAllTasksForProject(project: Project, selectedQuarter: string, settings?: ComputationSettings): Task[] {
   const realTasks = filterTasksByQuarter(project.tasks, selectedQuarter);
   const filteredSpecial = filterSpecialTasksByQuarter(project.specialTasks || [], selectedQuarter);
-  const virtualTasks = expandSpecialTasksToVirtualTasks(filteredSpecial, settings);
-  return [...realTasks, ...virtualTasks];
+  const virtualSpecialTasks = expandSpecialTasksToVirtualTasks(filteredSpecial, settings);
+  const filteredSuch = filterSuchTasksByQuarter(project.suchTasks || [], selectedQuarter);
+  const virtualSuchTasks = expandSuchTasksToVirtualTasks(filteredSuch, settings);
+  return [...realTasks, ...virtualSpecialTasks, ...virtualSuchTasks];
 }
 
 function getProjectTasksForYear(project: Project, year: number, settings?: ComputationSettings): Task[] {
@@ -216,8 +258,13 @@ function getProjectTasksForYear(project: Project, year: number, settings?: Compu
     const parsed = parseQuarter(st.dueQuarter);
     return !!parsed && parsed.year === year;
   });
-  const virtualTasks = expandSpecialTasksToVirtualTasks(filteredSpecial, settings);
-  return [...realTasks, ...virtualTasks];
+  const virtualSpecialTasks = expandSpecialTasksToVirtualTasks(filteredSpecial, settings);
+  const filteredSuch = (project.suchTasks || []).filter((st) => {
+    const parsed = parseQuarter(st.dueQuarter);
+    return !!parsed && parsed.year === year;
+  });
+  const virtualSuchTasks = expandSuchTasksToVirtualTasks(filteredSuch, settings);
+  return [...realTasks, ...virtualSpecialTasks, ...virtualSuchTasks];
 }
 
 function getYearsFromQuarters(quarters: string[]): number[] {
@@ -1766,6 +1813,10 @@ export default function DashboardView({
                 (p.specialTasks || []).some((st) =>
                   st.specialTaskCode.toLowerCase().includes(q) ||
                   st.name.toLowerCase().includes(q)
+                ) ||
+                (p.suchTasks || []).some((st) =>
+                  st.suchTaskCode.toLowerCase().includes(q) ||
+                  st.name.toLowerCase().includes(q)
                 )
             ),
           }))
@@ -2162,10 +2213,11 @@ export default function DashboardView({
           const allProjects = fw.programs.flatMap((p) => p.projects);
           const hasProjects = allProjects.length > 0;
           const hasTasksInQuarter = selectedQuarter === ALL_TIME
-            ? allProjects.some((p) => p.tasks.length > 0 || (p.specialTasks || []).length > 0)
+            ? allProjects.some((p) => p.tasks.length > 0 || (p.specialTasks || []).length > 0 || (p.suchTasks || []).length > 0)
             : allProjects.some((p) =>
                 p.tasks.some((t) => t.adjustedTargetQuarter === selectedQuarter) ||
-                (p.specialTasks || []).some((st) => st.dueQuarter === selectedQuarter)
+                (p.specialTasks || []).some((st) => st.dueQuarter === selectedQuarter) ||
+                (p.suchTasks || []).some((st) => st.dueQuarter === selectedQuarter)
               );
           return (
             <div
@@ -2328,10 +2380,11 @@ export default function DashboardView({
                           {fw.programs.map((prog) => {
                             if (prog.projects.length === 0) return null;
                             const hasTasksInProgram = selectedQuarter === ALL_TIME
-                              ? prog.projects.some((p) => p.tasks.length > 0 || (p.specialTasks || []).length > 0)
+                              ? prog.projects.some((p) => p.tasks.length > 0 || (p.specialTasks || []).length > 0 || (p.suchTasks || []).length > 0)
                               : prog.projects.some((p) =>
                                   p.tasks.some((t) => t.adjustedTargetQuarter === selectedQuarter) ||
-                                  (p.specialTasks || []).some((st) => st.dueQuarter === selectedQuarter)
+                                  (p.specialTasks || []).some((st) => st.dueQuarter === selectedQuarter) ||
+                                  (p.suchTasks || []).some((st) => st.dueQuarter === selectedQuarter)
                                 );
                             if (!hasTasksInProgram) return null;
                             const sortedProjects = sortConfig

@@ -28,6 +28,12 @@ interface WizardSpecialTask {
   name: string;
 }
 
+interface WizardSuchTask {
+  id: number;
+  suchTaskCode: string;
+  name: string;
+}
+
 interface WizardProject {
   id: number;
   name: string;
@@ -38,6 +44,7 @@ interface WizardProject {
   adjustedTargetQuarter: string;
   tasks: WizardTask[];
   specialTasks: WizardSpecialTask[];
+  suchTasks: WizardSuchTask[];
 }
 
 interface WizardProgram {
@@ -175,7 +182,7 @@ interface ConvItem {
 
 interface DispItem {
   key: string;
-  itemType: "task" | "specialTask";
+  itemType: "task" | "specialTask" | "suchTask";
   id: number;
   label: string;
   groupId: number;
@@ -302,6 +309,16 @@ export default function ChangeLevelModal({
           itemType: "specialTask",
           id: st.id,
           label: `${st.specialTaskCode} — ${st.name}`,
+          groupId: pj.id,
+          groupName: pj.name,
+        });
+      }
+      for (const st of pj.suchTasks) {
+        displaced.push({
+          key: `suchTask:${st.id}`,
+          itemType: "suchTask",
+          id: st.id,
+          label: `${st.suchTaskCode} — ${st.name}`,
           groupId: pj.id,
           groupName: pj.name,
         });
@@ -1117,12 +1134,12 @@ export default function ChangeLevelModal({
                           padding: "1px 5px",
                           borderRadius: 2,
                           letterSpacing: "0.04em",
-                          background: d.itemType === "specialTask" ? "#EDE9FE" : "#DBEAFE",
+                          background: d.itemType === "specialTask" ? "#EDE9FE" : d.itemType === "suchTask" ? "#D1FAE5" : "#DBEAFE",
                           color: "#374151",
                           flexShrink: 0,
                         }}
                       >
-                        {d.itemType === "specialTask" ? "ST" : "T"}
+                        {d.itemType === "specialTask" ? "HT" : d.itemType === "suchTask" ? "SUCH" : "T"}
                       </span>
                       <span
                         style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
@@ -1148,7 +1165,7 @@ export default function ChangeLevelModal({
               </div>
             ) : (
               <p style={{ fontSize: 12, color: "var(--ink-tertiary)", margin: 0 }}>
-                No tasks or special tasks will be displaced by this change.
+                No tasks or helpdesk tickets will be displaced by this change.
               </p>
             )}
 

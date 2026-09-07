@@ -38,6 +38,10 @@ export async function PATCH(
           where: { projectId: { in: projectIds } },
           data: { abandoned, abandonedAt, abandonedReason: abandoned ? abandonedReason ?? null : null, abandonedRemarks: abandoned ? abandonedRemarks ?? null : null },
         });
+        await tx.suchTask.updateMany({
+          where: { projectId: { in: projectIds } },
+          data: { abandoned, abandonedAt, abandonedReason: abandoned ? abandonedReason ?? null : null, abandonedRemarks: abandoned ? abandonedRemarks ?? null : null },
+        });
       }
     });
     const program = await prisma.program.findUnique({ where: { id: parseInt(id) } });

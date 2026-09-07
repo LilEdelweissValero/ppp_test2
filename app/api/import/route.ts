@@ -50,6 +50,26 @@ const SPECIAL_TASK_COLUMNS = [
   "phase_weight",
 ];
 
+const SUCH_TASK_COLUMNS = [
+  "framework_name",
+  "program_name",
+  "project_name",
+  "project_reference",
+  "project_owner",
+  "project_target_quarter",
+  "such_task_code",
+  "such_task_name",
+  "total_scheduled",
+  "sv",
+  "snv",
+  "nsv",
+  "due_quarter",
+  "last_updated_date",
+  "archived",
+  "phase_name",
+  "phase_weight",
+];
+
 const VALID_PRIORITIES = ["Low", "Moderate", "High"];
 
 function parseQuarter(q: string): boolean {
@@ -90,6 +110,14 @@ export async function GET() {
     ],
   ];
 
+  const sampleSuchTaskRows = [
+    [
+      "Infrastructure", "Network Upgrade", "Core Router Replacement",
+      "REF-001", "John Doe", "Q3 2026", "SUCH-001", "Network Audit",
+      8, 5, 2, 1, "Q3 2026", "", "FALSE",
+    ],
+  ];
+
   const wb = XLSX.utils.book_new();
   const ws1 = XLSX.utils.aoa_to_sheet([EXCEL_COLUMNS, ...sampleTaskRows]);
   ws1["!cols"] = EXCEL_COLUMNS.map((c) => ({ wch: Math.max(c.length + 2, 16) }));
@@ -97,7 +125,11 @@ export async function GET() {
 
   const ws2 = XLSX.utils.aoa_to_sheet([SPECIAL_TASK_COLUMNS, ...sampleSpecialTaskRows]);
   ws2["!cols"] = SPECIAL_TASK_COLUMNS.map((c) => ({ wch: Math.max(c.length + 2, 16) }));
-  XLSX.utils.book_append_sheet(wb, ws2, "Special Tasks");
+  XLSX.utils.book_append_sheet(wb, ws2, "Helpdesk Tickets");
+
+  const ws3 = XLSX.utils.aoa_to_sheet([SUCH_TASK_COLUMNS, ...sampleSuchTaskRows]);
+  ws3["!cols"] = SUCH_TASK_COLUMNS.map((c) => ({ wch: Math.max(c.length + 2, 16) }));
+  XLSX.utils.book_append_sheet(wb, ws3, "SUCH Tasks");
 
   const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
   return new Response(buffer, {
@@ -246,7 +278,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Parse special tasks sheet
-        const specialSheetName = workbook.SheetNames.find((n) => n === "Special Tasks");
+        const specialSheetName = workbook.SheetNames.find((n) => n === "Helpdesk Tickets");
         const specialTaskRecords: Record<string, string>[] = [];
         if (specialSheetName) {
           const sheet = workbook.Sheets[specialSheetName];
@@ -270,7 +302,32 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        totalRows = taskRecords.length + specialTaskRecords.length;
+        // Parse SUCH tasks sheet
+        const suchSheetName = workbook.SheetNames.find((n) => n === "SUCH Tasks");
+        const suchTaskRecords: Record<string, string>[] = [];
+        if (suchSheetName) {
+          const sheet = workbook.Sheets[suchSheetName];
+          const raw: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, {
+            defval: "",
+            raw: false,
+          });
+          if (raw.length > 0) {
+            const headers = Object.keys(raw[0]);
+            const actualSet = new Set(headers.map((h) => h.toLowerCase().trim()));
+            const missing = SUCH_TASK_COLUMNS.filter((c) => !actualSet.has(c.toLowerCase()));
+            if (missing.length > 0) {
+              problems.push({
+                row: "Sheet",
+                sheet: suchSheetName,
+                reason: `Missing columns: ${missing.join(", ")}`,
+              });
+            } else {
+              suchTaskRecords.push(...raw.map((r) => normalizeRow(r)));
+            }
+          }
+        }
+
+        totalRows = taskRecords.length + specialTaskRecords.length + suchTaskRecords.length;
 
         // Validate task rows
         for (let i = 0; i < taskRecords.length; i++) {
@@ -386,7 +443,7 @@ export async function POST(request: NextRequest) {
         for (let i = 0; i < specialTaskRecords.length; i++) {
           const row = specialTaskRecords[i];
           const rowNum = i + 2;
-          const sheetLabel = specialSheetName || "Special Tasks";
+          const sheetLabel = specialSheetName || "Helpdesk Tickets";
 
           const frameworkName = row.framework_name || "";
           const programName = row.program_name || "";
