@@ -38,6 +38,8 @@ function getProjectStatus(
     } catch { /* ignore */ }
   }
 
+  if (progressPct === 100) return "Completed";
+
   const quarterComparison = compareQuarters(adjustedTargetQuarter, monthQuarter);
   const isQuarterEndMonth = monthNum === 3 || monthNum === 6 || monthNum === 9 || monthNum === 12;
 
