@@ -13,7 +13,6 @@ export async function GET(
     include: {
       program: { select: { id: true, name: true } },
       phases: {
-        where: { archived: false },
         orderBy: { sortOrder: "asc" },
       },
       tasks: { orderBy: { sortOrder: "asc" } },

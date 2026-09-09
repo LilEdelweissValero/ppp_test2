@@ -23,7 +23,6 @@ const EXCEL_COLUMNS = [
   "task_target_quarter",
   "task_deliverable",
   "task_attachment_url",
-  "task_archived",
   "phase_name",
   "phase_weight",
 ];
@@ -45,7 +44,6 @@ const SPECIAL_TASK_COLUMNS = [
   "done",
   "due_quarter",
   "last_updated_date",
-  "archived",
   "phase_name",
   "phase_weight",
 ];
@@ -65,7 +63,6 @@ const SUCH_TASK_COLUMNS = [
   "nsv",
   "due_quarter",
   "last_updated_date",
-  "archived",
   "phase_name",
   "phase_weight",
 ];
@@ -92,13 +89,13 @@ export async function GET() {
       "Infrastructure", "Network Upgrade", "Core Router Replacement",
       "REF-001", "John Doe", "Q3 2026", "T-001", "Procure new routers",
       "Jane Smith", "High", "Replace all core routers", "None",
-      "Budget approved", "In Progress, Partial", "Q3 2026", "Routers deployed", "", "FALSE",
+      "Budget approved", "In Progress, Partial", "Q3 2026", "Routers deployed", "",
     ],
     [
       "Infrastructure", "Network Upgrade", "Core Router Replacement",
       "REF-001", "John Doe", "Q3 2026", "T-002", "Configure VLANs",
       "Jane Smith", "Moderate", "Set up VLAN configuration", "T-001",
-      "", "Not Yet Started", "Q4 2026", "VLAN config complete", "", "FALSE",
+      "", "Not Yet Started", "Q4 2026", "VLAN config complete", "",
     ],
   ];
 
@@ -106,7 +103,7 @@ export async function GET() {
     [
       "Infrastructure", "Network Upgrade", "Core Router Replacement",
       "REF-001", "John Doe", "Q3 2026", "SPEC-001", "Server Migration",
-      10, 2, 3, 1, 2, 2, "Q3 2026", "", "FALSE",
+      10, 2, 3, 1, 2, 2, "Q3 2026", "",
     ],
   ];
 
@@ -114,7 +111,7 @@ export async function GET() {
     [
       "Infrastructure", "Network Upgrade", "Core Router Replacement",
       "REF-001", "John Doe", "Q3 2026", "SUCH-001", "Network Audit",
-      8, 5, 2, 1, "Q3 2026", "", "FALSE",
+      8, 5, 2, 1, "Q3 2026", "",
     ],
   ];
 
@@ -160,7 +157,6 @@ interface ValidatedTaskRow {
   taskStatus: string;
   taskPriority: string;
   taskTargetQuarter: string;
-  taskArchived: boolean;
   phaseName: string | null;
   phaseWeight: number | null;
   row: Record<string, string>;
@@ -181,7 +177,6 @@ interface ValidatedSpecialTaskRow {
   phaseWeight: number | null;
   row: Record<string, string>;
   rowNum: number;
-  archived: boolean;
 }
 
 export async function POST(request: NextRequest) {
@@ -344,7 +339,6 @@ export async function POST(request: NextRequest) {
           const taskPriority = row.task_priority || "";
           const projectTargetQuarter = row.project_target_quarter || "";
           const taskTargetQuarter = row.task_target_quarter || "";
-          const taskArchived = row.task_archived?.toUpperCase() === "TRUE";
 
           if (!frameworkName || !projectName || !taskCode || !taskName) {
             problems.push({ row: `Row ${rowNum}`, sheet: sheetLabel, reason: "Missing required fields (framework_name, project_name, task_code, or task_name)" });
@@ -427,7 +421,6 @@ export async function POST(request: NextRequest) {
             projectOwner: row.project_owner || null,
             projectTargetQuarter,
             taskCode, taskName, taskStatus, taskPriority, taskTargetQuarter,
-            taskArchived,
             phaseName: row.phase_name || null,
             phaseWeight: row.phase_weight ? parseFloat(row.phase_weight) : null,
             row, rowNum,
@@ -452,7 +445,6 @@ export async function POST(request: NextRequest) {
           const specialTaskName = row.special_task_name || "";
           const dueQuarter = row.due_quarter || "";
           const projectTargetQuarter = row.project_target_quarter || "";
-          const specialTaskArchived = row.archived?.toUpperCase() === "TRUE";
 
           if (!frameworkName || !projectName || !specialTaskCode || !specialTaskName) {
             problems.push({ row: `Row ${rowNum}`, sheet: sheetLabel, reason: "Missing required fields (framework_name, project_name, special_task_code, or special_task_name)" });
@@ -521,7 +513,7 @@ export async function POST(request: NextRequest) {
             specialTaskCode, specialTaskName, dueQuarter,
             phaseName: row.phase_name || null,
             phaseWeight: row.phase_weight ? parseFloat(row.phase_weight) : null,
-            row, rowNum, archived: specialTaskArchived,
+            row, rowNum,
           });
 
           processedValidation++;
@@ -664,7 +656,6 @@ export async function POST(request: NextRequest) {
                 }
                 return raw.split(",").map((u: string) => ({ url: u.trim(), title: null })).filter((a: { url: string; title: null }) => a.url);
               })(),
-              archived: v.taskArchived,
             },
           });
           tasksCreated++;
@@ -717,7 +708,6 @@ export async function POST(request: NextRequest) {
               done: parseInt(v.row.done) || 0,
               dueQuarter: v.dueQuarter,
               lastUpdatedDate: v.row.last_updated_date || null,
-              archived: v.archived,
             },
           });
           specialTasksCreated++;

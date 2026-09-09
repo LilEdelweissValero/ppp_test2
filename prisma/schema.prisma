@@ -12,7 +12,6 @@ model Framework {
   name      String    @unique
   color     String
   sortOrder Int       @default(0) @map("sort_order")
-  archived  Boolean   @default(false)
   programs  Program[]
 }
 
@@ -22,7 +21,6 @@ model Program {
   frameworkId      Int
   framework        Framework @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
   sortOrder        Int       @default(0) @map("sort_order")
-  archived         Boolean   @default(false)
   abandoned        Boolean   @default(false)
   abandonedAt      String?   @map("abandoned_at")
   abandonedReason  String?   @map("abandoned_reason")
@@ -44,7 +42,6 @@ model Project {
   adjustedTargetQuarter String    @map("adjusted_target_quarter")
   actualCompletionDate  String?   @map("actual_completion_date")
   phasesTableName       String?   @map("phases_table_name")
-  archived              Boolean   @default(false)
   abandoned             Boolean   @default(false)
   abandonedAt           String?   @map("abandoned_at")
   abandonedReason       String?   @map("abandoned_reason")
@@ -64,7 +61,6 @@ model Phase {
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   weight    Float    @default(0)
   sortOrder Int      @default(0) @map("sort_order")
-  archived  Boolean  @default(false)
   tasks     Task[]
   specialTasks SpecialTask[]
   suchTasks    SuchTask[]
@@ -91,7 +87,6 @@ model Task {
   adjustedTargetQuarter String   @map("adjusted_target_quarter")
   deliverable           String?
   attachments           Json?    @map("attachments")
-  archived              Boolean  @default(false)
   abandoned             Boolean  @default(false)
   abandonedAt           String?  @map("abandoned_at")
   abandonedReason       String?  @map("abandoned_reason")
@@ -118,7 +113,6 @@ model SpecialTask {
   done              Int      @default(0)
   dueQuarter        String   @map("due_quarter")
   lastUpdatedDate   String?  @map("last_updated_date")
-  archived          Boolean  @default(false)
   abandoned         Boolean  @default(false)
   abandonedAt       String?  @map("abandoned_at")
   abandonedReason   String?  @map("abandoned_reason")
@@ -143,7 +137,6 @@ model SuchTask {
   nsv               Int      @default(0)
   dueQuarter        String   @map("due_quarter")
   lastUpdatedDate   String?  @map("last_updated_date")
-  archived          Boolean  @default(false)
   abandoned         Boolean  @default(false)
   abandonedAt       String?  @map("abandoned_at")
   abandonedReason   String?  @map("abandoned_reason")

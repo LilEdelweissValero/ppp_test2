@@ -7,7 +7,6 @@ export const getDashboardData = unstable_cache(
   async () => {
     const [frameworks, lastModified] = await Promise.all([
       prisma.framework.findMany({
-        where: { archived: false },
         select: {
           id: true,
           name: true,
@@ -35,7 +34,6 @@ export const getDashboardData = unstable_cache(
                       weight: true,
                       sortOrder: true,
                     },
-                    where: { archived: false },
                     orderBy: { sortOrder: "asc" },
                   },
                   tasks: {
@@ -55,7 +53,7 @@ export const getDashboardData = unstable_cache(
                       adjustedTargetQuarter: true,
                       phaseId: true,
                     },
-                    where: { archived: false, abandoned: false },
+                    where: { abandoned: false },
                     orderBy: { sortOrder: "asc" },
                   },
                   specialTasks: {
@@ -74,7 +72,7 @@ export const getDashboardData = unstable_cache(
                       lastUpdatedDate: true,
                       phaseId: true,
                     },
-                    where: { archived: false, abandoned: false },
+                    where: { abandoned: false },
                     orderBy: { sortOrder: "asc" },
                   },
                   suchTasks: {
@@ -91,15 +89,15 @@ export const getDashboardData = unstable_cache(
                       lastUpdatedDate: true,
                       phaseId: true,
                     },
-                    where: { archived: false, abandoned: false },
+                    where: { abandoned: false },
                     orderBy: { sortOrder: "asc" },
                   },
                 },
-                where: { archived: false, abandoned: false },
+                where: { abandoned: false },
                 orderBy: { sortOrder: "asc" },
               },
             },
-            where: { archived: false, abandoned: false },
+            where: { abandoned: false },
             orderBy: { sortOrder: "asc" },
           },
         },
@@ -139,7 +137,6 @@ export const getProjectData = unstable_cache(
             weight: true,
             sortOrder: true,
           },
-          where: { archived: false },
           orderBy: { sortOrder: "asc" },
         },
         tasks: {
@@ -178,7 +175,7 @@ export const getProjectData = unstable_cache(
             lastUpdatedDate: true,
             phaseId: true,
           },
-          where: { archived: false, abandoned: false },
+          where: { abandoned: false },
           orderBy: { sortOrder: "asc" },
         },
         suchTasks: {
@@ -195,7 +192,7 @@ export const getProjectData = unstable_cache(
             lastUpdatedDate: true,
             phaseId: true,
           },
-          where: { archived: false, abandoned: false },
+          where: { abandoned: false },
           orderBy: { sortOrder: "asc" },
         },
       },

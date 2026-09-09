@@ -20,7 +20,6 @@ const TASK_COLUMNS = [
   "task_target_quarter",
   "task_deliverable",
   "task_attachment_url",
-  "task_archived",
   "phase_name",
   "phase_weight",
 ];
@@ -42,7 +41,6 @@ const SPECIAL_TASK_COLUMNS = [
   "done",
   "due_quarter",
   "last_updated_date",
-  "archived",
   "phase_name",
   "phase_weight",
 ];
@@ -62,7 +60,6 @@ const SUCH_TASK_COLUMNS = [
   "nsv",
   "due_quarter",
   "last_updated_date",
-  "archived",
   "phase_name",
   "phase_weight",
 ];
@@ -82,7 +79,6 @@ export async function GET() {
         targetQuarter: true,
         deliverable: true,
         attachments: true,
-        archived: true,
         phase: {
           select: { name: true, weight: true },
         },
@@ -117,7 +113,6 @@ export async function GET() {
         done: true,
         dueQuarter: true,
         lastUpdatedDate: true,
-        archived: true,
         phase: {
           select: { name: true, weight: true },
         },
@@ -150,7 +145,6 @@ export async function GET() {
         nsv: true,
         dueQuarter: true,
         lastUpdatedDate: true,
-        archived: true,
         phase: {
           select: { name: true, weight: true },
         },
@@ -195,7 +189,6 @@ export async function GET() {
     Array.isArray(t.attachments)
       ? (t.attachments as { url: string; title?: string | null }[]).map((a) => a.url).join(", ")
       : "",
-    t.archived ? "TRUE" : "FALSE",
     t.phase?.name ?? "",
     t.phase?.weight ?? "",
   ]);
@@ -217,7 +210,6 @@ export async function GET() {
     st.done,
     st.dueQuarter,
     st.lastUpdatedDate ?? "",
-    st.archived ? "TRUE" : "FALSE",
     st.phase?.name ?? "",
     st.phase?.weight ?? "",
   ]);
@@ -237,7 +229,6 @@ export async function GET() {
     st.nsv,
     st.dueQuarter,
     st.lastUpdatedDate ?? "",
-    st.archived ? "TRUE" : "FALSE",
     st.phase?.name ?? "",
     st.phase?.weight ?? "",
   ]);

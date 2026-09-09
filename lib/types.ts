@@ -18,7 +18,6 @@ export interface Phase {
   projectId: number;
   weight: number;
   sortOrder: number;
-  archived: boolean;
 }
 
 export interface SpecialTask {
@@ -36,7 +35,6 @@ export interface SpecialTask {
   done: number;
   dueQuarter: string;
   lastUpdatedDate: string | null;
-  archived: boolean;
 }
 
 export interface SuchTask {
@@ -52,7 +50,6 @@ export interface SuchTask {
   nsv: number;
   dueQuarter: string;
   lastUpdatedDate: string | null;
-  archived: boolean;
 }
 
 export interface ProjectWithTasks {

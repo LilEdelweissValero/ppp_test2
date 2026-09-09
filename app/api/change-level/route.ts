@@ -157,27 +157,24 @@ async function validateTaskCodes(
 interface DisplacedRef {
   itemType: "task" | "specialTask" | "suchTask";
   id: number;
-  archived: boolean;
   groupId: number;
 }
 
 function buildDisplaced(
-  tasks: { id: number; archived: boolean; projectId: number }[],
-  specials: { id: number; archived: boolean; projectId: number }[],
-  suchTasks?: { id: number; archived: boolean; projectId: number }[]
+  tasks: { id: number; projectId: number }[],
+  specials: { id: number; projectId: number }[],
+  suchTasks?: { id: number; projectId: number }[]
 ): DisplacedRef[] {
   return [
-    ...tasks.map((t) => ({ itemType: "task" as const, id: t.id, archived: t.archived, groupId: t.projectId })),
+    ...tasks.map((t) => ({ itemType: "task" as const, id: t.id, groupId: t.projectId })),
     ...specials.map((s) => ({
       itemType: "specialTask" as const,
       id: s.id,
-      archived: s.archived,
       groupId: s.projectId,
     })),
     ...(suchTasks ?? []).map((s) => ({
       itemType: "suchTask" as const,
       id: s.id,
-      archived: s.archived,
       groupId: s.projectId,
     })),
   ];
@@ -190,7 +187,7 @@ function validateAllocations(
   conflicts: string[]
 ): void {
   const missing = displaced.filter(
-    (d) => !d.archived && !allocList.some((a) => a.itemType === d.itemType && a.itemId === d.id)
+    (d) => !allocList.some((a) => a.itemType === d.itemType && a.itemId === d.id)
   );
   if (missing.length > 0) {
     conflicts.push(
@@ -227,7 +224,6 @@ async function reallocateDisplaced(
   const groupTargets = new Map<number, number>();
 
   for (const d of displaced) {
-    if (d.archived) continue;
     const alloc = allocByItem.get(`${d.itemType}:${d.id}`);
     if (!alloc) continue;
     const resolved = resolveTarget(alloc.projectId);
@@ -240,10 +236,8 @@ async function reallocateDisplaced(
 
   for (const d of displaced) {
     let target: number | undefined;
-    if (!d.archived) {
-      const alloc = allocByItem.get(`${d.itemType}:${d.id}`);
-      if (alloc) target = resolveTarget(alloc.projectId);
-    }
+    const alloc = allocByItem.get(`${d.itemType}:${d.id}`);
+    if (alloc) target = resolveTarget(alloc.projectId);
     if (target === undefined) target = groupTargets.get(d.groupId);
     if (target === undefined) {
       if (fallback === undefined) fallback = fallbackTargetId();
@@ -473,7 +467,7 @@ async function frameworkToProgram(
     for (const f of frameworks) {
       progSort++;
       const created = await tx.program.create({
-        data: { name: f.name, frameworkId: destId, sortOrder: progSort, archived: f.archived },
+        data: { name: f.name, frameworkId: destId, sortOrder: progSort },
       });
       fwToProg.set(f.id, created.id);
     }
@@ -492,7 +486,6 @@ async function frameworkToProgram(
             targetQuarter: quarters.get(p.id)!,
             adjustedTargetQuarter: quarters.get(p.id)!,
             actualCompletionDate: null,
-            archived: p.archived,
             sortOrder: pjSort,
           },
         });
@@ -519,7 +512,6 @@ async function frameworkToProgram(
             targetQuarter: proj.targetQuarter,
             adjustedTargetQuarter: proj.adjustedTargetQuarter,
             deliverable: proj.reference,
-            archived: proj.archived,
             sortOrder: tSort,
           },
         });
@@ -647,7 +639,7 @@ async function programToFramework(
     for (const p of programs) {
       fwSort++;
       const created = await tx.framework.create({
-        data: { name: p.name, color: str(fieldMap.get(p.id)?.color), sortOrder: fwSort, archived: p.archived },
+        data: { name: p.name, color: str(fieldMap.get(p.id)?.color), sortOrder: fwSort },
       });
       progToFw.set(p.id, created.id);
     }
@@ -658,7 +650,7 @@ async function programToFramework(
       for (const proj of projectsByProgram.get(p.id) ?? []) {
         pgSort++;
         const created = await tx.program.create({
-          data: { name: proj.name, frameworkId: progToFw.get(p.id)!, sortOrder: pgSort, archived: proj.archived },
+          data: { name: proj.name, frameworkId: progToFw.get(p.id)!, sortOrder: pgSort },
         });
         projToProg.set(proj.id, created.id);
       }
@@ -679,7 +671,6 @@ async function programToFramework(
             targetQuarter: t.targetQuarter,
             adjustedTargetQuarter: t.adjustedTargetQuarter,
             actualCompletionDate: null,
-            archived: t.archived,
             sortOrder: pjSort,
           },
         });
@@ -839,7 +830,6 @@ async function programToProject(
           targetQuarter: q,
           adjustedTargetQuarter: q,
           actualCompletionDate: null,
-          archived: p.archived,
           sortOrder: pjSort,
         },
       });
@@ -865,7 +855,6 @@ async function programToProject(
             targetQuarter: proj.targetQuarter,
             adjustedTargetQuarter: proj.adjustedTargetQuarter,
             deliverable: proj.reference,
-            archived: proj.archived,
             sortOrder: tSort,
           },
         });
@@ -983,7 +972,7 @@ async function projectToProgram(
     for (const proj of projects) {
       pgSort++;
       const created = await tx.program.create({
-        data: { name: proj.name, frameworkId: destId, sortOrder: pgSort, archived: proj.archived },
+        data: { name: proj.name, frameworkId: destId, sortOrder: pgSort },
       });
       projToProg.set(proj.id, created.id);
     }
@@ -1003,7 +992,6 @@ async function projectToProgram(
             targetQuarter: t.targetQuarter,
             adjustedTargetQuarter: t.adjustedTargetQuarter,
             actualCompletionDate: null,
-            archived: t.archived,
             sortOrder: pjSort,
           },
         });
@@ -1143,7 +1131,6 @@ async function projectToTask(
           targetQuarter: proj.targetQuarter,
           adjustedTargetQuarter: proj.adjustedTargetQuarter,
           deliverable: proj.reference,
-          archived: proj.archived,
           sortOrder: tSort,
         },
       });
@@ -1221,9 +1208,8 @@ async function taskToProject(itemIds: number[], fieldMap: Map<number, FieldBag>,
           owner: str(bag.owner) || t.assignee,
           targetQuarter: t.targetQuarter,
           adjustedTargetQuarter: t.adjustedTargetQuarter,
-          actualCompletionDate: null,
-          archived: t.archived,
-          sortOrder: pjSort,
+            actualCompletionDate: null,
+            sortOrder: pjSort,
         },
       });
       rootResults.push({ newId: created.id, name: t.name });

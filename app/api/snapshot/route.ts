@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const snapshot = await getSnapshotAt(timestamp);
+    const snapshot = await getSnapshotAt(timestamp, true);
     return NextResponse.json(snapshot);
   } catch (error) {
     console.error("Snapshot reconstruction failed:", error);

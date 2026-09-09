@@ -54,7 +54,6 @@ export interface CachedPhase {
   name: string;
   weight: number;
   sortOrder: number;
-  archived: boolean;
 }
 
 export interface CachedProject {

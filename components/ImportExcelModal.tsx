@@ -801,7 +801,7 @@ export default function ImportExcelModal({ open, onClose, onSave }: Props) {
         {tab === "export" && (
           <div id="tab-export" role="tabpanel" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <p style={{ fontSize: 12, color: "var(--ink-secondary)", margin: 0 }}>
-              Export all existing tasks (including archived) to an Excel file.
+              Export all existing tasks to an Excel file.
             </p>
 
             {/* Stats */}
@@ -835,10 +835,6 @@ export default function ImportExcelModal({ open, onClose, onSave }: Props) {
                 <span style={{ fontSize: 12, color: "var(--ink-tertiary)", fontStyle: "italic" }}>No data</span>
               )}
             </div>
-
-            <p style={{ fontSize: 11, color: "var(--ink-tertiary)", margin: 0 }}>
-              Includes archived records.
-            </p>
 
             <button
               onClick={handleExport}

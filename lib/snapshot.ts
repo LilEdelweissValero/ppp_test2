@@ -19,7 +19,6 @@ interface SnapshotTask {
   dependencies: string | null;
   adjustedTargetQuarter: string;
   phaseId: number | null;
-  archived: boolean;
   abandoned: boolean;
 }
 
@@ -37,7 +36,6 @@ interface SnapshotSpecialTask {
   dueQuarter: string;
   lastUpdatedDate: string | null;
   phaseId: number | null;
-  archived: boolean;
   abandoned: boolean;
 }
 
@@ -53,7 +51,6 @@ interface SnapshotSuchTask {
   dueQuarter: string;
   lastUpdatedDate: string | null;
   phaseId: number | null;
-  archived: boolean;
   abandoned: boolean;
 }
 
@@ -63,7 +60,6 @@ interface SnapshotPhase {
   name: string;
   weight: number;
   sortOrder: number;
-  archived: boolean;
 }
 
 interface SnapshotProject {
@@ -76,7 +72,6 @@ interface SnapshotProject {
   adjustedTargetQuarter: string;
   actualCompletionDate: string | null;
   phasesTableName: string | null;
-  archived: boolean;
   abandoned: boolean;
   phases: SnapshotPhase[];
   tasks: SnapshotTask[];
@@ -88,7 +83,6 @@ interface SnapshotProgram {
   id: number;
   name: string;
   frameworkId: number;
-  archived: boolean;
   abandoned: boolean;
   projects: SnapshotProject[];
 }
@@ -97,7 +91,6 @@ interface SnapshotFramework {
   id: number;
   name: string;
   color: string;
-  archived: boolean;
   programs: SnapshotProgram[];
 }
 
@@ -116,7 +109,7 @@ interface ChangeLogEntry {
 
 // ── Snapshot reconstruction ──────────────────────────────────────────────────
 
-export async function getSnapshotAt(timestamp: string): Promise<{
+export async function getSnapshotAt(timestamp: string, historical = false): Promise<{
   frameworks: SnapshotFramework[];
   lastModifiedAt: string;
   settings: ComputationSettings | null;
@@ -128,7 +121,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
   const minuteStart = Math.floor(targetDate.getTime() / 60000) * 60000;
   const revertAfter = new Date(minuteStart + 60000 - 1); // end of the chosen minute
 
-  // Fetch current live data (all items, including archived)
+  // Fetch current live data
   const [currentFrameworks, allLogs, allSettingsLogs] = await Promise.all([
     prisma.framework.findMany({
       select: {
@@ -136,14 +129,12 @@ export async function getSnapshotAt(timestamp: string): Promise<{
         name: true,
         color: true,
         sortOrder: true,
-        archived: true,
         programs: {
           select: {
             id: true,
             name: true,
             frameworkId: true,
             sortOrder: true,
-            archived: true,
             abandoned: true,
             projects: {
               select: {
@@ -157,7 +148,6 @@ export async function getSnapshotAt(timestamp: string): Promise<{
                 actualCompletionDate: true,
                 phasesTableName: true,
                 sortOrder: true,
-                archived: true,
                 abandoned: true,
                 phases: {
                   select: {
@@ -166,7 +156,6 @@ export async function getSnapshotAt(timestamp: string): Promise<{
                     name: true,
                     weight: true,
                     sortOrder: true,
-                    archived: true,
                   },
                   orderBy: { sortOrder: "asc" },
                 },
@@ -188,7 +177,6 @@ export async function getSnapshotAt(timestamp: string): Promise<{
                     deliverable: true,
                     attachments: true,
                     phaseId: true,
-                    archived: true,
                     abandoned: true,
                   },
                   orderBy: { sortOrder: "asc" },
@@ -209,7 +197,6 @@ export async function getSnapshotAt(timestamp: string): Promise<{
                     dueQuarter: true,
                     lastUpdatedDate: true,
                     phaseId: true,
-                    archived: true,
                     abandoned: true,
                   },
                   orderBy: { sortOrder: "asc" },
@@ -228,7 +215,6 @@ export async function getSnapshotAt(timestamp: string): Promise<{
                     dueQuarter: true,
                     lastUpdatedDate: true,
                     phaseId: true,
-                    archived: true,
                     abandoned: true,
                   },
                   orderBy: { sortOrder: "asc" },
@@ -259,7 +245,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
   // If no changes after the boundary, return current data as-is
   if (allLogs.length === 0) {
     return {
-      frameworks: filterArchived(currentFrameworks),
+      frameworks: filterAbandoned(currentFrameworks, historical),
       lastModifiedAt: timestamp,
       settings: null, // null = use current settings
     };
@@ -321,50 +307,6 @@ export async function getSnapshotAt(timestamp: string): Promise<{
         // Entity was deleted AFTER our target timestamp — remove from createdAfter
         // (it existed before T even if also created before T)
         createdAfter.delete(entityKey);
-        break;
-      }
-      case "archive": {
-        if (log.entityType === "Project") {
-          // Project archived AFTER T → it wasn't archived at T
-          unarchiveEntity("Project", log.entityId);
-          // Cascade: also unarchive all tasks of this project (legacy single-entry)
-          const pr = projectMap.get(log.entityId);
-          if (pr) {
-            for (const t of pr.tasks) {
-              unarchiveEntity("Task", t.id);
-            }
-            for (const st of pr.specialTasks) {
-              unarchiveEntity("SpecialTask", st.id);
-            }
-            for (const st of pr.suchTasks) {
-              unarchiveEntity("SuchTask", st.id);
-            }
-          }
-        } else {
-          unarchiveEntity(log.entityType, log.entityId);
-        }
-        break;
-      }
-      case "unarchive": {
-        if (log.entityType === "Project") {
-          // Project unarchived AFTER T → it was archived at T
-          archiveEntity("Project", log.entityId);
-          // Cascade: also archive all tasks of this project (legacy single-entry)
-          const pr = projectMap.get(log.entityId);
-          if (pr) {
-            for (const t of pr.tasks) {
-              archiveEntity("Task", t.id);
-            }
-            for (const st of pr.specialTasks) {
-              archiveEntity("SpecialTask", st.id);
-            }
-            for (const st of pr.suchTasks) {
-              archiveEntity("SuchTask", st.id);
-            }
-          }
-        } else {
-          archiveEntity(log.entityType, log.entityId);
-        }
         break;
       }
       case "abandon": {
@@ -538,56 +480,6 @@ export async function getSnapshotAt(timestamp: string): Promise<{
     }
   }
 
-  function unarchiveEntity(type: string, id: number) {
-    if (type === "Framework") {
-      const f = frameworkMap.get(id);
-      if (f) f.archived = false;
-    } else if (type === "Program") {
-      const p = programMap.get(id);
-      if (p) p.archived = false;
-    } else if (type === "Project") {
-      const p = projectMap.get(id);
-      if (p) p.archived = false;
-    } else if (type === "Phase") {
-      const ph = phaseMap.get(id);
-      if (ph) ph.archived = false;
-    } else if (type === "Task") {
-      const t = taskMap.get(id);
-      if (t) t.archived = false;
-    } else if (type === "SpecialTask") {
-      const st = specialTaskMap.get(id);
-      if (st) st.archived = false;
-    } else if (type === "SuchTask") {
-      const st = suchTaskMap.get(id);
-      if (st) st.archived = false;
-    }
-  }
-
-  function archiveEntity(type: string, id: number) {
-    if (type === "Framework") {
-      const f = frameworkMap.get(id);
-      if (f) f.archived = true;
-    } else if (type === "Program") {
-      const p = programMap.get(id);
-      if (p) p.archived = true;
-    } else if (type === "Project") {
-      const p = projectMap.get(id);
-      if (p) p.archived = true;
-    } else if (type === "Phase") {
-      const ph = phaseMap.get(id);
-      if (ph) ph.archived = true;
-    } else if (type === "Task") {
-      const t = taskMap.get(id);
-      if (t) t.archived = true;
-    } else if (type === "SpecialTask") {
-      const st = specialTaskMap.get(id);
-      if (st) st.archived = true;
-    } else if (type === "SuchTask") {
-      const st = suchTaskMap.get(id);
-      if (st) st.archived = true;
-    }
-  }
-
   function applyUpdateReverse(type: string, id: number, details: string) {
     const changes = parseDetails(details);
     if (type === "Framework") {
@@ -611,14 +503,12 @@ export async function getSnapshotAt(timestamp: string): Promise<{
         if (changes.adjustedTargetQuarter) p.adjustedTargetQuarter = changes.adjustedTargetQuarter.old;
         if (changes.actualCompletionDate) p.actualCompletionDate = changes.actualCompletionDate.old || null;
         if (changes.phasesTableName) p.phasesTableName = changes.phasesTableName.old || null;
-        if (changes.archived) p.archived = changes.archived.old === "true";
       }
     } else if (type === "Phase") {
       const ph = phaseMap.get(id);
       if (ph) {
         if (changes.name) ph.name = changes.name.old;
         if (changes.weight) ph.weight = parseFloat(changes.weight.old) || 0;
-        if (changes.archived) ph.archived = changes.archived.old === "true";
       }
     } else if (type === "Task") {
       const t = taskMap.get(id);
@@ -634,7 +524,6 @@ export async function getSnapshotAt(timestamp: string): Promise<{
         if (changes.deliverable) t.deliverable = changes.deliverable.old || null;
         if (changes.targetQuarter) t.targetQuarter = changes.targetQuarter.old;
         if (changes.adjustedTargetQuarter) t.adjustedTargetQuarter = changes.adjustedTargetQuarter.old;
-        if (changes.archived) t.archived = changes.archived.old === "true";
       }
     } else if (type === "SpecialTask") {
       const st = specialTaskMap.get(id);
@@ -649,7 +538,6 @@ export async function getSnapshotAt(timestamp: string): Promise<{
         if (changes.done) st.done = parseInt(changes.done.old) || 0;
         if (changes.dueQuarter) st.dueQuarter = changes.dueQuarter.old;
         if (changes.lastUpdatedDate) st.lastUpdatedDate = changes.lastUpdatedDate.old || null;
-        if (changes.archived) st.archived = changes.archived.old === "true";
       }
     } else if (type === "SuchTask") {
       const st = suchTaskMap.get(id);
@@ -662,13 +550,11 @@ export async function getSnapshotAt(timestamp: string): Promise<{
         if (changes.nsv) st.nsv = parseInt(changes.nsv.old) || 0;
         if (changes.dueQuarter) st.dueQuarter = changes.dueQuarter.old;
         if (changes.lastUpdatedDate) st.lastUpdatedDate = changes.lastUpdatedDate.old || null;
-        if (changes.archived) st.archived = changes.archived.old === "true";
       }
     }
   }
 
   // Reconstruct the tree, excluding entities created after the target timestamp
-  // and handling archive status
   const reconstructed: SnapshotFramework[] = [];
 
   for (const [fid, f] of frameworkMap) {
@@ -703,7 +589,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
             dependencies: t.dependencies,
             adjustedTargetQuarter: t.adjustedTargetQuarter,
             phaseId: t.phaseId,
-            archived: t.archived,
+            abandoned: t.abandoned,
           });
         }
 
@@ -725,7 +611,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
             dueQuarter: st.dueQuarter,
             lastUpdatedDate: st.lastUpdatedDate,
             phaseId: st.phaseId,
-            archived: st.archived,
+            abandoned: st.abandoned,
           });
         }
 
@@ -745,7 +631,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
             dueQuarter: st.dueQuarter,
             lastUpdatedDate: st.lastUpdatedDate,
             phaseId: st.phaseId,
-            archived: st.archived,
+            abandoned: st.abandoned,
           });
         }
 
@@ -759,7 +645,6 @@ export async function getSnapshotAt(timestamp: string): Promise<{
             name: ph.name,
             weight: ph.weight,
             sortOrder: ph.sortOrder,
-            archived: ph.archived,
           });
         }
 
@@ -773,7 +658,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
           adjustedTargetQuarter: pr.adjustedTargetQuarter,
           actualCompletionDate: pr.actualCompletionDate,
           phasesTableName: pr.phasesTableName,
-          archived: pr.archived,
+          abandoned: pr.abandoned,
           phases,
           tasks,
           specialTasks,
@@ -785,7 +670,7 @@ export async function getSnapshotAt(timestamp: string): Promise<{
         id: p.id,
         name: p.name,
         frameworkId: p.frameworkId,
-        archived: p.archived,
+        abandoned: p.abandoned,
         projects,
       });
     }
@@ -794,7 +679,6 @@ export async function getSnapshotAt(timestamp: string): Promise<{
       id: f.id,
       name: f.name,
       color: f.color,
-      archived: f.archived,
       programs,
     });
   }
@@ -813,31 +697,31 @@ export async function getSnapshotAt(timestamp: string): Promise<{
   }
 
   return {
-    frameworks: filterArchived(reconstructed),
+    frameworks: filterAbandoned(reconstructed, historical),
     lastModifiedAt: timestamp,
     settings: historicalSettings,
   };
 }
 
-// ── Filter archived/abandoned items (dashboard only shows active) ────────────
+// ── Filter abandoned items (dashboard only shows active) ────────────────────
 
-function filterArchived(frameworks: SnapshotFramework[]): SnapshotFramework[] {
+function filterAbandoned(frameworks: SnapshotFramework[], historical = false): SnapshotFramework[] {
+  if (historical) return frameworks;
   return frameworks
-    .filter((f) => !f.archived)
     .map((f) => ({
       ...f,
       programs: f.programs
-        .filter((p) => !p.archived && !p.abandoned)
+        .filter((p) => !p.abandoned)
         .map((p) => ({
           ...p,
           projects: p.projects
-            .filter((pr) => !pr.archived && !pr.abandoned)
+            .filter((pr) => !pr.abandoned)
             .map((pr) => ({
               ...pr,
-              phases: pr.phases.filter((ph) => !ph.archived),
-              tasks: pr.tasks.filter((t) => !t.archived && !t.abandoned),
-              specialTasks: pr.specialTasks.filter((st) => !st.archived && !st.abandoned),
-              suchTasks: pr.suchTasks.filter((st) => !st.archived && !st.abandoned),
+              phases: pr.phases,
+              tasks: pr.tasks.filter((t) => !t.abandoned),
+              specialTasks: pr.specialTasks.filter((st) => !st.abandoned),
+              suchTasks: pr.suchTasks.filter((st) => !st.abandoned),
             })),
         })),
     }));
