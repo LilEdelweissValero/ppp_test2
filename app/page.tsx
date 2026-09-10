@@ -2,6 +2,7 @@ import DashboardView from "@/components/DashboardView";
 import HeaderTimestamp from "@/components/HeaderTimestamp";
 import { compareQuarters } from "@/lib/quarters";
 import { getDashboardData } from "@/lib/portfolio-data";
+import { getSettings } from "@/lib/computation-settings-server";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,10 @@ export default async function DashboardPage({
   const query = await searchParams;
   const asOf = query.asOf || null;
 
-  const { frameworks, lastModifiedAt } = await getDashboardData();
+  const [{ frameworks, lastModifiedAt }, initialSettings] = await Promise.all([
+    getDashboardData(),
+    getSettings(),
+  ]);
 
   const quarterSet = new Set<string>();
   for (const framework of frameworks) {
@@ -115,6 +119,7 @@ export default async function DashboardPage({
           existingQuarters={existingQuarters}
           sourceVersion={lastModifiedAt}
           historicalTimestamp={asOf}
+          initialSettings={initialSettings}
         />
       </main>
     </div>

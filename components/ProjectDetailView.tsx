@@ -60,6 +60,7 @@ function expandSpecialTasksToVirtualTasks(specialTasks: CachedSpecialTask[], set
 interface Props {
   project: Project;
   historicalTimestamp?: string | null;
+  initialSettings?: ComputationSettings;
 }
 
 function SortableTaskRow({
@@ -278,7 +279,7 @@ function SortableTaskRow({
   );
 }
 
-export default function ProjectDetailView({ project: initialProject, historicalTimestamp }: Props) {
+export default function ProjectDetailView({ project: initialProject, historicalTimestamp, initialSettings }: Props) {
   const router = useRouter();
   const { canReturnToDashboard, setProject } = usePortfolioCache();
   const [project, setCurrentProject] = useState(initialProject);
@@ -301,21 +302,29 @@ export default function ProjectDetailView({ project: initialProject, historicalT
   const [specialTasks, setSpecialTasks] = useState<CachedSpecialTask[]>(initialProject.specialTasks || []);
   const [suchTasks, setSuchTasks] = useState<CachedSuchTask[]>(initialProject.suchTasks || []);
   const [phases, setPhases] = useState<CachedPhase[]>(initialProject.phases || []);
-  const [compSettings, setCompSettings] = useState<ComputationSettings | undefined>(undefined);
+  const [compSettings, setCompSettings] = useState<ComputationSettings | undefined>(initialSettings);
+  const settingsLoaded = compSettings !== undefined;
   const abandonReasons = compSettings?.abandonmentReasons ?? [];
   const [showPhaseSetup, setShowPhaseSetup] = useState(false);
   const [showAddPhase, setShowAddPhase] = useState(false);
   const [showEditPhases, setShowEditPhases] = useState(false);
   const [editPhase, setEditPhase] = useState<CachedPhase | null>(null);
 
+  // Sync server-preloaded settings (e.g. after router.refresh() post-save)
   useEffect(() => {
+    if (initialSettings) setCompSettings(initialSettings);
+  }, [initialSettings]);
+
+  // Revalidate live settings (covers mid-session saves; no-op fallback if fetch fails)
+  useEffect(() => {
+    if (historicalTimestamp) return;
     fetch("/api/settings/computation")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data) setCompSettings(data);
       })
       .catch(() => {});
-  }, []);
+  }, [historicalTimestamp]);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
   const [savingOrder, setSavingOrder] = useState(false);
   const [saveOrderError, setSaveOrderError] = useState<string | null>(null);
@@ -345,13 +354,17 @@ export default function ProjectDetailView({ project: initialProject, historicalT
   // Fetch snapshot data when in historical mode
   useEffect(() => {
     if (!historicalTimestamp) {
-      // Restore live settings
-      fetch("/api/settings/computation")
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
-          if (data) setCompSettings(data);
-        })
-        .catch(() => {});
+      // Restore live settings (snapshot mode may have overridden them)
+      if (initialSettings) {
+        setCompSettings(initialSettings);
+      } else {
+        fetch("/api/settings/computation")
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            if (data) setCompSettings(data);
+          })
+          .catch(() => {});
+      }
       return;
     }
     fetch(`/api/snapshot?timestamp=${encodeURIComponent(historicalTimestamp)}`)
@@ -374,10 +387,13 @@ export default function ProjectDetailView({ project: initialProject, historicalT
         }
         if (data?.settings) {
           setCompSettings(data.settings);
+        } else if (initialSettings) {
+          // Snapshot had no settings change before T ("use current settings")
+          setCompSettings(initialSettings);
         }
       })
       .catch(() => {});
-  }, [historicalTimestamp, project.id]);
+  }, [historicalTimestamp, project.id, initialSettings]);
 
   function handleTaskMouseEnter(task: Task, e: React.MouseEvent<HTMLTableRowElement>) {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
@@ -682,7 +698,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
               </h1>
               <p className="detail-program">{project.program.name}</p>
             </div>
-            <HealthBadge health={health} />
+            <HealthBadge health={health} loading={!settingsLoaded} />
           </div>
 
           <div className="detail-meta-grid">

@@ -160,6 +160,7 @@ interface Props {
   existingQuarters: string[];
   sourceVersion: string | null;
   historicalTimestamp?: string | null;
+  initialSettings?: ComputationSettings;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -712,7 +713,7 @@ function ProgramSummaryRow({
       </td>
       {/* health badge */}
       <td style={{ padding: "5px 10px", textAlign: "left", width: 110, background: programBg }}>
-        <HealthBadge health={programHealth} />
+        <HealthBadge health={programHealth} loading={settings === undefined} />
       </td>
     </tr>
   );
@@ -1384,7 +1385,7 @@ function SortableProjectRow({
 
       {/* health badge */}
       <td style={{ ...tdMetric, textAlign: "left", width: 110 }}>
-        <HealthBadge health={health} />
+        <HealthBadge health={health} loading={settings === undefined} />
       </td>
     </tr>
   );
@@ -1523,6 +1524,7 @@ export default function DashboardView({
   existingQuarters,
   sourceVersion,
   historicalTimestamp,
+  initialSettings,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1565,19 +1567,26 @@ export default function DashboardView({
   const [changeLevelConfig, setChangeLevelConfig] = useState<LevelChangeConfig | null>(null);
   const [showImportExcel, setShowImportExcel] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [compSettings, setCompSettings] = useState<ComputationSettings | undefined>(undefined);
+  const [compSettings, setCompSettings] = useState<ComputationSettings | undefined>(initialSettings);
+  const settingsLoaded = compSettings !== undefined;
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
   const deferredSearch = useDeferredValue(search);
 
-  // Fetch computation settings
+  // Sync server-preloaded settings (e.g. after router.refresh() post-save)
   useEffect(() => {
+    if (initialSettings) setCompSettings(initialSettings);
+  }, [initialSettings]);
+
+  // Revalidate live settings (covers mid-session saves; no-op fallback if fetch fails)
+  useEffect(() => {
+    if (historicalTimestamp) return;
     fetch("/api/settings/computation")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data) setCompSettings(data);
       })
       .catch(() => {});
-  }, []);
+  }, [historicalTimestamp]);
 
   useEffect(() => {
     setPortfolio(frameworks);
@@ -1587,13 +1596,17 @@ export default function DashboardView({
   useEffect(() => {
     if (!historicalTimestamp) {
       setPortfolio(frameworks);
-      // Restore live settings
-      fetch("/api/settings/computation")
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
-          if (data) setCompSettings(data);
-        })
-        .catch(() => {});
+      // Restore live settings (snapshot mode may have overridden them)
+      if (initialSettings) {
+        setCompSettings(initialSettings);
+      } else {
+        fetch("/api/settings/computation")
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            if (data) setCompSettings(data);
+          })
+          .catch(() => {});
+      }
       return;
     }
     setSnapshotLoading(true);
@@ -1605,11 +1618,14 @@ export default function DashboardView({
         }
         if (data?.settings) {
           setCompSettings(data.settings);
+        } else if (initialSettings) {
+          // Snapshot had no settings change before T ("use current settings")
+          setCompSettings(initialSettings);
         }
         setSnapshotLoading(false);
       })
       .catch(() => setSnapshotLoading(false));
-  }, [historicalTimestamp, frameworks]);
+  }, [historicalTimestamp, frameworks, initialSettings]);
 
   useEffect(() => {
     seedPortfolio(frameworks, sourceVersion);
@@ -2343,7 +2359,7 @@ export default function DashboardView({
                         >
                           {fwPctRounded}%
                         </span>
-                        <HealthBadge health={fwHealth} />
+                        <HealthBadge health={fwHealth} loading={!settingsLoaded} />
                       </div>
                     );
                   })()}
@@ -2531,6 +2547,7 @@ export default function DashboardView({
           <ComputationSettingsModal
             open={showSettings}
             onClose={() => setShowSettings(false)}
+            onSaved={(settings) => setCompSettings(settings)}
           />
         </>
       )}

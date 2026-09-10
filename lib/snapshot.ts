@@ -683,13 +683,16 @@ export async function getSnapshotAt(timestamp: string, historical = false): Prom
     });
   }
 
-  // Reconstruct historical settings from the latest settings log entry at or before T
+  // Reconstruct historical settings from the latest settings log entry at or before T.
+  // newValue = the settings in effect after that save, which is what the user expects
+  // to see when viewing "as of" a given time.  oldValue would be one version behind.
   let historicalSettings: ComputationSettings | null = null;
   if (allSettingsLogs.length > 0) {
     const latestSettingsLog = allSettingsLogs[0];
-    if (latestSettingsLog.oldValue) {
+    const raw = latestSettingsLog.newValue || latestSettingsLog.oldValue;
+    if (raw) {
       try {
-        historicalSettings = JSON.parse(latestSettingsLog.oldValue);
+        historicalSettings = JSON.parse(raw);
       } catch {
         // Malformed — fall back to null (current settings)
       }

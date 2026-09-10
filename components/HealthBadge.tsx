@@ -38,9 +38,26 @@ const HEALTH_STYLES: Record<
 
 export default function HealthBadge({
   health,
+  loading,
 }: {
   health: string | null;
+  loading?: boolean;
 }) {
+  if (loading) {
+    return (
+      <span
+        aria-hidden="true"
+        style={{
+          display: "inline-block",
+          minWidth: 108,
+          height: 20,
+          background: "#E5E7EB",
+          borderRadius: 2,
+          whiteSpace: "nowrap",
+        }}
+      />
+    );
+  }
   if (!health) {
     return (
       <span

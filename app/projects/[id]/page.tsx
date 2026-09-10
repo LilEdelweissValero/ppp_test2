@@ -4,6 +4,7 @@ import ProjectDetailView from "@/components/ProjectDetailView";
 import CachedProjectRoute from "@/components/CachedProjectRoute";
 import HeaderTimestamp from "@/components/HeaderTimestamp";
 import { getProjectData, getDashboardData } from "@/lib/portfolio-data";
+import { getSettings } from "@/lib/computation-settings-server";
 
 export const dynamic = "force-dynamic";
 
@@ -26,9 +27,10 @@ export default async function ProjectPage({
     return <CachedProjectRoute projectId={projectId} />;
   }
 
-  const [project, { lastModifiedAt }] = await Promise.all([
+  const [project, { lastModifiedAt }, initialSettings] = await Promise.all([
     getProjectData(projectId),
     getDashboardData(),
+    getSettings(),
   ]);
   if (!project) notFound();
 
@@ -88,7 +90,7 @@ export default async function ProjectPage({
         </div>
       </header>
 
-      <ProjectDetailView project={project} historicalTimestamp={asOf} />
+      <ProjectDetailView project={project} historicalTimestamp={asOf} initialSettings={initialSettings} />
     </div>
   );
 }

@@ -19,6 +19,7 @@ import type {
 interface Props {
   open: boolean;
   onClose: () => void;
+  onSaved?: (settings: ComputationSettings) => void;
 }
 
 type Tab = "statuses" | "health" | "completionRates" | "abandonment";
@@ -761,7 +762,7 @@ function AbandonmentReasonsTab({
 
 // ── Main Modal ─────────────────────────────────────────────────────────────
 
-export default function ComputationSettingsModal({ open, onClose }: Props) {
+export default function ComputationSettingsModal({ open, onClose, onSaved }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("statuses");
   const [settings, setSettings] = useState<ComputationSettings>(
@@ -875,6 +876,7 @@ export default function ComputationSettingsModal({ open, onClose }: Props) {
       }
 
       setOriginal(settings);
+      onSaved?.(settings);
       router.refresh();
     } catch {
       setError("Failed to save settings. Please try again.");
