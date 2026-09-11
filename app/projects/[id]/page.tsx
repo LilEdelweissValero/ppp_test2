@@ -5,6 +5,7 @@ import CachedProjectRoute from "@/components/CachedProjectRoute";
 import HeaderTimestamp from "@/components/HeaderTimestamp";
 import { getProjectData, getDashboardData } from "@/lib/portfolio-data";
 import { getSettings } from "@/lib/computation-settings-server";
+import { hasEditAccess } from "@/lib/edit-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -27,10 +28,11 @@ export default async function ProjectPage({
     return <CachedProjectRoute projectId={projectId} />;
   }
 
-  const [project, { lastModifiedAt }, initialSettings] = await Promise.all([
+  const [project, { lastModifiedAt }, initialSettings, canEdit] = await Promise.all([
     getProjectData(projectId),
     getDashboardData(),
     getSettings(),
+    hasEditAccess(),
   ]);
   if (!project) notFound();
 
@@ -90,7 +92,7 @@ export default async function ProjectPage({
         </div>
       </header>
 
-      <ProjectDetailView project={project} historicalTimestamp={asOf} initialSettings={initialSettings} />
+      <ProjectDetailView project={project} historicalTimestamp={asOf} initialSettings={initialSettings} canEdit={canEdit} />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { touchLastModified } from "@/lib/system-metadata";
 import { logChange } from "@/lib/audit-log";
+import { requireEdit } from "@/lib/edit-auth";
 import { getSettings } from "@/lib/computation-settings-server";
 import { isQuarterValid } from "@/lib/quarters";
 import type { Prisma } from "@/app/generated/prisma/client";
@@ -305,6 +306,8 @@ async function reallocateDisplaced(
 }
 
 export async function POST(request: NextRequest) {
+  const blocked = await requireEdit();
+  if (blocked) return blocked;
   let body: Record<string, unknown>;
   try {
     body = await request.json();

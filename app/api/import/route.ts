@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import * as XLSX from "xlsx";
 import { touchLastModified } from "@/lib/system-metadata";
 import { logChange } from "@/lib/audit-log";
+import { requireEdit } from "@/lib/edit-auth";
 import { getSettings } from "@/lib/computation-settings-server";
 
 const EXCEL_COLUMNS = [
@@ -180,6 +181,14 @@ interface ValidatedSpecialTaskRow {
 }
 
 export async function POST(request: NextRequest) {
+  const blocked = await requireEdit();
+  if (blocked) {
+    const message = JSON.stringify({ type: "error", error: "View-only mode. Editing is disabled." }) + "\n";
+    return new Response(message, {
+      status: 403,
+      headers: { "Content-Type": "application/x-ndjson" },
+    });
+  }
   const settings = await getSettings();
   const validStatuses = settings.statuses.map((s) => s.name);
 

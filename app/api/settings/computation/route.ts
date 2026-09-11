@@ -8,6 +8,7 @@ import { validateHealthRules } from "@/lib/computation-settings";
 import type { ComputationSettings } from "@/lib/computation-settings";
 import { logChange, diffSettings } from "@/lib/audit-log";
 import { touchLastModified } from "@/lib/system-metadata";
+import { requireEdit } from "@/lib/edit-auth";
 
 export async function GET() {
   const settings = await getSettings();
@@ -15,6 +16,8 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
+  const blocked = await requireEdit();
+  if (blocked) return blocked;
   try {
     const settings: ComputationSettings = await request.json();
 

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { touchLastModified } from "@/lib/system-metadata";
 import { logChange, diffFieldsV2 } from "@/lib/audit-log";
 import { getSettings } from "@/lib/computation-settings-server";
+import { requireEdit } from "@/lib/edit-auth";
 
 export async function GET(
   _request: NextRequest,
@@ -20,6 +21,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const blocked = await requireEdit();
+  if (blocked) return blocked;
   const { id } = await params;
   const body = await request.json();
   const {

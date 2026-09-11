@@ -3,6 +3,7 @@ import HeaderTimestamp from "@/components/HeaderTimestamp";
 import { compareQuarters } from "@/lib/quarters";
 import { getDashboardData } from "@/lib/portfolio-data";
 import { getSettings } from "@/lib/computation-settings-server";
+import { hasEditAccess } from "@/lib/edit-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -14,9 +15,10 @@ export default async function DashboardPage({
   const query = await searchParams;
   const asOf = query.asOf || null;
 
-  const [{ frameworks, lastModifiedAt }, initialSettings] = await Promise.all([
+  const [{ frameworks, lastModifiedAt }, initialSettings, canEdit] = await Promise.all([
     getDashboardData(),
     getSettings(),
+    hasEditAccess(),
   ]);
 
   const quarterSet = new Set<string>();
@@ -110,6 +112,26 @@ export default async function DashboardPage({
         </div>
       )}
 
+      {/* ── View-only banner ── */}
+      {!canEdit && !isHistorical && (
+        <div
+          style={{
+            background: "var(--ground-metric)",
+            borderBottom: "1px solid var(--rule)",
+            padding: "8px 24px",
+            fontSize: 12,
+            color: "var(--ink-secondary)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+          }}
+        >
+          <span style={{ fontWeight: 600 }}>View only</span>
+          <span>&mdash; Editing is disabled on this link.</span>
+        </div>
+      )}
+
       {/* ── Dashboard body ── */}
       <main
         style={{ maxWidth: 1600, margin: "0 auto", padding: "20px 24px 48px" }}
@@ -120,6 +142,7 @@ export default async function DashboardPage({
           sourceVersion={lastModifiedAt}
           historicalTimestamp={asOf}
           initialSettings={initialSettings}
+          canEdit={canEdit}
         />
       </main>
     </div>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { touchLastModified } from "@/lib/system-metadata";
 import { logChange } from "@/lib/audit-log";
+import { requireEdit } from "@/lib/edit-auth";
 
 const PRESET_COLORS = [
   "#DBEAFE",
@@ -52,6 +53,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const blocked = await requireEdit();
+  if (blocked) return blocked;
   const body = await request.json();
   const { name, color } = body;
   if (!name || typeof name !== "string" || !name.trim()) {

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logChange } from "@/lib/audit-log";
+import { requireEdit } from "@/lib/edit-auth";
 
 export async function POST(request: NextRequest) {
+  const blocked = await requireEdit();
+  if (blocked) return blocked;
   try {
     const body = await request.json();
     const { projectId, monthKey, remarks } = body;

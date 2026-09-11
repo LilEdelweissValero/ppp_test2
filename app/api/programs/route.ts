@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { touchLastModified } from "@/lib/system-metadata";
 import { logChange } from "@/lib/audit-log";
+import { requireEdit } from "@/lib/edit-auth";
 
 export async function GET(request: NextRequest) {
   const simple = request.nextUrl.searchParams.get("simple") === "true";
@@ -22,6 +23,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const blocked = await requireEdit();
+  if (blocked) return blocked;
   const body = await request.json();
   const { name, frameworkId } = body;
   if (!name || typeof name !== "string" || !name.trim()) {

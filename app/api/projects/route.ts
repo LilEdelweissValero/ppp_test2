@@ -3,8 +3,11 @@ import { prisma } from "@/lib/db";
 import { isQuarterValid } from "@/lib/quarters";
 import { touchLastModified } from "@/lib/system-metadata";
 import { logChange } from "@/lib/audit-log";
+import { requireEdit } from "@/lib/edit-auth";
 
 export async function POST(request: NextRequest) {
+  const blocked = await requireEdit();
+  if (blocked) return blocked;
   const body = await request.json();
   const { name, programId, reference, owner, targetQuarter, actualCompletionDate } = body;
 

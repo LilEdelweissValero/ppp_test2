@@ -8,6 +8,7 @@ import UnabandonConfirmModal from "./UnabandonConfirmModal";
 
 interface Props {
   data: AbandonedData;
+  canEdit: boolean;
 }
 
 function formatDate(iso: string): string {
@@ -98,7 +99,7 @@ const badgeStyle: React.CSSProperties = {
   whiteSpace: "nowrap",
 };
 
-export default function AbandonedView({ data }: Props) {
+export default function AbandonedView({ data, canEdit }: Props) {
   const router = useRouter();
   const [expandedPrograms, setExpandedPrograms] = useState<Set<number>>(new Set());
   const [expandedProjects, setExpandedProjects] = useState<Set<number>>(new Set());
@@ -273,6 +274,7 @@ export default function AbandonedView({ data }: Props) {
                   onToggleProject={toggleProject}
                   onUnabandon={handleUnabandon}
                   loading={loading}
+                  canEdit={canEdit}
                 />
               ))}
             </tbody>
@@ -280,7 +282,7 @@ export default function AbandonedView({ data }: Props) {
         </div>
       )}
 
-      {unabandonTarget && (
+      {unabandonTarget && canEdit && (
         <UnabandonConfirmModal
           open={!!unabandonTarget}
           onClose={() => setUnabandonTarget(null)}
@@ -303,6 +305,7 @@ function ProgramRow({
   onToggleProject,
   onUnabandon,
   loading,
+  canEdit,
 }: {
   prog: AbandonedData["programs"][number];
   expanded: boolean;
@@ -316,6 +319,7 @@ function ProgramRow({
     parents: Array<{ type: "Project" | "Program"; name: string }>,
   ) => void;
   loading: number | null;
+  canEdit: boolean;
 }) {
   const isAbandoned = prog.abandoned;
 
@@ -351,7 +355,7 @@ function ProgramRow({
           {prog.abandonedAt ? formatDate(prog.abandonedAt) : "—"}
         </td>
         <td style={cellAction}>
-          {isAbandoned ? (
+          {isAbandoned && canEdit ? (
             <button
               onClick={(e) => { e.stopPropagation(); onUnabandon("program", prog.id, prog.name, []); }}
               disabled={loading === prog.id}
@@ -372,6 +376,7 @@ function ProgramRow({
           onToggleProject={onToggleProject}
           onUnabandon={onUnabandon}
           loading={loading}
+          canEdit={canEdit}
         />
       ))}
     </>
@@ -386,6 +391,7 @@ function ProjectRow({
   onToggleProject,
   onUnabandon,
   loading,
+  canEdit,
 }: {
   proj: AbandonedData["programs"][number]["projects"][number];
   progName: string;
@@ -399,6 +405,7 @@ function ProjectRow({
     parents: Array<{ type: "Project" | "Program"; name: string }>,
   ) => void;
   loading: number | null;
+  canEdit: boolean;
 }) {
   const isAbandoned = proj.abandoned;
   const expanded = expandedProjects.has(proj.id);
@@ -436,7 +443,7 @@ function ProjectRow({
           {proj.abandonedAt ? formatDate(proj.abandonedAt) : "—"}
         </td>
         <td style={cellActionSmall}>
-          {isAbandoned ? (
+          {isAbandoned && canEdit ? (
             <button
               onClick={(e) => { e.stopPropagation(); onUnabandon("project", proj.id, proj.name, progAbandoned ? [{ type: "Program", name: progName }] : []); }}
               disabled={loading === proj.id}
@@ -473,6 +480,7 @@ function ProjectRow({
             {task.abandonedAt ? formatDate(task.abandonedAt) : "—"}
           </td>
           <td style={{ ...cellNested, textAlign: "right" }}>
+            {canEdit ? (
             <button
               onClick={(e) => { e.stopPropagation(); const parents = [...(proj.abandoned ? [{ type: "Project" as const, name: proj.name }] : []), ...(progAbandoned ? [{ type: "Program" as const, name: progName }] : [])]; onUnabandon(task.type, task.id, task.name, parents); }}
               disabled={loading === task.id}
@@ -480,6 +488,7 @@ function ProjectRow({
             >
               {loading === task.id ? "..." : "Unabandon"}
             </button>
+            ) : null}
           </td>
         </tr>
       ))}

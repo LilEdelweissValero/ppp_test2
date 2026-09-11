@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { touchLastModified } from "@/lib/system-metadata";
 import { logChange } from "@/lib/audit-log";
+import { requireEdit } from "@/lib/edit-auth";
 
 export async function PATCH(request: NextRequest) {
+  const blocked = await requireEdit();
+  if (blocked) return blocked;
   const body = await request.json();
   const { assignments } = body as {
     assignments: { taskId?: number; specialTaskId?: number; suchTaskId?: number; phaseId: number | null }[];

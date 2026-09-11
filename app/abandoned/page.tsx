@@ -1,10 +1,11 @@
 import { fetchAbandonedData } from "@/lib/abandoned-data";
 import AbandonedView from "@/components/AbandonedView";
+import { hasEditAccess } from "@/lib/edit-auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function AbandonedPage() {
-  const data = await fetchAbandonedData();
+  const [data, canEdit] = await Promise.all([fetchAbandonedData(), hasEditAccess()]);
 
   return (
     <div className="min-h-screen" style={{ background: "var(--ground)" }}>
@@ -59,7 +60,7 @@ export default async function AbandonedPage() {
       </header>
 
       <main style={{ maxWidth: 1600, margin: "0 auto", padding: "20px 24px 48px" }}>
-        <AbandonedView data={data} />
+        <AbandonedView data={data} canEdit={canEdit} />
       </main>
     </div>
   );

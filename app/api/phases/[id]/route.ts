@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { touchLastModified } from "@/lib/system-metadata";
 import { logChange, diffFieldsV2 } from "@/lib/audit-log";
+import { requireEdit } from "@/lib/edit-auth";
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const blocked = await requireEdit();
+  if (blocked) return blocked;
   let body: { name?: string; weight?: number };
   try {
     body = await request.json();
@@ -55,6 +58,8 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const blocked = await requireEdit();
+  if (blocked) return blocked;
   const { id } = await params;
 
   const phase = await prisma.phase.findUnique({

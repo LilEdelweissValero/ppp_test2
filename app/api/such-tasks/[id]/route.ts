@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { touchLastModified } from "@/lib/system-metadata";
 import { logChange, diffFields } from "@/lib/audit-log";
+import { requireEdit } from "@/lib/edit-auth";
 
 export async function GET(
   _request: NextRequest,
@@ -20,6 +21,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const blocked = await requireEdit();
+  if (blocked) return blocked;
   const body = await request.json();
   const {
     suchTaskCode,

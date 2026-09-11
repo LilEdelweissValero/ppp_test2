@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { touchLastModified } from "@/lib/system-metadata";
 import { logChange, diffFields } from "@/lib/audit-log";
+import { requireEdit } from "@/lib/edit-auth";
 
 export async function PATCH(
   request: NextRequest,
@@ -9,6 +10,8 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const body = await request.json();
+  const blocked = await requireEdit();
+  if (blocked) return blocked;
   const { name, frameworkId, abandoned, abandonedReason, abandonedRemarks } = body;
 
   const oldProgram = await prisma.program.findUnique({ where: { id: parseInt(id) } });
@@ -95,6 +98,8 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const blocked = await requireEdit();
+  if (blocked) return blocked;
   const { id } = await params;
   const projectCount = await prisma.project.count({
     where: { programId: parseInt(id) },

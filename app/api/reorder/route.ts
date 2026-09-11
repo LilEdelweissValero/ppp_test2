@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { touchLastModified } from "@/lib/system-metadata";
 import { logChange } from "@/lib/audit-log";
+import { requireEdit } from "@/lib/edit-auth";
 
 const VALID_TYPES = ["framework", "program", "project", "task", "phase"] as const;
 type EntityType = (typeof VALID_TYPES)[number];
 
 export async function PATCH(request: NextRequest) {
+  const blocked = await requireEdit();
+  if (blocked) return blocked;
   let body: { entityType?: unknown; orderedIds?: unknown };
   try {
     body = await request.json();

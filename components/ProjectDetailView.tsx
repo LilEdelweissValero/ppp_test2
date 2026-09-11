@@ -61,6 +61,7 @@ interface Props {
   project: Project;
   historicalTimestamp?: string | null;
   initialSettings?: ComputationSettings;
+  canEdit?: boolean;
 }
 
 function SortableTaskRow({
@@ -279,11 +280,13 @@ function SortableTaskRow({
   );
 }
 
-export default function ProjectDetailView({ project: initialProject, historicalTimestamp, initialSettings }: Props) {
+export default function ProjectDetailView({ project: initialProject, historicalTimestamp, initialSettings, canEdit }: Props) {
   const router = useRouter();
   const { canReturnToDashboard, setProject } = usePortfolioCache();
   const [project, setCurrentProject] = useState(initialProject);
   const isHistorical = !!historicalTimestamp;
+  const [editUnlocked, setEditUnlocked] = useState<boolean | undefined>(canEdit);
+  const locked = isHistorical || editUnlocked !== true;
   const [showEditProject, setShowEditProject] = useState(false);
   const [showAddTask, setShowAddTask] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
@@ -309,6 +312,19 @@ export default function ProjectDetailView({ project: initialProject, historicalT
   const [showAddPhase, setShowAddPhase] = useState(false);
   const [showEditPhases, setShowEditPhases] = useState(false);
   const [editPhase, setEditPhase] = useState<CachedPhase | null>(null);
+
+  // View-only mode: server prop when rendered by the project page; client
+  // check for the cached navigation path (CachedProjectRoute passes no prop).
+  useEffect(() => {
+    if (canEdit !== undefined) {
+      setEditUnlocked(canEdit);
+      return;
+    }
+    fetch("/api/auth/status")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setEditUnlocked(data?.canEdit === true))
+      .catch(() => setEditUnlocked(false));
+  }, [canEdit]);
 
   // Sync server-preloaded settings (e.g. after router.refresh() post-save)
   useEffect(() => {
@@ -681,7 +697,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
   }
 
   return (
-    <main className={isHistorical ? "detail-shell readonly-view" : "detail-shell"}>
+    <main className={locked ? "detail-shell readonly-view" : "detail-shell"}>
       <div className="detail-container">
         <div>
           <button type="button" onClick={handleBackToDashboard} className="detail-back">
@@ -733,7 +749,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
           </div>
 
           <div className="detail-actions">
-            {!isHistorical && (
+            {!locked && (
               <>
                 <button
                   onClick={() => {
@@ -772,6 +788,11 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                 Historical view — edits are disabled
               </span>
             )}
+            {!isHistorical && editUnlocked === false && (
+              <span style={{ fontSize: 12, color: "var(--ink-tertiary)", fontStyle: "italic" }}>
+                View only — editing is disabled on this link
+              </span>
+            )}
           </div>
         </section>
 
@@ -786,7 +807,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                 {phases.length > 0 && " · Weights must equal 100%"}
               </p>
             </div>
-            {!isHistorical && (
+            {!locked && (
               <button
                 onClick={() => setShowEditPhases(true)}
                 className="detail-button"
@@ -851,7 +872,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                           </div>
                         </td>
                         <td style={{ width: 100 }}>
-                          {!isHistorical && (
+                          {!locked && (
                             <button
                               onClick={() => setViewHistory({ type: "Phase", id: phase.id })}
                               style={{ fontSize: 11, color: "var(--ink-secondary)", background: "none", border: "none", cursor: "pointer" }}
@@ -876,10 +897,10 @@ export default function ProjectDetailView({ project: initialProject, historicalT
               <h2 id="tasks-title" className="detail-task-heading">Tasks</h2>
               <p className="detail-task-subtitle">
                 {tasks.length} task{tasks.length === 1 ? "" : "s"}
-                {!isHistorical && " · Click priority or status to edit inline"}
+                {!locked && " · Click priority or status to edit inline"}
               </p>
             </div>
-            {!isHistorical && (
+            {!locked && (
               <button
                 onClick={() => setShowAddTask(true)}
                 className="detail-button detail-button-primary"
@@ -899,7 +920,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
               id="task-sort"
               sensors={sensors}
               collisionDetection={closestCenter}
-              onDragEnd={isHistorical ? () => {} : handleDragEnd}
+              onDragEnd={locked ? () => {} : handleDragEnd}
             >
               <SortableContext
                 items={sortedTasks.map((t) => t.id)}
@@ -975,7 +996,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                           onMouseEnter={(e) => handleTaskMouseEnter(task, e)}
                           onMouseLeave={handleTaskMouseLeave}
                           settings={compSettings}
-                          isHistorical={isHistorical}
+                          isHistorical={locked}
                           phases={phases}
                           onAssignPhase={handleAssignPhase}
                           />
@@ -996,7 +1017,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
               <h2 id="special-tasks-title" className="detail-task-heading">Helpdesk Tickets</h2>
               <p className="detail-task-subtitle">
                 {specialTasks.length} helpdesk ticket{specialTasks.length === 1 ? "" : "s"}
-                {!isHistorical && " · Click cells to edit inline"}
+                {!locked && " · Click cells to edit inline"}
               </p>
             </div>
           </div>
@@ -1051,7 +1072,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                                   );
                                 });
                               }}
-                              disabled={isHistorical}
+                              disabled={locked}
                               style={{
                                 fontSize: 11,
                                 padding: "2px 4px",
@@ -1076,8 +1097,8 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                         {/* NYS */}
                         <td
                           className="detail-inline-cell"
-                          style={{ width: 50, textAlign: "center", cursor: isHistorical ? "default" : undefined }}
-                          onClick={() => !isHistorical && setEditingSpecialCell({ taskId: st.id, field: "nys" })}
+                          style={{ width: 50, textAlign: "center", cursor: locked ? "default" : undefined }}
+                          onClick={() => !locked && setEditingSpecialCell({ taskId: st.id, field: "nys" })}
                         >
                           {editingSpecialCell?.taskId === st.id && editingSpecialCell.field === "nys" ? (
                             <input
@@ -1112,8 +1133,8 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                         {/* PLAN */}
                         <td
                           className="detail-inline-cell"
-                          style={{ width: 55, textAlign: "center", cursor: isHistorical ? "default" : undefined }}
-                          onClick={() => !isHistorical && setEditingSpecialCell({ taskId: st.id, field: "plan" })}
+                          style={{ width: 55, textAlign: "center", cursor: locked ? "default" : undefined }}
+                          onClick={() => !locked && setEditingSpecialCell({ taskId: st.id, field: "plan" })}
                         >
                           {editingSpecialCell?.taskId === st.id && editingSpecialCell.field === "plan" ? (
                             <input
@@ -1148,8 +1169,8 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                         {/* PART */}
                         <td
                           className="detail-inline-cell"
-                          style={{ width: 55, textAlign: "center", cursor: isHistorical ? "default" : undefined }}
-                          onClick={() => !isHistorical && setEditingSpecialCell({ taskId: st.id, field: "part" })}
+                          style={{ width: 55, textAlign: "center", cursor: locked ? "default" : undefined }}
+                          onClick={() => !locked && setEditingSpecialCell({ taskId: st.id, field: "part" })}
                         >
                           {editingSpecialCell?.taskId === st.id && editingSpecialCell.field === "part" ? (
                             <input
@@ -1184,8 +1205,8 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                         {/* MOSTLY */}
                         <td
                           className="detail-inline-cell"
-                          style={{ width: 65, textAlign: "center", cursor: isHistorical ? "default" : undefined }}
-                          onClick={() => !isHistorical && setEditingSpecialCell({ taskId: st.id, field: "mostly" })}
+                          style={{ width: 65, textAlign: "center", cursor: locked ? "default" : undefined }}
+                          onClick={() => !locked && setEditingSpecialCell({ taskId: st.id, field: "mostly" })}
                         >
                           {editingSpecialCell?.taskId === st.id && editingSpecialCell.field === "mostly" ? (
                             <input
@@ -1220,8 +1241,8 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                         {/* DONE */}
                         <td
                           className="detail-inline-cell"
-                          style={{ width: 55, textAlign: "center", cursor: isHistorical ? "default" : undefined }}
-                          onClick={() => !isHistorical && setEditingSpecialCell({ taskId: st.id, field: "done" })}
+                          style={{ width: 55, textAlign: "center", cursor: locked ? "default" : undefined }}
+                          onClick={() => !locked && setEditingSpecialCell({ taskId: st.id, field: "done" })}
                         >
                           {editingSpecialCell?.taskId === st.id && editingSpecialCell.field === "done" ? (
                             <input
@@ -1267,7 +1288,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                           </span>
                         </td>
                         <td style={{ width: 120 }}>
-                          {!isHistorical && (
+                          {!locked && (
                           <div className="detail-task-actions">
                             <button
                               onClick={() => setEditSpecialTask(st)}
@@ -1309,7 +1330,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
               <h2 id="such-tasks-title" className="detail-task-heading">SUCH Tasks</h2>
               <p className="detail-task-subtitle">
                 {suchTasks.length} SUCH task{suchTasks.length === 1 ? "" : "s"}
-                {!isHistorical && " · Click cells to edit inline"}
+                {!locked && " · Click cells to edit inline"}
               </p>
             </div>
           </div>
@@ -1362,7 +1383,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                                   );
                                 });
                               }}
-                              disabled={isHistorical}
+                              disabled={locked}
                               style={{
                                 fontSize: 11,
                                 padding: "2px 4px",
@@ -1387,8 +1408,8 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                         {/* S V */}
                         <td
                           className="detail-inline-cell"
-                          style={{ width: 50, textAlign: "center", cursor: isHistorical ? "default" : undefined }}
-                          onClick={() => !isHistorical && setEditingSuchCell({ taskId: st.id, field: "sv" })}
+                          style={{ width: 50, textAlign: "center", cursor: locked ? "default" : undefined }}
+                          onClick={() => !locked && setEditingSuchCell({ taskId: st.id, field: "sv" })}
                         >
                           {editingSuchCell?.taskId === st.id && editingSuchCell.field === "sv" ? (
                             <input
@@ -1423,8 +1444,8 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                         {/* S nV */}
                         <td
                           className="detail-inline-cell"
-                          style={{ width: 50, textAlign: "center", cursor: isHistorical ? "default" : undefined }}
-                          onClick={() => !isHistorical && setEditingSuchCell({ taskId: st.id, field: "snv" })}
+                          style={{ width: 50, textAlign: "center", cursor: locked ? "default" : undefined }}
+                          onClick={() => !locked && setEditingSuchCell({ taskId: st.id, field: "snv" })}
                         >
                           {editingSuchCell?.taskId === st.id && editingSuchCell.field === "snv" ? (
                             <input
@@ -1459,8 +1480,8 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                         {/* nS V */}
                         <td
                           className="detail-inline-cell"
-                          style={{ width: 50, textAlign: "center", cursor: isHistorical ? "default" : undefined }}
-                          onClick={() => !isHistorical && setEditingSuchCell({ taskId: st.id, field: "nsv" })}
+                          style={{ width: 50, textAlign: "center", cursor: locked ? "default" : undefined }}
+                          onClick={() => !locked && setEditingSuchCell({ taskId: st.id, field: "nsv" })}
                         >
                           {editingSuchCell?.taskId === st.id && editingSuchCell.field === "nsv" ? (
                             <input
@@ -1506,7 +1527,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                           </span>
                         </td>
                         <td style={{ width: 120 }}>
-                          {!isHistorical && (
+                          {!locked && (
                           <div className="detail-task-actions">
                             <button
                               onClick={() => setEditSuchTask(st)}
@@ -1540,7 +1561,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
         </section>
         )}
 
-        {!isHistorical && (
+        {!locked && (
         <>
         <ProjectFormModal
           open={showEditProject}

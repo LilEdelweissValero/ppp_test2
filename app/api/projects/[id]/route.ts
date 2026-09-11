@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { touchLastModified } from "@/lib/system-metadata";
 import { logChange, diffFieldsV2 } from "@/lib/audit-log";
+import { requireEdit } from "@/lib/edit-auth";
 
 export async function GET(
   _request: NextRequest,
@@ -30,6 +31,8 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const body = await request.json();
+  const blocked = await requireEdit();
+  if (blocked) return blocked;
   const { name, programId, reference, owner, targetQuarter, adjustedTargetQuarter, actualCompletionDate, phasesTableName, abandoned, abandonedReason, abandonedRemarks } = body;
 
   const oldProject = await prisma.project.findUnique({ where: { id: parseInt(id) } });

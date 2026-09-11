@@ -161,6 +161,7 @@ interface Props {
   sourceVersion: string | null;
   historicalTimestamp?: string | null;
   initialSettings?: ComputationSettings;
+  canEdit: boolean;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -1394,6 +1395,7 @@ function SortableProjectRow({
 // ── Actions dropdown ───────────────────────────────────────────────────────
 
 function ActionsMenu({
+  canEdit,
   onManageFrameworks,
   onManagePrograms,
   onManageProjects,
@@ -1404,6 +1406,7 @@ function ActionsMenu({
   onViewAbandoned,
   onSettings,
 }: {
+  canEdit: boolean;
   onManageFrameworks: () => void;
   onManagePrograms: () => void;
   onManageProjects: () => void;
@@ -1427,17 +1430,23 @@ function ActionsMenu({
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const items = [
-    { label: "Manage Frameworks", action: onManageFrameworks },
-    { label: "Manage Programs", action: onManagePrograms },
-    { label: "Manage Projects", action: onManageProjects },
-    { label: "Manage Tasks", action: onManageTasks },
-    { label: "Import / Export Excel", action: onImportExcel },
-    { label: "History Log", action: onHistoryLog },
-    { label: "Monthly Updates", action: onMonthlyUpdates },
-    { label: "View Abandoned", action: onViewAbandoned },
-    { label: "Settings", action: onSettings },
-  ];
+  const items = canEdit
+    ? [
+        { label: "Manage Frameworks", action: onManageFrameworks },
+        { label: "Manage Programs", action: onManagePrograms },
+        { label: "Manage Projects", action: onManageProjects },
+        { label: "Manage Tasks", action: onManageTasks },
+        { label: "Import / Export Excel", action: onImportExcel },
+        { label: "History Log", action: onHistoryLog },
+        { label: "Monthly Updates", action: onMonthlyUpdates },
+        { label: "View Abandoned", action: onViewAbandoned },
+        { label: "Settings", action: onSettings },
+      ]
+    : [
+        { label: "History Log", action: onHistoryLog },
+        { label: "Monthly Updates", action: onMonthlyUpdates },
+        { label: "View Abandoned", action: onViewAbandoned },
+      ];
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
@@ -1525,6 +1534,7 @@ export default function DashboardView({
   sourceVersion,
   historicalTimestamp,
   initialSettings,
+  canEdit,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1537,6 +1547,7 @@ export default function DashboardView({
   } = usePortfolioCache();
   const [portfolio, setPortfolio] = useState(frameworks);
   const isHistorical = !!historicalTimestamp;
+  const editable = canEdit && !isHistorical;
   const [snapshotLoading, setSnapshotLoading] = useState(false);
 
   const [selectedQuarter, setSelectedQuarter] = useState(searchParams.get("q") || ALL_TIME);
@@ -2104,7 +2115,7 @@ export default function DashboardView({
         <div style={{ flex: 1 }} />
 
         {/* Add Project button */}
-        {!isHistorical && (
+        {editable && (
           <button
             onClick={() => setShowAddProject(true)}
             style={{
@@ -2134,6 +2145,7 @@ export default function DashboardView({
         {!isHistorical && (
           <div style={{ display: "flex", alignItems: "flex-end" }}>
             <ActionsMenu
+              canEdit={canEdit}
               onManageFrameworks={() => setShowManageFrameworks(true)}
               onManagePrograms={() => setShowManagePrograms(true)}
               onManageProjects={() => setShowManageProjects(true)}
@@ -2372,7 +2384,7 @@ export default function DashboardView({
                       id={`project-sort-${fw.id}`}
                       sensors={sensors}
                       collisionDetection={closestCenter}
-                      onDragEnd={isHistorical ? () => {} : (event) => handleProjectDragEnd(fw.id, event)}
+                      onDragEnd={editable ? (event) => handleProjectDragEnd(fw.id, event) : () => {}}
                     >
                       <table
                         style={{
@@ -2442,7 +2454,7 @@ export default function DashboardView({
                                       if (cached) setProject({ ...cached, ...fields });
                                     }}
                                     settings={compSettings}
-                                    isHistorical={isHistorical}
+                                    isHistorical={!editable}
                                     historicalTimestamp={historicalTimestamp}
                                   />
                                 ))}
@@ -2484,7 +2496,7 @@ export default function DashboardView({
       </div>
 
       {/* ── Modals ── */}
-      {!isHistorical && (
+      {editable && (
         <>
           <ProjectFormModal
             open={showAddProject}

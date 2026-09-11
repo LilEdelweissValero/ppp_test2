@@ -79,9 +79,11 @@ function computeRowSpans(projects: ProjectRow[]) {
 function EditableRemarks({
   value,
   onSave,
+  readOnly,
 }: {
   value: string;
   onSave: (remarks: string) => void;
+  readOnly?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -139,21 +141,21 @@ function EditableRemarks({
 
   return (
     <div
-      onClick={() => setEditing(true)}
-      title="Click to edit remarks"
+      onClick={() => { if (!readOnly) setEditing(true); }}
+      title={readOnly ? undefined : "Click to edit remarks"}
       style={{
         fontSize: 11,
         lineHeight: 1.4,
         color: "var(--ink-secondary)",
-        cursor: "text",
+        cursor: readOnly ? "default" : "text",
         minHeight: 28,
         whiteSpace: "pre-wrap",
         wordBreak: "break-word",
         padding: "2px 0",
-        borderBottom: "1px dashed var(--rule)",
+        borderBottom: readOnly ? "none" : "1px dashed var(--rule)",
       }}
     >
-      {value || <span style={{ color: "var(--ink-tertiary)", fontStyle: "italic" }}>Click to add remarks</span>}
+      {value || <span style={{ color: "var(--ink-tertiary)", fontStyle: "italic" }}>{readOnly ? "—" : "Click to add remarks"}</span>}
     </div>
   );
 }
@@ -163,6 +165,14 @@ export default function MonthlyUpdatesView() {
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [canEdit, setCanEdit] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/status")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setCanEdit(data?.canEdit === true))
+      .catch(() => setCanEdit(false));
+  }, []);
 
   useEffect(() => {
     fetch("/api/monthly-updates")
@@ -550,6 +560,7 @@ export default function MonthlyUpdatesView() {
                             <EditableRemarks
                               value={remarks}
                               onSave={(val) => handleRemarksSave(project.id, m.key, val)}
+                              readOnly={!canEdit}
                             />
                           </td>
                         </Fragment>
