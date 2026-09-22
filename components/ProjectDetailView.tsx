@@ -1712,7 +1712,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
             open={!!editSuchTask}
             onClose={() => setEditSuchTask(null)}
             onSave={() => {}}
-            onSaveSpecial={(savedSuchTask) => {
+            onSaveSuch={(savedSuchTask) => {
               updateSuchTasks(suchTasks.map((st) =>
                 st.id === savedSuchTask.id ? savedSuchTask : st
               ));
@@ -1724,9 +1724,9 @@ export default function ProjectDetailView({ project: initialProject, historicalT
             onAbandon={() => {
               setEditSuchTask(null);
             }}
-            initialSpecialData={{
+            initialSuchData={{
               id: editSuchTask.id,
-              specialTaskCode: editSuchTask.suchTaskCode,
+              suchTaskCode: editSuchTask.suchTaskCode,
               name: editSuchTask.name,
               dueQuarter: editSuchTask.dueQuarter,
               lastUpdatedDate: editSuchTask.lastUpdatedDate,

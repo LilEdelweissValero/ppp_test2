@@ -94,7 +94,7 @@ export default function TaskFormModal({
 
   const [taskType, setTaskType] = useState<"normal" | "special" | "such">(isSpecialEdit ? "special" : isSuchEdit ? "such" : "normal");
   const [taskCode, setTaskCode] = useState(initialData?.taskCode || initialSpecialData?.specialTaskCode || initialSuchData?.suchTaskCode || "");
-  const [name, setName] = useState(initialData?.name || initialSpecialData?.name || "");
+  const [name, setName] = useState(initialData?.name || initialSpecialData?.name || initialSuchData?.name || "");
   const [assignee, setAssignee] = useState(initialData?.assignee || "");
   const [priority, setPriority] = useState(initialData?.priority || "Low");
   const [description, setDescription] = useState(
@@ -108,7 +108,7 @@ export default function TaskFormModal({
     initialData?.status || getDefaultSettings().statuses[0].name
   );
   const [targetQuarter, setTargetQuarter] = useState(
-    initialData?.targetQuarter || initialSpecialData?.dueQuarter || ""
+    initialData?.targetQuarter || initialSpecialData?.dueQuarter || initialSuchData?.dueQuarter || ""
   );
   const [deliverable, setDeliverable] = useState(
     initialData?.deliverable || ""
@@ -116,7 +116,7 @@ export default function TaskFormModal({
   const [attachments, setAttachments] = useState<Attachment[]>(
     initialData?.attachments?.map(a => ({ title: a.title || "", url: a.url })) || [{ title: "", url: "" }]
   );
-  const [phaseId, setPhaseId] = useState<number | null>(initialData?.phaseId ?? initialSpecialData?.phaseId ?? null);
+  const [phaseId, setPhaseId] = useState<number | null>(initialData?.phaseId ?? initialSpecialData?.phaseId ?? initialSuchData?.phaseId ?? null);
   const [serverError, setServerError] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -337,7 +337,7 @@ export default function TaskFormModal({
   }
 
   const hasOptionalContent = description || dependencies || deliverable || validAttachments.length > 0 || notes;
-  const showTypeSelector = !isEdit && !isSpecialEdit;
+  const showTypeSelector = !isEdit && !isSpecialEdit && !isSuchEdit;
 
   const inputStyle = (invalid?: boolean): React.CSSProperties => ({
     width: "100%",
