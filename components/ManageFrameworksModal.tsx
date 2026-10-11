@@ -377,6 +377,7 @@ export default function ManageFrameworksModal({
 
       onChange(finalFrameworks);
       setIsDirty(false);
+      onClose();
     } catch {
       setError("Save failed. Please try again.");
     } finally {

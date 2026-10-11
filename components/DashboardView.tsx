@@ -282,6 +282,9 @@ function getYearsFromQuarters(quarters: string[]): number[] {
 
 type SortConfig = { key: string; direction: "asc" | "desc" } | null;
 
+// Applied automatically when a quarter is selected (click "#" to turn it off)
+const QUARTER_DEFAULT_SORT = { key: "taskCount", direction: "desc" } as const;
+
 const HEALTH_ORDINAL: Record<string, number> = {
   Completed: 0,
   "On Time": 1,
@@ -1580,7 +1583,9 @@ export default function DashboardView({
   const [showSettings, setShowSettings] = useState(false);
   const [compSettings, setCompSettings] = useState<ComputationSettings | undefined>(initialSettings);
   const settingsLoaded = compSettings !== undefined;
-  const [sortConfig, setSortConfig] = useState<SortConfig>(null);
+  const [sortConfig, setSortConfig] = useState<SortConfig>(
+    selectedQuarter === ALL_TIME ? null : QUARTER_DEFAULT_SORT
+  );
   const deferredSearch = useDeferredValue(search);
 
   // Sync server-preloaded settings (e.g. after router.refresh() post-save)
@@ -1878,6 +1883,20 @@ export default function DashboardView({
     router.refresh();
   }
 
+  function handleQuarterChange(quarter: string) {
+    setSelectedQuarter(quarter);
+    if (quarter !== ALL_TIME) {
+      setSortConfig(QUARTER_DEFAULT_SORT);
+    } else {
+      // Drop the auto-applied sort, but keep any sort the user picked themselves
+      setSortConfig((prev) =>
+        prev?.key === QUARTER_DEFAULT_SORT.key && prev.direction === QUARTER_DEFAULT_SORT.direction
+          ? null
+          : prev
+      );
+    }
+  }
+
   function handleSort(key: string) {
     setSortConfig((prev) => {
       if (prev?.key === key) {
@@ -2044,7 +2063,7 @@ export default function DashboardView({
           </label>
           <select
             value={selectedQuarter}
-            onChange={(e) => setSelectedQuarter(e.target.value)}
+            onChange={(e) => handleQuarterChange(e.target.value)}
             style={{
               border: "1px solid var(--rule-strong)",
               borderRadius: 3,

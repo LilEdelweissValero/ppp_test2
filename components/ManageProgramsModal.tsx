@@ -396,6 +396,7 @@ export default function ManageProgramsModal({
 
       onChange(finalPrograms);
       setIsDirty(false);
+      onClose();
     } catch {
       setError("Save failed. Please try again.");
     } finally {
