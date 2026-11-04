@@ -2037,6 +2037,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
             phases={phases}
             tasks={activeTasks}
             specialTasks={activeSpecialTasks}
+            suchTasks={activeSuchTasks}
             compSettings={compSettings || { statuses: getDefaultSettings().statuses }}
             onSaved={(tableName, updatedPhases) => {
               setCurrentProject({ ...project, phasesTableName: tableName });

@@ -78,13 +78,14 @@ function computePhaseProgress(
   const virtualTasks = phaseSpecial.flatMap((st) => {
     const statuses = compSettings.statuses;
     const result: { status: string }[] = [];
-    for (const [status, count] of [
+    const pairs: [string, number][] = [
       [statuses[0]?.name ?? "Not Yet Started", st.nys],
       [statuses[1]?.name ?? "In Progress, Planning or Initiated", st.plan],
       [statuses[2]?.name ?? "In Progress, Partial", st.part],
       [statuses[3]?.name ?? "In Progress, Mostly Done or Testing", st.mostly],
       [statuses[4]?.name ?? "Complete or Verified", st.done],
-    ]) {
+    ];
+    for (const [status, count] of pairs) {
       for (let i = 0; i < count; i++) {
         result.push({ status });
       }
