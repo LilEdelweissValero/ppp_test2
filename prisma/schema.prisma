@@ -46,6 +46,9 @@ model Project {
   abandonedAt           String?   @map("abandoned_at")
   abandonedReason       String?   @map("abandoned_reason")
   abandonedRemarks      String?   @map("abandoned_remarks")
+  carriedOverTo         String?   @map("carried_over_to")
+  carriedOverAt         String?   @map("carried_over_at")
+  carriedOverRemarks    String?   @map("carried_over_remarks")
   phases                Phase[]
   tasks                 Task[]
   specialTasks          SpecialTask[]
@@ -91,6 +94,9 @@ model Task {
   abandonedAt           String?  @map("abandoned_at")
   abandonedReason       String?  @map("abandoned_reason")
   abandonedRemarks      String?  @map("abandoned_remarks")
+  carriedOverTo         String?  @map("carried_over_to")
+  carriedOverAt         String?  @map("carried_over_at")
+  carriedOverRemarks    String?  @map("carried_over_remarks")
 
   @@index([projectId])
   @@index([phaseId])
@@ -117,6 +123,9 @@ model SpecialTask {
   abandonedAt       String?  @map("abandoned_at")
   abandonedReason   String?  @map("abandoned_reason")
   abandonedRemarks  String?  @map("abandoned_remarks")
+  carriedOverTo      String?  @map("carried_over_to")
+  carriedOverAt      String?  @map("carried_over_at")
+  carriedOverRemarks String?  @map("carried_over_remarks")
 
   @@index([projectId])
   @@index([phaseId])
@@ -141,6 +150,9 @@ model SuchTask {
   abandonedAt       String?  @map("abandoned_at")
   abandonedReason   String?  @map("abandoned_reason")
   abandonedRemarks  String?  @map("abandoned_remarks")
+  carriedOverTo      String?  @map("carried_over_to")
+  carriedOverAt      String?  @map("carried_over_at")
+  carriedOverRemarks String?  @map("carried_over_remarks")
 
   @@index([projectId])
   @@index([phaseId])

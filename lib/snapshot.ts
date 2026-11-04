@@ -20,6 +20,7 @@ interface SnapshotTask {
   adjustedTargetQuarter: string;
   phaseId: number | null;
   abandoned: boolean;
+  carriedOverTo: string | null;
 }
 
 interface SnapshotSpecialTask {
@@ -37,6 +38,7 @@ interface SnapshotSpecialTask {
   lastUpdatedDate: string | null;
   phaseId: number | null;
   abandoned: boolean;
+  carriedOverTo: string | null;
 }
 
 interface SnapshotSuchTask {
@@ -52,6 +54,7 @@ interface SnapshotSuchTask {
   lastUpdatedDate: string | null;
   phaseId: number | null;
   abandoned: boolean;
+  carriedOverTo: string | null;
 }
 
 interface SnapshotPhase {
@@ -73,6 +76,7 @@ interface SnapshotProject {
   actualCompletionDate: string | null;
   phasesTableName: string | null;
   abandoned: boolean;
+  carriedOverTo: string | null;
   phases: SnapshotPhase[];
   tasks: SnapshotTask[];
   specialTasks: SnapshotSpecialTask[];
@@ -149,6 +153,7 @@ export async function getSnapshotAt(timestamp: string, historical = false): Prom
                 phasesTableName: true,
                 sortOrder: true,
                 abandoned: true,
+                carriedOverTo: true,
                 phases: {
                   select: {
                     id: true,
@@ -178,6 +183,7 @@ export async function getSnapshotAt(timestamp: string, historical = false): Prom
                     attachments: true,
                     phaseId: true,
                     abandoned: true,
+                    carriedOverTo: true,
                   },
                   orderBy: { sortOrder: "asc" },
                 },
@@ -198,6 +204,7 @@ export async function getSnapshotAt(timestamp: string, historical = false): Prom
                     lastUpdatedDate: true,
                     phaseId: true,
                     abandoned: true,
+                    carriedOverTo: true,
                   },
                   orderBy: { sortOrder: "asc" },
                 },
@@ -216,6 +223,7 @@ export async function getSnapshotAt(timestamp: string, historical = false): Prom
                     lastUpdatedDate: true,
                     phaseId: true,
                     abandoned: true,
+                    carriedOverTo: true,
                   },
                   orderBy: { sortOrder: "asc" },
                 },
@@ -375,6 +383,36 @@ export async function getSnapshotAt(timestamp: string, historical = false): Prom
         }
         break;
       }
+      case "carry_over":
+      case "uncarry_over": {
+        // carry_over after T -> item was live at T; uncarry_over after T -> it was
+        // parked at T (restore the year recorded in the log details).
+        const parked = log.changeType === "uncarry_over";
+        let year: string | null = null;
+        if (parked) {
+          try {
+            year = JSON.parse(log.details ?? "{}")?.to ?? null;
+          } catch {
+            year = null;
+          }
+          year = year ?? String(new Date().getFullYear() + 1);
+        }
+        const value = parked ? year : null;
+        if (log.entityType === "Project") {
+          const pr = projectMap.get(log.entityId);
+          if (pr) pr.carriedOverTo = value;
+        } else if (log.entityType === "Task") {
+          const t = taskMap.get(log.entityId);
+          if (t) t.carriedOverTo = value;
+        } else if (log.entityType === "SpecialTask") {
+          const st = specialTaskMap.get(log.entityId);
+          if (st) st.carriedOverTo = value;
+        } else if (log.entityType === "SuchTask") {
+          const st = suchTaskMap.get(log.entityId);
+          if (st) st.carriedOverTo = value;
+        }
+        break;
+      }
       case "update": {
         if (log.details) {
           applyUpdateReverse(log.entityType, log.entityId, log.details);
@@ -526,6 +564,7 @@ export async function getSnapshotAt(timestamp: string, historical = false): Prom
         if (changes.targetQuarter) t.targetQuarter = changes.targetQuarter.old;
         if (changes.adjustedTargetQuarter) t.adjustedTargetQuarter = changes.adjustedTargetQuarter.old;
         if (changes.phaseId) t.phaseId = parseInt(changes.phaseId.old) || null;
+        if (changes.projectId) t.projectId = parseInt(changes.projectId.old) || t.projectId;
       }
     } else if (type === "SpecialTask") {
       const st = specialTaskMap.get(id);
@@ -541,6 +580,7 @@ export async function getSnapshotAt(timestamp: string, historical = false): Prom
         if (changes.dueQuarter) st.dueQuarter = changes.dueQuarter.old;
         if (changes.lastUpdatedDate) st.lastUpdatedDate = changes.lastUpdatedDate.old || null;
         if (changes.phaseId) st.phaseId = parseInt(changes.phaseId.old) || null;
+        if (changes.projectId) st.projectId = parseInt(changes.projectId.old) || st.projectId;
       }
     } else if (type === "SuchTask") {
       const st = suchTaskMap.get(id);
@@ -554,6 +594,7 @@ export async function getSnapshotAt(timestamp: string, historical = false): Prom
         if (changes.dueQuarter) st.dueQuarter = changes.dueQuarter.old;
         if (changes.lastUpdatedDate) st.lastUpdatedDate = changes.lastUpdatedDate.old || null;
         if (changes.phaseId) st.phaseId = parseInt(changes.phaseId.old) || null;
+        if (changes.projectId) st.projectId = parseInt(changes.projectId.old) || st.projectId;
       }
     }
   }
@@ -594,6 +635,7 @@ export async function getSnapshotAt(timestamp: string, historical = false): Prom
             adjustedTargetQuarter: t.adjustedTargetQuarter,
             phaseId: t.phaseId,
             abandoned: t.abandoned,
+            carriedOverTo: t.carriedOverTo,
           });
         }
 
@@ -616,6 +658,7 @@ export async function getSnapshotAt(timestamp: string, historical = false): Prom
             lastUpdatedDate: st.lastUpdatedDate,
             phaseId: st.phaseId,
             abandoned: st.abandoned,
+            carriedOverTo: st.carriedOverTo,
           });
         }
 
@@ -636,6 +679,7 @@ export async function getSnapshotAt(timestamp: string, historical = false): Prom
             lastUpdatedDate: st.lastUpdatedDate,
             phaseId: st.phaseId,
             abandoned: st.abandoned,
+            carriedOverTo: st.carriedOverTo,
           });
         }
 
@@ -663,6 +707,7 @@ export async function getSnapshotAt(timestamp: string, historical = false): Prom
           actualCompletionDate: pr.actualCompletionDate,
           phasesTableName: pr.phasesTableName,
           abandoned: pr.abandoned,
+          carriedOverTo: pr.carriedOverTo,
           phases,
           tasks,
           specialTasks,
@@ -733,13 +778,13 @@ function filterAbandoned(frameworks: SnapshotFramework[], historical = false): S
         .map((p) => ({
           ...p,
           projects: p.projects
-            .filter((pr) => !pr.abandoned)
+            .filter((pr) => !pr.abandoned && !pr.carriedOverTo)
             .map((pr) => ({
               ...pr,
               phases: pr.phases,
-              tasks: pr.tasks.filter((t) => !t.abandoned),
-              specialTasks: pr.specialTasks.filter((st) => !st.abandoned),
-              suchTasks: pr.suchTasks.filter((st) => !st.abandoned),
+              tasks: pr.tasks.filter((t) => !t.abandoned && !t.carriedOverTo),
+              specialTasks: pr.specialTasks.filter((st) => !st.abandoned && !st.carriedOverTo),
+              suchTasks: pr.suchTasks.filter((st) => !st.abandoned && !st.carriedOverTo),
             })),
         })),
     }));

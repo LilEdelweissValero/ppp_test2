@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import Modal from "./Modal";
 import QuarterSelect from "./QuarterSelect";
 import AbandonConfirmModal from "./AbandonConfirmModal";
+import CarryOverConfirmModal from "./CarryOverConfirmModal";
+import { nextYear } from "@/lib/carry-over";
 import { PRIORITY_LABELS, getStatusList } from "@/lib/status";
 import { getDefaultSettings } from "@/lib/computation-settings";
 import type { ComputationSettings } from "@/lib/computation-settings";
@@ -124,6 +126,8 @@ export default function TaskFormModal({
   const [showAdditional, setShowAdditional] = useState(false);
   const [abandonTarget, setAbandonTarget] = useState<{ id: number; name: string; type: "task" | "special-task" | "such-task" } | null>(null);
   const [abandonLoading, setAbandonLoading] = useState(false);
+  const [carryTarget, setCarryTarget] = useState<{ id: number; name: string; type: "task" | "special-task" | "such-task" } | null>(null);
+  const [carryLoading, setCarryLoading] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -746,7 +750,34 @@ export default function TaskFormModal({
           paddingTop: 12,
           borderTop: "1px solid var(--rule)",
         }}>
-          <div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {(isEdit || isSpecialEdit || isSuchEdit) && (
+              <button
+                type="button"
+                onClick={() => {
+                  const carryType = isSuchEdit ? "such-task" : isSpecialEdit ? "special-task" : "task";
+                  const carryName = isSuchEdit
+                    ? `${initialSuchData?.suchTaskCode}: ${initialSuchData?.name}`
+                    : isSpecialEdit
+                    ? `${initialSpecialData?.specialTaskCode}: ${initialSpecialData?.name}`
+                    : `${initialData?.taskCode}: ${initialData?.name}`;
+                  const carryId = isSuchEdit ? initialSuchData!.id : isSpecialEdit ? initialSpecialData!.id : initialData!.id;
+                  setCarryTarget({ id: carryId, name: carryName, type: carryType });
+                }}
+                style={{
+                  padding: "7px 12px",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: "var(--status-partial-ink)",
+                  background: "none",
+                  border: "1px solid var(--status-partial-ink)",
+                  borderRadius: 3,
+                  cursor: "pointer",
+                }}
+              >
+                Carry over to {nextYear()}
+              </button>
+            )}
             {(isEdit || isSpecialEdit || isSuchEdit) && (
               <button
                 type="button"
@@ -813,6 +844,34 @@ export default function TaskFormModal({
         </div>
       </form>
     </Modal>
+
+    {carryTarget && (
+      <CarryOverConfirmModal
+        open={!!carryTarget}
+        onClose={() => setCarryTarget(null)}
+        onConfirm={async (remarks) => {
+          setCarryLoading(true);
+          try {
+            const endpoint = carryTarget.type === "special-task" ? "special-tasks" : carryTarget.type === "such-task" ? "such-tasks" : "tasks";
+            const res = await fetch(`/api/${endpoint}/${carryTarget.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ carriedOver: true, carriedOverRemarks: remarks || null }),
+            });
+            if (res.ok) {
+              setCarryTarget(null);
+              onAbandon?.(); // item left the active set: parent refreshes like abandon
+              onClose();
+            }
+          } finally {
+            setCarryLoading(false);
+          }
+        }}
+        entityType={carryTarget.type === "special-task" ? "SpecialTask" : carryTarget.type === "such-task" ? "SuchTask" : "Task"}
+        entityName={carryTarget.name}
+        loading={carryLoading}
+      />
+    )}
 
     {abandonTarget && (
       <AbandonConfirmModal

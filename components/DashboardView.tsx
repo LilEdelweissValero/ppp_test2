@@ -1407,6 +1407,7 @@ function ActionsMenu({
   onHistoryLog,
   onMonthlyUpdates,
   onViewAbandoned,
+  onViewParkingLot,
   onSettings,
 }: {
   canEdit: boolean;
@@ -1418,6 +1419,7 @@ function ActionsMenu({
   onHistoryLog: () => void;
   onMonthlyUpdates: () => void;
   onViewAbandoned: () => void;
+  onViewParkingLot: () => void;
   onSettings: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -1442,12 +1444,14 @@ function ActionsMenu({
         { label: "Import / Export Excel", action: onImportExcel },
         { label: "History Log", action: onHistoryLog },
         { label: "Monthly Updates", action: onMonthlyUpdates },
+        { label: "Parking Lot", action: onViewParkingLot },
         { label: "View Abandoned", action: onViewAbandoned },
         { label: "Settings", action: onSettings },
       ]
     : [
         { label: "History Log", action: onHistoryLog },
         { label: "Monthly Updates", action: onMonthlyUpdates },
+        { label: "Parking Lot", action: onViewParkingLot },
         { label: "View Abandoned", action: onViewAbandoned },
       ];
 
@@ -2208,6 +2212,7 @@ export default function DashboardView({
               onHistoryLog={() => window.open("/history", "_blank")}
               onMonthlyUpdates={() => window.open("/monthly-updates", "_blank")}
               onViewAbandoned={() => router.push("/abandoned")}
+              onViewParkingLot={() => router.push("/carried-over")}
               onSettings={() => setShowSettings(true)}
             />
           </div>

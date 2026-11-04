@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Modal from "./Modal";
 import AbandonConfirmModal from "./AbandonConfirmModal";
+import CarryOverConfirmModal from "./CarryOverConfirmModal";
+import { nextYear } from "@/lib/carry-over";
 
 interface ProjectRow {
   id: number;
@@ -27,6 +29,8 @@ export default function ManageProjectsModal({ open, onClose, projects, onChangeL
     entityId: number;
     entityName: string;
   } | null>(null);
+  const [carryTarget, setCarryTarget] = useState<{ entityId: number; entityName: string } | null>(null);
+  const [carryLoading, setCarryLoading] = useState(false);
   const [abandonReasons, setAbandonReasons] = useState<string[]>([]);
   const [abandonLoading, setAbandonLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -91,6 +95,24 @@ export default function ManageProjectsModal({ open, onClose, projects, onChangeL
       }
     } finally {
       setAbandonLoading(false);
+    }
+  }
+
+  async function handleCarryConfirm(remarks: string) {
+    if (!carryTarget) return;
+    setCarryLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${carryTarget.entityId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ carriedOver: true, carriedOverRemarks: remarks || null }),
+      });
+      if (res.ok) {
+        setCarryTarget(null);
+        setRefreshKey((k) => k + 1);
+      }
+    } finally {
+      setCarryLoading(false);
     }
   }
 
@@ -193,6 +215,13 @@ export default function ManageProjectsModal({ open, onClose, projects, onChangeL
                   {p.programName} · {p.frameworkName}
                 </span>
                 <button
+                  onClick={() => setCarryTarget({ entityId: p.id, entityName: p.name })}
+                  title={`Carry project over to ${nextYear()}`}
+                  style={{ color: "var(--status-partial-ink)", background: "none", border: "none", cursor: "pointer", padding: "2px 4px", fontSize: 11, fontWeight: 500 }}
+                >
+                  Carry over
+                </button>
+                <button
                   onClick={() => setAbandonTarget({ entityId: p.id, entityName: p.name })}
                   title="Abandon project"
                   style={{ color: "#B91C1C", background: "none", border: "none", cursor: "pointer", padding: "2px 4px", fontSize: 11, fontWeight: 500 }}
@@ -204,6 +233,16 @@ export default function ManageProjectsModal({ open, onClose, projects, onChangeL
           ))}
         </div>
       </div>
+      {carryTarget && (
+        <CarryOverConfirmModal
+          open={!!carryTarget}
+          onClose={() => setCarryTarget(null)}
+          onConfirm={handleCarryConfirm}
+          entityType="Project"
+          entityName={carryTarget.entityName}
+          loading={carryLoading}
+        />
+      )}
       {abandonTarget && (
         <AbandonConfirmModal
           open={!!abandonTarget}

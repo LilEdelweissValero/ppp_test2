@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { touchLastModified } from "@/lib/system-metadata";
 import { logChange, diffFields } from "@/lib/audit-log";
 import { requireEdit } from "@/lib/edit-auth";
+import { carryOverData } from "@/lib/carry-over";
 
 export async function GET(
   _request: NextRequest,
@@ -36,6 +37,9 @@ export async function PATCH(
     abandonedReason,
     abandonedRemarks,
     phaseId,
+    carriedOver,
+    carriedOverTo,
+    carriedOverRemarks,
   } = body;
 
   const existingTask = await prisma.suchTask.findUnique({ where: { id: parseInt(id) } });
@@ -75,6 +79,9 @@ export async function PATCH(
     updateData.abandonedRemarks = abandoned ? abandonedRemarks ?? null : null;
   }
   if (phaseId !== undefined) updateData.phaseId = phaseId ? parseInt(phaseId) : null;
+  if (carriedOver !== undefined && typeof carriedOver === "boolean") {
+    Object.assign(updateData, carryOverData(carriedOver, carriedOverTo, carriedOverRemarks));
+  }
 
   // Auto-compute totalScheduled from sv + snv
   if (sv !== undefined || snv !== undefined) {
@@ -180,6 +187,17 @@ export async function PATCH(
       entityName: `${suchTask.suchTaskCode}: ${suchTask.name}`,
       changeType: abandoned ? "abandon" : "unabandon",
       details: JSON.stringify({ reason: abandonedReason, remarks: abandonedRemarks }),
+    });
+  }
+
+  if (carriedOver !== undefined && typeof carriedOver === "boolean") {
+    const current = suchTask ?? existingTask;
+    await logChange({
+      entityType: "SuchTask",
+      entityId: current.id,
+      entityName: `${current.suchTaskCode}: ${current.name}`,
+      changeType: carriedOver ? "carry_over" : "uncarry_over",
+      details: JSON.stringify({ to: updateData.carriedOverTo, remarks: carriedOverRemarks }),
     });
   }
 
