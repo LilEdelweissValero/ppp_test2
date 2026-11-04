@@ -66,6 +66,104 @@ interface Props {
   canEdit?: boolean;
 }
 
+// ── Carried-over rows (amber; every current-year cell is "-") ─────────────
+// Not sortable and never part of a calculation. Actions stay as on other rows.
+
+function CarriedRowActions({
+  locked,
+  onEdit,
+  onChangeQuarter,
+  onViewHistory,
+}: {
+  locked: boolean;
+  onEdit: () => void;
+  onChangeQuarter: () => void;
+  onViewHistory: () => void;
+}) {
+  return (
+    <td style={{ width: 120 }}>
+      {!locked && (
+        <div className="detail-task-actions">
+          <button onClick={onEdit} className="detail-task-action">Edit</button>
+          <button onClick={onChangeQuarter} className="detail-task-action">Qtr</button>
+          <button onClick={onViewHistory} className="detail-task-action">History</button>
+        </div>
+      )}
+    </td>
+  );
+}
+
+function CarriedTaskRow({
+  task,
+  hasPhases,
+  locked,
+  onEdit,
+  onChangeQuarter,
+  onViewHistory,
+}: {
+  task: Task;
+  hasPhases: boolean;
+  locked: boolean;
+  onEdit: () => void;
+  onChangeQuarter: () => void;
+  onViewHistory: () => void;
+}) {
+  return (
+    <tr className="detail-task-row detail-task-row-carried">
+      <td style={{ width: 32 }} />
+      <td className="detail-task-code" style={{ width: 100 }}>{task.taskCode}</td>
+      <td style={{ width: 220 }}>{task.name}</td>
+      {hasPhases && <td style={{ width: 100 }}>-</td>}
+      <td style={{ width: 110 }}>-</td>
+      <td style={{ width: 80 }}>-</td>
+      <td style={{ width: 160 }}>
+        <span className="detail-carried-label">Carried over to {task.carriedOverTo}</span>
+      </td>
+      <td style={{ width: 90 }}>-</td>
+      <td style={{ textAlign: "center", width: 50 }}>-</td>
+      <CarriedRowActions locked={locked} onEdit={onEdit} onChangeQuarter={onChangeQuarter} onViewHistory={onViewHistory} />
+    </tr>
+  );
+}
+
+// Helpdesk / SUCH tables: one merged label cell across the count columns.
+function CarriedCountRow({
+  code,
+  name,
+  year,
+  hasPhases,
+  labelSpan,
+  locked,
+  onEdit,
+  onChangeQuarter,
+  onViewHistory,
+}: {
+  code: string;
+  name: string;
+  year: string | null | undefined;
+  hasPhases: boolean;
+  labelSpan: number;
+  locked: boolean;
+  onEdit: () => void;
+  onChangeQuarter: () => void;
+  onViewHistory: () => void;
+}) {
+  return (
+    <tr className="detail-task-row detail-task-row-carried">
+      <td className="detail-task-code" style={{ width: 100 }}>{code}</td>
+      <td style={{ width: 180 }}>{name}</td>
+      {hasPhases && <td style={{ width: 100 }}>-</td>}
+      <td colSpan={labelSpan} style={{ textAlign: "center" }}>
+        <span className="detail-carried-label">Carried over to {year}</span>
+      </td>
+      <td style={{ width: 80 }}>-</td>
+      <td style={{ width: 100 }}>-</td>
+      <td style={{ textAlign: "center", width: 50 }}>-</td>
+      <CarriedRowActions locked={locked} onEdit={onEdit} onChangeQuarter={onChangeQuarter} onViewHistory={onViewHistory} />
+    </tr>
+  );
+}
+
 function SortableTaskRow({
   task,
   onEdit,
@@ -393,7 +491,8 @@ export default function ProjectDetailView({ project: initialProject, historicalT
     }
     let cancelled = false;
     setSnapshotState("loading");
-    fetch(`/api/snapshot?timestamp=${encodeURIComponent(historicalTimestamp)}`)
+    // includeCarriedOver: this page renders carried-over rows (amber) itself
+    fetch(`/api/snapshot?timestamp=${encodeURIComponent(historicalTimestamp)}&includeCarriedOver=1`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (cancelled) return;
@@ -482,10 +581,19 @@ export default function ProjectDetailView({ project: initialProject, historicalT
     if (!isHistorical) setProject(nextProject);
   }
 
-  const virtualTasks = expandSpecialTasksToVirtualTasks(specialTasks, compSettings);
-  const virtualSuchTasks = expandSuchTasksToVirtualTasks(suchTasks, compSettings);
-  const allTasksWithPhase = [...tasks.map((t) => ({ status: t.status, phaseId: t.phaseId })), ...virtualTasks, ...virtualSuchTasks];
-  const allTasksForPct = [...tasks, ...virtualTasks, ...virtualSuchTasks];
+  // Carried-over rows stay in the arrays so they render (amber), but every
+  // calculation, count and modal below uses the active (not carried) arrays.
+  const activeTasks = tasks.filter((t) => !t.carriedOverTo);
+  const carriedTasks = tasks.filter((t) => t.carriedOverTo);
+  const activeSpecialTasks = specialTasks.filter((t) => !t.carriedOverTo);
+  const carriedSpecialTasks = specialTasks.filter((t) => t.carriedOverTo);
+  const activeSuchTasks = suchTasks.filter((t) => !t.carriedOverTo);
+  const carriedSuchTasks = suchTasks.filter((t) => t.carriedOverTo);
+
+  const virtualTasks = expandSpecialTasksToVirtualTasks(activeSpecialTasks, compSettings);
+  const virtualSuchTasks = expandSuchTasksToVirtualTasks(activeSuchTasks, compSettings);
+  const allTasksWithPhase = [...activeTasks.map((t) => ({ status: t.status, phaseId: t.phaseId })), ...virtualTasks, ...virtualSuchTasks];
+  const allTasksForPct = [...activeTasks, ...virtualTasks, ...virtualSuchTasks];
   const hasPhases = phases.length > 0;
   const pct = computeProjectPercentComplete(
     allTasksForPct,
@@ -554,7 +662,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
   }
 
   const sortedTasks = sortConfig
-    ? [...tasks].sort((a, b) => {
+    ? [...activeTasks].sort((a, b) => {
         const va = getTaskSortValue(a, sortConfig.key);
         const vb = getTaskSortValue(b, sortConfig.key);
         let cmp: number;
@@ -567,7 +675,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
         }
         return sortConfig.direction === "asc" ? cmp : -cmp;
       })
-    : tasks;
+    : activeTasks;
 
   async function handleInlineSave(
     taskId: number,
@@ -648,6 +756,20 @@ export default function ProjectDetailView({ project: initialProject, historicalT
     }
   }
 
+  // A task was carried over (row turns amber) or returned (row becomes active again)
+  function handleCarryOverChange(
+    type: "task" | "special-task" | "such-task",
+    saved: { id: number; carriedOverTo: string | null; carriedOverRemarks: string | null }
+  ) {
+    const patch = { carriedOverTo: saved.carriedOverTo, carriedOverRemarks: saved.carriedOverRemarks };
+    if (type === "task") updateTasks(tasks.map((t) => (t.id === saved.id ? { ...t, ...patch } : t)));
+    else if (type === "special-task") updateSpecialTasks(specialTasks.map((t) => (t.id === saved.id ? { ...t, ...patch } : t)));
+    else updateSuchTasks(suchTasks.map((t) => (t.id === saved.id ? { ...t, ...patch } : t)));
+    setEditTask(null);
+    setEditSpecialTask(null);
+    setEditSuchTask(null);
+  }
+
   async function handleSaveOrder() {
     console.log("[SAVE ORDER] Button clicked — starting handleSaveOrder");
     console.log("[SAVE ORDER] sortConfig:", sortConfig);
@@ -679,7 +801,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
         throw new Error(`Save failed (${response.status})`);
       }
       console.log("[SAVE ORDER] Request succeeded — applying reordered tasks locally");
-      updateTasks(sortedTasks);
+      updateTasks([...sortedTasks, ...carriedTasks]);
       setSortConfig(null);
       router.refresh();
       console.log("[SAVE ORDER] updateTasks applied, sortConfig cleared, router.refresh() called");
@@ -697,12 +819,13 @@ export default function ProjectDetailView({ project: initialProject, historicalT
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const oldIndex = tasks.findIndex((t) => t.id === active.id);
-    const newIndex = tasks.findIndex((t) => t.id === over.id);
+    // Reorder only the active tasks; carried-over rows sit after them untouched.
+    const oldIndex = activeTasks.findIndex((t) => t.id === active.id);
+    const newIndex = activeTasks.findIndex((t) => t.id === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
     const previousTasks = tasks;
-    const reordered = arrayMove(tasks, oldIndex, newIndex);
-    updateTasks(reordered);
+    const reordered = arrayMove(activeTasks, oldIndex, newIndex);
+    updateTasks([...reordered, ...carriedTasks]);
 
     try {
       const response = await fetch("/api/reorder", {
@@ -769,6 +892,14 @@ export default function ProjectDetailView({ project: initialProject, historicalT
             <HealthBadge health={health} loading={!settingsLoaded} />
           </div>
 
+          {project.carriedOverTo && (
+            <p className="detail-carried-banner" role="status">
+              <strong>This project is carried over to {project.carriedOverTo}.</strong>
+              {" "}It is excluded from current-year calculations.
+              {project.carriedOverRemarks ? ` ${project.carriedOverRemarks}` : ""}
+            </p>
+          )}
+
           <div className="detail-meta-grid">
             <div className="detail-meta-item">
               <span className="detail-meta-label">Reference</span>
@@ -805,7 +936,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
               <>
                 <button
                   onClick={() => {
-                    if (phases.length === 0 && (tasks.length > 0 || specialTasks.length > 0 || suchTasks.length > 0)) {
+                    if (phases.length === 0 && (activeTasks.length > 0 || activeSpecialTasks.length > 0 || activeSuchTasks.length > 0)) {
                       setShowPhaseSetup(true);
                     } else {
                       setShowAddPhase(true);
@@ -903,8 +1034,8 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                 </thead>
                 <tbody>
                   {phases.map((phase) => {
-                    const phaseTasks = tasks.filter((t) => t.phaseId === phase.id);
-                    const phaseSpecialTasks = specialTasks.filter((st) => st.phaseId === phase.id);
+                    const phaseTasks = activeTasks.filter((t) => t.phaseId === phase.id);
+                    const phaseSpecialTasks = activeSpecialTasks.filter((st) => st.phaseId === phase.id);
                     const phaseVirtualTasks = expandSpecialTasksToVirtualTasks(phaseSpecialTasks, compSettings);
                     const allPhaseTasks = [...phaseTasks.map((t) => ({ status: t.status })), ...phaseVirtualTasks];
                     const phasePct = computePhasePercentComplete(allPhaseTasks, compSettings);
@@ -948,7 +1079,8 @@ export default function ProjectDetailView({ project: initialProject, historicalT
             <div>
               <h2 id="tasks-title" className="detail-task-heading">Tasks</h2>
               <p className="detail-task-subtitle">
-                {tasks.length} task{tasks.length === 1 ? "" : "s"}
+                {activeTasks.length} task{activeTasks.length === 1 ? "" : "s"}
+                {carriedTasks.length > 0 && ` · ${carriedTasks.length} carried over`}
                 {!locked && " · Click priority or status to edit inline"}
               </p>
             </div>
@@ -1053,6 +1185,17 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                           onAssignPhase={handleAssignPhase}
                           />
                       ))}
+                      {carriedTasks.map((task) => (
+                        <CarriedTaskRow
+                          key={`carried-${task.id}`}
+                          task={task}
+                          hasPhases={hasPhases}
+                          locked={locked}
+                          onEdit={() => setEditTask(task)}
+                          onChangeQuarter={() => setChangeTaskQuarter(task)}
+                          onViewHistory={() => setViewHistory({ type: "Task", id: task.id })}
+                        />
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -1068,7 +1211,8 @@ export default function ProjectDetailView({ project: initialProject, historicalT
             <div>
               <h2 id="special-tasks-title" className="detail-task-heading">Helpdesk Tickets</h2>
               <p className="detail-task-subtitle">
-                {specialTasks.length} helpdesk ticket{specialTasks.length === 1 ? "" : "s"}
+                {activeSpecialTasks.length} helpdesk ticket{activeSpecialTasks.length === 1 ? "" : "s"}
+                {carriedSpecialTasks.length > 0 && ` · ${carriedSpecialTasks.length} carried over`}
                 {!locked && " · Click cells to edit inline"}
               </p>
             </div>
@@ -1100,7 +1244,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                   </tr>
                 </thead>
                 <tbody>
-                  {specialTasks.map((st) => {
+                  {activeSpecialTasks.map((st) => {
                     const total = st.nys + st.plan + st.part + st.mostly + st.done;
                     const pctVal = total > 0 ? Math.round((st.done / total) * 100) : 0;
                     return (
@@ -1368,6 +1512,20 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                       </tr>
                     );
                   })}
+                  {carriedSpecialTasks.map((st) => (
+                    <CarriedCountRow
+                      key={`carried-${st.id}`}
+                      code={st.specialTaskCode}
+                      name={st.name}
+                      year={st.carriedOverTo}
+                      hasPhases={hasPhases}
+                      labelSpan={6}
+                      locked={locked}
+                      onEdit={() => setEditSpecialTask(st)}
+                      onChangeQuarter={() => setChangeSpecialTaskQuarter(st)}
+                      onViewHistory={() => setViewHistory({ type: "SpecialTask", id: st.id })}
+                    />
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -1381,7 +1539,8 @@ export default function ProjectDetailView({ project: initialProject, historicalT
             <div>
               <h2 id="such-tasks-title" className="detail-task-heading">SUCH Tasks</h2>
               <p className="detail-task-subtitle">
-                {suchTasks.length} SUCH task{suchTasks.length === 1 ? "" : "s"}
+                {activeSuchTasks.length} SUCH task{activeSuchTasks.length === 1 ? "" : "s"}
+                {carriedSuchTasks.length > 0 && ` · ${carriedSuchTasks.length} carried over`}
                 {!locked && " · Click cells to edit inline"}
               </p>
             </div>
@@ -1411,7 +1570,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                   </tr>
                 </thead>
                 <tbody>
-                  {suchTasks.map((st) => {
+                  {activeSuchTasks.map((st) => {
                     const totalScheduled = st.sv + st.snv;
                     const pctVal = computeSuchTaskPercent(st.sv, st.snv, st.nsv);
                     return (
@@ -1607,6 +1766,20 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                       </tr>
                     );
                   })}
+                  {carriedSuchTasks.map((st) => (
+                    <CarriedCountRow
+                      key={`carried-${st.id}`}
+                      code={st.suchTaskCode}
+                      name={st.name}
+                      year={st.carriedOverTo}
+                      hasPhases={hasPhases}
+                      labelSpan={4}
+                      locked={locked}
+                      onEdit={() => setEditSuchTask(st)}
+                      onChangeQuarter={() => setChangeSuchTaskQuarter(st)}
+                      onViewHistory={() => setViewHistory({ type: "SuchTask", id: st.id })}
+                    />
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -1666,6 +1839,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
             onAbandon={() => {
               setEditTask(null);
             }}
+            onCarryOverChange={handleCarryOverChange}
             initialData={{
               id: editTask.id,
               taskCode: editTask.taskCode,
@@ -1680,6 +1854,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
               deliverable: editTask.deliverable || "",
               attachments: Array.isArray(editTask.attachments) ? editTask.attachments as { url: string; title: string | null }[] : [],
               phaseId: editTask.phaseId,
+              carriedOverTo: editTask.carriedOverTo ?? null,
             }}
           />
         )}
@@ -1730,6 +1905,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
             onAbandon={() => {
               setEditSpecialTask(null);
             }}
+            onCarryOverChange={handleCarryOverChange}
             initialSpecialData={{
               id: editSpecialTask.id,
               specialTaskCode: editSpecialTask.specialTaskCode,
@@ -1737,6 +1913,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
               dueQuarter: editSpecialTask.dueQuarter,
               lastUpdatedDate: editSpecialTask.lastUpdatedDate,
               phaseId: editSpecialTask.phaseId,
+              carriedOverTo: editSpecialTask.carriedOverTo ?? null,
             }}
           />
         )}
@@ -1776,6 +1953,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
             onAbandon={() => {
               setEditSuchTask(null);
             }}
+            onCarryOverChange={handleCarryOverChange}
             initialSuchData={{
               id: editSuchTask.id,
               suchTaskCode: editSuchTask.suchTaskCode,
@@ -1783,6 +1961,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
               dueQuarter: editSuchTask.dueQuarter,
               lastUpdatedDate: editSuchTask.lastUpdatedDate,
               phaseId: editSuchTask.phaseId,
+              carriedOverTo: editSuchTask.carriedOverTo ?? null,
             }}
           />
         )}
@@ -1812,14 +1991,15 @@ export default function ProjectDetailView({ project: initialProject, historicalT
             open={showPhaseSetup}
             onClose={() => setShowPhaseSetup(false)}
             projectId={project.id}
-            tasks={tasks}
-            specialTasks={specialTasks}
-            suchTasks={suchTasks}
+            tasks={activeTasks}
+            specialTasks={activeSpecialTasks}
+            suchTasks={activeSuchTasks}
             onSaved={(createdPhases, updatedTasks, updatedSpecialTasks, updatedSuchTasks) => {
               setPhases(createdPhases);
-              setTasks(updatedTasks);
-              setSpecialTasks(updatedSpecialTasks);
-              setSuchTasks(updatedSuchTasks);
+              // The modal only saw active items; keep carried-over rows in place
+              setTasks([...updatedTasks, ...carriedTasks]);
+              setSpecialTasks([...updatedSpecialTasks, ...carriedSpecialTasks]);
+              setSuchTasks([...updatedSuchTasks, ...carriedSuchTasks]);
             }}
           />
         )}
@@ -1855,8 +2035,8 @@ export default function ProjectDetailView({ project: initialProject, historicalT
             projectId={project.id}
             currentTableName={project.phasesTableName || null}
             phases={phases}
-            tasks={tasks}
-            specialTasks={specialTasks}
+            tasks={activeTasks}
+            specialTasks={activeSpecialTasks}
             compSettings={compSettings || { statuses: getDefaultSettings().statuses }}
             onSaved={(tableName, updatedPhases) => {
               setCurrentProject({ ...project, phasesTableName: tableName });

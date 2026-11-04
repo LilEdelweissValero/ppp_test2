@@ -137,8 +137,22 @@ interface Project {
   tasks: Task[];
   specialTasks: SpecialTask[];
   suchTasks: SuchTask[];
+  // Carried-over tasks hidden from this view; when > 0 the project page must
+  // load fresh data (the client cache has no carried rows).
+  carriedTaskCount?: number;
   // Populated at render time from parent program
   programName?: string;
+}
+
+// A whole project carried over to a later year. Shown as an amber row, kept out
+// of `projects` so it never enters an aggregate.
+interface CarriedProject {
+  id: number;
+  name: string;
+  programId: number;
+  reference: string | null;
+  owner: string | null;
+  carriedOverTo: string;
 }
 
 interface Program {
@@ -146,6 +160,7 @@ interface Program {
   name: string;
   frameworkId: number;
   projects: Project[];
+  carriedProjects?: CarriedProject[];
 }
 
 interface Framework {
@@ -167,6 +182,18 @@ interface Props {
 // ── Constants ──────────────────────────────────────────────────────────────
 
 const ALL_TIME = "all";
+
+// Project page link. The client cache is seeded from dashboard data, which hides
+// carried-over tasks, so projects that have any skip the cache and load fresh.
+function projectHref(
+  project: { id: number; carriedTaskCount?: number },
+  historicalTimestamp?: string | null
+): string {
+  if (historicalTimestamp) {
+    return `/projects/${project.id}?asOf=${encodeURIComponent(historicalTimestamp)}`;
+  }
+  return project.carriedTaskCount ? `/projects/${project.id}` : `/projects/${project.id}?cached=1`;
+}
 
 // Short column labels derived from settings at render time
 const STATUS_COL_DEFAULTS = [
@@ -850,6 +877,53 @@ function FrameworkSummaryRow({
   );
 }
 
+// ── Carried-over project row (amber, no calculations) ──────────────────────
+
+function CarriedProjectRow({
+  project,
+  programName,
+  historicalTimestamp,
+  onNavigate,
+}: {
+  project: CarriedProject;
+  programName: string;
+  historicalTimestamp?: string | null;
+  onNavigate: () => void;
+}) {
+  const tdAmber: React.CSSProperties = {
+    padding: "8px 10px",
+    borderBottom: "1px solid var(--rule)",
+    fontSize: 12,
+    color: "var(--status-partial-ink)",
+    background: "var(--status-partial-bg)",
+    verticalAlign: "middle",
+  };
+  return (
+    <tr>
+      <td style={{ ...tdAmber, padding: "8px 8px", width: 32 }} />
+      <td style={{ ...tdAmber, width: 220 }}>
+        <Link
+          // Carried projects aren't in the client cache, so always load fresh
+          href={projectHref({ id: project.id, carriedTaskCount: 1 }, historicalTimestamp)}
+          onNavigate={onNavigate}
+          style={{ fontWeight: 600, fontSize: 12, color: "var(--status-partial-ink)", textDecoration: "underline" }}
+        >
+          {project.name}
+        </Link>
+      </td>
+      <td style={{ ...tdAmber, width: 150, fontSize: 11 }}>{programName}</td>
+      <td style={{ ...tdAmber, width: 100, fontSize: 11, fontFamily: "var(--font-mono)" }}>{project.reference || "—"}</td>
+      <td style={{ ...tdAmber, width: 110, fontSize: 11 }}>{project.owner || "—"}</td>
+      <td
+        colSpan={12}
+        style={{ ...tdAmber, fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase" }}
+      >
+        Carried over to {project.carriedOverTo}
+      </td>
+    </tr>
+  );
+}
+
 // ── Sortable project row ───────────────────────────────────────────────────
 
 function SortableProjectRow({
@@ -935,7 +1009,7 @@ function SortableProjectRow({
         </td>
         <td style={{ ...tdBase, width: 220 }}>
           <Link
-            href={isHistorical && historicalTimestamp ? `/projects/${project.id}?asOf=${encodeURIComponent(historicalTimestamp)}` : `/projects/${project.id}?cached=1`}
+            href={projectHref(project, isHistorical ? historicalTimestamp : null)}
             prefetch={shouldPrefetch}
             onPointerEnter={onPrefetch}
             onFocus={onPrefetch}
@@ -1082,7 +1156,7 @@ function SortableProjectRow({
       {/* project name */}
       <td style={{ ...tdBase, width: 220 }}>
         <Link
-          href={isHistorical && historicalTimestamp ? `/projects/${project.id}?asOf=${encodeURIComponent(historicalTimestamp)}` : `/projects/${project.id}?cached=1`}
+          href={projectHref(project, isHistorical ? historicalTimestamp : null)}
           prefetch={shouldPrefetch ? true : false}
           onPointerEnter={onPrefetch}
           onFocus={onPrefetch}
@@ -1701,7 +1775,18 @@ export default function DashboardView({
         program.projects.map((project) => {
           // The client cache holds current data; never let it override a snapshot
           const cached = isHistorical ? undefined : getProject(project.id);
-          return cached ? { ...project, ...cached } : project;
+          if (!cached) return project;
+          // The project page keeps carried-over rows in the cache so it can show
+          // them amber; the dashboard must never count them.
+          const merged = { ...project, ...cached };
+          const live = <T extends object>(items: T[] | undefined) =>
+            (items ?? []).filter((i) => !(i as { carriedOverTo?: string | null }).carriedOverTo);
+          return {
+            ...merged,
+            tasks: live(merged.tasks),
+            specialTasks: live(merged.specialTasks),
+            suchTasks: live(merged.suchTasks),
+          };
         })
       )
     );
@@ -1838,6 +1923,10 @@ export default function DashboardView({
               current
                 .flatMap((item) => item.programs)
                 .find((item) => item.id === program.id)?.projects || [],
+            carriedProjects:
+              current
+                .flatMap((item) => item.programs)
+                .find((item) => item.id === program.id)?.carriedProjects || [],
           })),
       }))
     );
@@ -1884,8 +1973,16 @@ export default function DashboardView({
                   st.name.toLowerCase().includes(q)
                 )
             ),
+            carriedProjects: (prog.carriedProjects ?? []).filter(
+              (p) =>
+                p.name.toLowerCase().includes(q) ||
+                (p.reference ?? "").toLowerCase().includes(q) ||
+                (p.owner ?? "").toLowerCase().includes(q) ||
+                prog.name.toLowerCase().includes(q) ||
+                fw.name.toLowerCase().includes(q)
+            ),
           }))
-          .filter((prog) => prog.projects.length > 0),
+          .filter((prog) => prog.projects.length > 0 || prog.carriedProjects.length > 0),
       }))
       .filter((fw) => fw.programs.length > 0);
   }, [resolvedFrameworks, deferredSearch]);
@@ -2350,6 +2447,10 @@ export default function DashboardView({
           const isCollapsed = collapsed.has(fw.id);
           const allProjects = fw.programs.flatMap((p) => p.projects);
           const hasProjects = allProjects.length > 0;
+          // Whole carried-over projects: amber rows only, never counted below.
+          // They have no current-year tasks, so a quarter filter hides them.
+          const carriedCount = fw.programs.reduce((n, p) => n + (p.carriedProjects?.length ?? 0), 0);
+          const hasCarried = selectedQuarter === ALL_TIME && carriedCount > 0;
           const hasTasksInQuarter = selectedQuarter === ALL_TIME
             ? allProjects.some((p) => p.tasks.length > 0 || (p.specialTasks || []).length > 0 || (p.suchTasks || []).length > 0)
             : allProjects.some((p) =>
@@ -2433,6 +2534,7 @@ export default function DashboardView({
                       {fw.programs.length} program{fw.programs.length !== 1 ? "s" : ""}
                       {" · "}
                       {allProjects.length} project{allProjects.length !== 1 ? "s" : ""}
+                      {carriedCount > 0 && ` · ${carriedCount} carried over`}
                     </span>
                   </div>
 
@@ -2488,7 +2590,7 @@ export default function DashboardView({
                 </div>
 
               {/* ── Framework table ── */}
-              {!isCollapsed && hasProjects && hasTasksInQuarter && (
+              {!isCollapsed && ((hasProjects && hasTasksInQuarter) || hasCarried) && (
                 <div style={{ flex: 1, overflowX: "auto" }}>
                     <DndContext
                       id={`project-sort-${fw.id}`}
@@ -2505,18 +2607,21 @@ export default function DashboardView({
                         role="table"
                       >
                         <thead>
-                          <FrameworkSummaryRow
-                            framework={fw}
-                            selectedQuarter={selectedQuarter}
-                            settings={compSettings}
-                          />
+                          {hasProjects && hasTasksInQuarter && (
+                            <FrameworkSummaryRow
+                              framework={fw}
+                              selectedQuarter={selectedQuarter}
+                              settings={compSettings}
+                            />
+                          )}
                         </thead>
                         <TableHeader sortConfig={sortConfig} onSort={handleSort} settings={compSettings} />
                         <tbody>
 
                           {/* Programs + their projects */}
                           {fw.programs.map((prog) => {
-                            if (prog.projects.length === 0) return null;
+                            const carriedRows = selectedQuarter === ALL_TIME ? prog.carriedProjects ?? [] : [];
+                            if (prog.projects.length === 0 && carriedRows.length === 0) return null;
                             const hasTasksInProgram = selectedQuarter === ALL_TIME
                               ? prog.projects.some((p) => p.tasks.length > 0 || (p.specialTasks || []).length > 0 || (p.suchTasks || []).length > 0)
                               : prog.projects.some((p) =>
@@ -2524,7 +2629,8 @@ export default function DashboardView({
                                   (p.specialTasks || []).some((st) => st.dueQuarter === selectedQuarter) ||
                                   (p.suchTasks || []).some((st) => st.dueQuarter === selectedQuarter)
                                 );
-                            if (!hasTasksInProgram) return null;
+                            const showLive = prog.projects.length > 0 && hasTasksInProgram;
+                            if (!showLive && carriedRows.length === 0) return null;
                             const sortedProjects = sortConfig
                               ? [...prog.projects].sort((a, b) => {
                                   const va = getSortValue(a, sortConfig.key, selectedQuarter);
@@ -2539,15 +2645,18 @@ export default function DashboardView({
                                 items={sortedProjects.map((p) => p.id)}
                                 strategy={verticalListSortingStrategy}
                               >
-                                {/* Program sub-header */}
-                                <ProgramSummaryRow
-                                  program={prog}
-                                  selectedQuarter={selectedQuarter}
-                                  accentColor={fw.color}
-                                  settings={compSettings}
-                                />
+                                {/* Program sub-header (live projects only; a program with
+                                    nothing but carried projects has no figures to show) */}
+                                {showLive && (
+                                  <ProgramSummaryRow
+                                    program={prog}
+                                    selectedQuarter={selectedQuarter}
+                                    accentColor={fw.color}
+                                    settings={compSettings}
+                                  />
+                                )}
                                 {/* Project rows */}
-                                {!programsCollapsed &&
+                                {showLive && !programsCollapsed &&
                                 sortedProjects.map((project, rowIdx) => (
                                   <SortableProjectRow
                                     key={project.id}
@@ -2555,7 +2664,7 @@ export default function DashboardView({
                                     selectedQuarter={selectedQuarter}
                                     isEven={rowIdx % 2 === 0}
                                     programName={prog.name}
-                                    onPrefetch={() => router.prefetch(isHistorical && historicalTimestamp ? `/projects/${project.id}?asOf=${encodeURIComponent(historicalTimestamp)}` : `/projects/${project.id}?cached=1`)}
+                                    onPrefetch={() => router.prefetch(projectHref(project, isHistorical ? historicalTimestamp : null))}
                                     onNavigate={() => {
                                       markDashboardNavigation(project.id);
                                     }}
@@ -2568,7 +2677,19 @@ export default function DashboardView({
                                     historicalTimestamp={historicalTimestamp}
                                   />
                                 ))}
+                                {/* Carried-over projects: amber rows after the live ones */}
+                                {!programsCollapsed &&
+                                  carriedRows.map((project) => (
+                                    <CarriedProjectRow
+                                      key={`carried-${project.id}`}
+                                      project={project}
+                                      programName={prog.name}
+                                      historicalTimestamp={isHistorical ? historicalTimestamp : null}
+                                      onNavigate={() => markDashboardNavigation(project.id)}
+                                    />
+                                  ))}
                               </SortableContext>
+
                             );
                           })}
                         </tbody>
@@ -2578,7 +2699,7 @@ export default function DashboardView({
               )}
 
               {/* Empty framework */}
-              {!isCollapsed && !programsCollapsed && !hasProjects && (
+              {!isCollapsed && !programsCollapsed && !hasProjects && !hasCarried && (
                 <p
                   style={{
                     padding: "16px 20px",
@@ -2589,7 +2710,7 @@ export default function DashboardView({
                   No projects in this framework yet.
                 </p>
               )}
-              {!isCollapsed && !programsCollapsed && hasProjects && !hasTasksInQuarter && (
+              {!isCollapsed && !programsCollapsed && hasProjects && !hasTasksInQuarter && !hasCarried && (
                 <p
                   style={{
                     padding: "16px 20px",

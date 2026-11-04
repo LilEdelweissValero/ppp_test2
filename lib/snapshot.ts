@@ -83,11 +83,21 @@ interface SnapshotProject {
   suchTasks: SnapshotSuchTask[];
 }
 
+export interface SnapshotCarriedProject {
+  id: number;
+  name: string;
+  programId: number;
+  reference: string | null;
+  owner: string | null;
+  carriedOverTo: string;
+}
+
 interface SnapshotProgram {
   id: number;
   name: string;
   frameworkId: number;
   abandoned: boolean;
+  carriedProjects?: SnapshotCarriedProject[];
   projects: SnapshotProject[];
 }
 
@@ -113,7 +123,11 @@ interface ChangeLogEntry {
 
 // ── Snapshot reconstruction ──────────────────────────────────────────────────
 
-export async function getSnapshotAt(timestamp: string, historical = false): Promise<{
+export async function getSnapshotAt(
+  timestamp: string,
+  historical = false,
+  includeCarriedOver = false
+): Promise<{
   frameworks: SnapshotFramework[];
   lastModifiedAt: string;
   settings: ComputationSettings | null;
@@ -253,7 +267,7 @@ export async function getSnapshotAt(timestamp: string, historical = false): Prom
   // If no changes after the boundary, return current data as-is
   if (allLogs.length === 0) {
     return {
-      frameworks: filterAbandoned(currentFrameworks, historical),
+      frameworks: filterAbandoned(currentFrameworks, historical, includeCarriedOver),
       lastModifiedAt: timestamp,
       settings: null, // null = use current settings
     };
@@ -760,7 +774,7 @@ export async function getSnapshotAt(timestamp: string, historical = false): Prom
   }
 
   return {
-    frameworks: filterAbandoned(reconstructed, historical),
+    frameworks: filterAbandoned(reconstructed, historical, includeCarriedOver),
     lastModifiedAt: timestamp,
     settings: historicalSettings,
   };
@@ -768,24 +782,49 @@ export async function getSnapshotAt(timestamp: string, historical = false): Prom
 
 // ── Filter abandoned items (dashboard only shows active) ────────────────────
 
-function filterAbandoned(frameworks: SnapshotFramework[], historical = false): SnapshotFramework[] {
+// Carried-over handling:
+//  - default (dashboard, monthly updates): carried tasks are dropped and carried
+//    projects are split out into `carriedProjects` so they never reach aggregates.
+//  - includeCarriedOver (project page): carried tasks/projects are kept with their
+//    `carriedOverTo` flag so the page can render them amber (and exclude them from math).
+function filterAbandoned(
+  frameworks: SnapshotFramework[],
+  historical = false,
+  includeCarriedOver = false
+): SnapshotFramework[] {
   if (historical) return frameworks;
-  return frameworks
-    .map((f) => ({
-      ...f,
-      programs: f.programs
-        .filter((p) => !p.abandoned)
-        .map((p) => ({
+  const keepCarried = includeCarriedOver;
+  return frameworks.map((f) => ({
+    ...f,
+    programs: f.programs
+      .filter((p) => !p.abandoned)
+      .map((p) => {
+        const liveProjects = p.projects.filter((pr) => !pr.abandoned);
+        const carriedProjects: SnapshotCarriedProject[] = keepCarried
+          ? []
+          : liveProjects
+              .filter((pr) => pr.carriedOverTo)
+              .map((pr) => ({
+                id: pr.id,
+                name: pr.name,
+                programId: pr.programId,
+                reference: pr.reference,
+                owner: pr.owner,
+                carriedOverTo: pr.carriedOverTo as string,
+              }));
+        return {
           ...p,
-          projects: p.projects
-            .filter((pr) => !pr.abandoned && !pr.carriedOverTo)
+          carriedProjects,
+          projects: liveProjects
+            .filter((pr) => keepCarried || !pr.carriedOverTo)
             .map((pr) => ({
               ...pr,
               phases: pr.phases,
-              tasks: pr.tasks.filter((t) => !t.abandoned && !t.carriedOverTo),
-              specialTasks: pr.specialTasks.filter((st) => !st.abandoned && !st.carriedOverTo),
-              suchTasks: pr.suchTasks.filter((st) => !st.abandoned && !st.carriedOverTo),
+              tasks: pr.tasks.filter((t) => !t.abandoned && (keepCarried || !t.carriedOverTo)),
+              specialTasks: pr.specialTasks.filter((st) => !st.abandoned && (keepCarried || !st.carriedOverTo)),
+              suchTasks: pr.suchTasks.filter((st) => !st.abandoned && (keepCarried || !st.carriedOverTo)),
             })),
-        })),
-    }));
+        };
+      }),
+  }));
 }

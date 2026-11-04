@@ -467,6 +467,33 @@ select:focus-visible {
   background: var(--accent-bg);
 }
 
+/* Carried-over rows: amber, kept amber on hover, excluded from all calculations */
+.detail-task-table tbody tr.detail-task-row-carried,
+.detail-task-table tbody tr.detail-task-row-carried:hover {
+  background: var(--status-partial-bg);
+}
+
+.detail-task-table tbody tr.detail-task-row-carried td {
+  color: var(--status-partial-ink);
+}
+
+.detail-carried-label {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.detail-carried-banner {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--status-partial-ink);
+  border-radius: 3px;
+  background: var(--status-partial-bg);
+  color: var(--status-partial-ink);
+  font-size: 12px;
+}
+
 .detail-task-table .detail-task-code {
   color: var(--ink-secondary);
   font-family: var(--font-mono);

@@ -43,6 +43,7 @@ interface Props {
     deliverable: string;
     attachments: { url: string; title: string | null }[];
     phaseId: number | null;
+    carriedOverTo?: string | null;
   };
   initialSpecialData?: {
     id: number;
@@ -51,6 +52,7 @@ interface Props {
     dueQuarter: string;
     lastUpdatedDate: string | null;
     phaseId: number | null;
+    carriedOverTo?: string | null;
   };
   initialSuchData?: {
     id: number;
@@ -59,9 +61,16 @@ interface Props {
     dueQuarter: string;
     lastUpdatedDate: string | null;
     phaseId: number | null;
+    carriedOverTo?: string | null;
   };
   abandonReasons?: string[];
   onAbandon?: () => void;
+  // Called after an item is carried over or returned; receives the saved row so
+  // the caller can update it in place. Falls back to onAbandon when not provided.
+  onCarryOverChange?: (
+    type: "task" | "special-task" | "such-task",
+    saved: { id: number; carriedOverTo: string | null; carriedOverRemarks: string | null }
+  ) => void;
 }
 
 export default function TaskFormModal({
@@ -77,10 +86,17 @@ export default function TaskFormModal({
   initialSuchData,
   abandonReasons = [],
   onAbandon,
+  onCarryOverChange,
 }: Props) {
   const isEdit = !!initialData;
   const isSpecialEdit = !!initialSpecialData;
   const isSuchEdit = !!initialSuchData;
+  // Set when this item is currently parked in the Parking Lot
+  const carriedYear = isSuchEdit
+    ? initialSuchData?.carriedOverTo
+    : isSpecialEdit
+    ? initialSpecialData?.carriedOverTo
+    : initialData?.carriedOverTo;
   const isSpecialMode = isSpecialEdit || isSuchEdit || false;
 
   const [compSettings, setCompSettings] = useState<ComputationSettings | undefined>(undefined);
@@ -128,6 +144,38 @@ export default function TaskFormModal({
   const [abandonLoading, setAbandonLoading] = useState(false);
   const [carryTarget, setCarryTarget] = useState<{ id: number; name: string; type: "task" | "special-task" | "such-task" } | null>(null);
   const [carryLoading, setCarryLoading] = useState(false);
+
+  // Carry over (carriedOver: true) or return to the current year (false)
+  async function setCarriedOver(
+    target: { id: number; type: "task" | "special-task" | "such-task" },
+    carriedOver: boolean,
+    remarks?: string
+  ) {
+    setCarryLoading(true);
+    try {
+      const endpoint = target.type === "special-task" ? "special-tasks" : target.type === "such-task" ? "such-tasks" : "tasks";
+      const res = await fetch(`/api/${endpoint}/${target.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(carriedOver ? { carriedOver: true, carriedOverRemarks: remarks || null } : { carriedOver: false }),
+      });
+      if (!res.ok) return;
+      const saved = await res.json();
+      setCarryTarget(null);
+      if (onCarryOverChange) {
+        onCarryOverChange(target.type, {
+          id: target.id,
+          carriedOverTo: saved.carriedOverTo ?? null,
+          carriedOverRemarks: saved.carriedOverRemarks ?? null,
+        });
+      } else {
+        onAbandon?.();
+      }
+      onClose();
+    } finally {
+      setCarryLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (open) {
@@ -762,8 +810,11 @@ export default function TaskFormModal({
                     ? `${initialSpecialData?.specialTaskCode}: ${initialSpecialData?.name}`
                     : `${initialData?.taskCode}: ${initialData?.name}`;
                   const carryId = isSuchEdit ? initialSuchData!.id : isSpecialEdit ? initialSpecialData!.id : initialData!.id;
-                  setCarryTarget({ id: carryId, name: carryName, type: carryType });
+                  // Parked items go straight back; otherwise ask for remarks first
+                  if (carriedYear) setCarriedOver({ id: carryId, type: carryType }, false);
+                  else setCarryTarget({ id: carryId, name: carryName, type: carryType });
                 }}
+                disabled={carryLoading}
                 style={{
                   padding: "7px 12px",
                   fontSize: 12,
@@ -775,7 +826,7 @@ export default function TaskFormModal({
                   cursor: "pointer",
                 }}
               >
-                Carry over to {nextYear()}
+                {carriedYear ? `Return to ${Number(nextYear()) - 1}` : `Carry over to ${nextYear()}`}
               </button>
             )}
             {(isEdit || isSpecialEdit || isSuchEdit) && (
@@ -849,24 +900,7 @@ export default function TaskFormModal({
       <CarryOverConfirmModal
         open={!!carryTarget}
         onClose={() => setCarryTarget(null)}
-        onConfirm={async (remarks) => {
-          setCarryLoading(true);
-          try {
-            const endpoint = carryTarget.type === "special-task" ? "special-tasks" : carryTarget.type === "such-task" ? "such-tasks" : "tasks";
-            const res = await fetch(`/api/${endpoint}/${carryTarget.id}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ carriedOver: true, carriedOverRemarks: remarks || null }),
-            });
-            if (res.ok) {
-              setCarryTarget(null);
-              onAbandon?.(); // item left the active set: parent refreshes like abandon
-              onClose();
-            }
-          } finally {
-            setCarryLoading(false);
-          }
-        }}
+        onConfirm={(remarks) => setCarriedOver(carryTarget, true, remarks)}
         entityType={carryTarget.type === "special-task" ? "SpecialTask" : carryTarget.type === "such-task" ? "SuchTask" : "Task"}
         entityName={carryTarget.name}
         loading={carryLoading}

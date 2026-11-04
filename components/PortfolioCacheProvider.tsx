@@ -17,6 +17,8 @@ export interface CachedTask {
   dependencies: string | null;
   notes: string | null;
   phaseId: number | null;
+  carriedOverTo?: string | null;
+  carriedOverRemarks?: string | null;
 }
 
 export interface CachedSpecialTask {
@@ -33,6 +35,8 @@ export interface CachedSpecialTask {
   dueQuarter: string;
   lastUpdatedDate: string | null;
   phaseId: number | null;
+  carriedOverTo?: string | null;
+  carriedOverRemarks?: string | null;
 }
 
 export interface CachedSuchTask {
@@ -47,6 +51,8 @@ export interface CachedSuchTask {
   dueQuarter: string;
   lastUpdatedDate: string | null;
   phaseId: number | null;
+  carriedOverTo?: string | null;
+  carriedOverRemarks?: string | null;
 }
 
 export interface CachedPhase {
@@ -66,6 +72,8 @@ export interface CachedProject {
   adjustedTargetQuarter: string;
   actualCompletionDate: string | null;
   phasesTableName: string | null;
+  carriedOverTo?: string | null;
+  carriedOverRemarks?: string | null;
   program: { id: number; name: string };
   phases: CachedPhase[];
   tasks: CachedTask[];

@@ -21,7 +21,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const snapshot = await getSnapshotAt(timestamp);
+    // The project page asks for carried-over rows so it can render them amber;
+    // the dashboard and monthly updates keep the default (carried items excluded).
+    const includeCarriedOver = searchParams.get("includeCarriedOver") === "1";
+    const snapshot = await getSnapshotAt(timestamp, false, includeCarriedOver);
     return NextResponse.json(snapshot);
   } catch (error) {
     console.error("Snapshot reconstruction failed:", error);
