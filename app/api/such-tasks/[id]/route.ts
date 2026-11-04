@@ -161,7 +161,7 @@ export async function PATCH(
   const details = diffFields(
     existingTask as Record<string, unknown>,
     updateData,
-    ["suchTaskCode", "name", "totalScheduled", "sv", "snv", "nsv", "dueQuarter", "lastUpdatedDate"]
+    ["suchTaskCode", "name", "totalScheduled", "sv", "snv", "nsv", "dueQuarter", "lastUpdatedDate", "phaseId"]
   );
   if (details) {
     await logChange({

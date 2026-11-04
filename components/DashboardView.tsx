@@ -1548,7 +1548,8 @@ export default function DashboardView({
     markDashboardNavigation,
     version,
   } = usePortfolioCache();
-  const [portfolio, setPortfolio] = useState(frameworks);
+  // In historical mode start empty so live data never flashes before the snapshot loads
+  const [portfolio, setPortfolio] = useState(historicalTimestamp ? [] : frameworks);
   const isHistorical = !!historicalTimestamp;
   const editable = canEdit && !isHistorical;
   const [snapshotLoading, setSnapshotLoading] = useState(false);
@@ -1605,8 +1606,9 @@ export default function DashboardView({
   }, [historicalTimestamp]);
 
   useEffect(() => {
+    if (historicalTimestamp) return;
     setPortfolio(frameworks);
-  }, [frameworks]);
+  }, [frameworks, historicalTimestamp]);
 
   // Fetch snapshot data when in historical mode
   useEffect(() => {
@@ -1626,6 +1628,7 @@ export default function DashboardView({
       return;
     }
     setSnapshotLoading(true);
+    setPortfolio([]);
     fetch(`/api/snapshot?timestamp=${encodeURIComponent(historicalTimestamp)}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -1652,7 +1655,18 @@ export default function DashboardView({
     Record<number, Project[]>
   >({});
 
-  const quarters = [ALL_TIME, ...existingQuarters];
+  // Historical mode: quarters come from the snapshot, not the live page props
+  const quarterOptions = useMemo(() => {
+    if (!isHistorical) return existingQuarters;
+    const set = new Set<string>();
+    for (const fw of portfolio)
+      for (const prog of fw.programs)
+        for (const p of prog.projects)
+          for (const t of p.tasks) set.add(t.adjustedTargetQuarter);
+    return [...set].sort(compareQuarters);
+  }, [isHistorical, existingQuarters, portfolio]);
+
+  const quarters = [ALL_TIME, ...quarterOptions];
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -1667,7 +1681,8 @@ export default function DashboardView({
     const allProjects = portfolio.flatMap((framework) =>
       framework.programs.flatMap((program) =>
         program.projects.map((project) => {
-          const cached = getProject(project.id);
+          // The client cache holds current data; never let it override a snapshot
+          const cached = isHistorical ? undefined : getProject(project.id);
           return cached ? { ...project, ...cached } : project;
         })
       )
@@ -1696,7 +1711,7 @@ export default function DashboardView({
         return { ...prog, projects };
       }),
     }));
-  }, [portfolio, frameworkProjectsOverride, getProject, version]);
+  }, [portfolio, frameworkProjectsOverride, getProject, version, isHistorical]);
 
   const programOptions = useMemo(
     () =>
@@ -1949,14 +1964,20 @@ export default function DashboardView({
 
   // ── Year completion summary ──────────────────────────────────────────────────
   // Derived from existing task quarters (independent of the quarter filter).
-  const years = useMemo(() => getYearsFromQuarters(existingQuarters), [existingQuarters]);
+  const years = useMemo(() => getYearsFromQuarters(quarterOptions), [quarterOptions]);
   const [selectedYear, setSelectedYear] = useState<number | null>(
     years.length > 0 ? years[0] : null
   );
+  // Snapshot years arrive after mount; keep the selection valid
+  useEffect(() => {
+    if (selectedYear === null || !years.includes(selectedYear)) {
+      setSelectedYear(years.length > 0 ? years[0] : null);
+    }
+  }, [years, selectedYear]);
   const yearPct = useMemo(() => {
     if (selectedYear === null) return null;
     const frameworkPcts: number[] = [];
-    for (const fw of frameworks) {
+    for (const fw of portfolio) {
       const programPcts = fw.programs
         .map((prog) => {
           const projPcts = prog.projects
@@ -1981,7 +2002,7 @@ export default function DashboardView({
     if (frameworkPcts.length === 0) return null;
     const mean = frameworkPcts.reduce((sum, pct) => sum + pct, 0) / frameworkPcts.length;
     return Math.round(mean * 100);
-  }, [selectedYear, compSettings, frameworks]);
+  }, [selectedYear, compSettings, portfolio]);
 
   // ── render ───────────────────────────────────────────────────────────────
 

@@ -396,6 +396,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                 setTasks(pr.tasks as Task[]);
                 setSpecialTasks(pr.specialTasks as CachedSpecialTask[]);
                 setSuchTasks(pr.suchTasks as CachedSuchTask[]);
+                setPhases((pr.phases || []) as typeof phases);
                 break;
               }
             }

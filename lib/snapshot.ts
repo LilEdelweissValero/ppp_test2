@@ -503,6 +503,7 @@ export async function getSnapshotAt(timestamp: string, historical = false): Prom
         if (changes.adjustedTargetQuarter) p.adjustedTargetQuarter = changes.adjustedTargetQuarter.old;
         if (changes.actualCompletionDate) p.actualCompletionDate = changes.actualCompletionDate.old || null;
         if (changes.phasesTableName) p.phasesTableName = changes.phasesTableName.old || null;
+        if (changes.programId) p.programId = parseInt(changes.programId.old) || p.programId;
       }
     } else if (type === "Phase") {
       const ph = phaseMap.get(id);
@@ -524,6 +525,7 @@ export async function getSnapshotAt(timestamp: string, historical = false): Prom
         if (changes.deliverable) t.deliverable = changes.deliverable.old || null;
         if (changes.targetQuarter) t.targetQuarter = changes.targetQuarter.old;
         if (changes.adjustedTargetQuarter) t.adjustedTargetQuarter = changes.adjustedTargetQuarter.old;
+        if (changes.phaseId) t.phaseId = parseInt(changes.phaseId.old) || null;
       }
     } else if (type === "SpecialTask") {
       const st = specialTaskMap.get(id);
@@ -538,6 +540,7 @@ export async function getSnapshotAt(timestamp: string, historical = false): Prom
         if (changes.done) st.done = parseInt(changes.done.old) || 0;
         if (changes.dueQuarter) st.dueQuarter = changes.dueQuarter.old;
         if (changes.lastUpdatedDate) st.lastUpdatedDate = changes.lastUpdatedDate.old || null;
+        if (changes.phaseId) st.phaseId = parseInt(changes.phaseId.old) || null;
       }
     } else if (type === "SuchTask") {
       const st = suchTaskMap.get(id);
@@ -550,6 +553,7 @@ export async function getSnapshotAt(timestamp: string, historical = false): Prom
         if (changes.nsv) st.nsv = parseInt(changes.nsv.old) || 0;
         if (changes.dueQuarter) st.dueQuarter = changes.dueQuarter.old;
         if (changes.lastUpdatedDate) st.lastUpdatedDate = changes.lastUpdatedDate.old || null;
+        if (changes.phaseId) st.phaseId = parseInt(changes.phaseId.old) || null;
       }
     }
   }
@@ -693,6 +697,17 @@ export async function getSnapshotAt(timestamp: string, historical = false): Prom
     if (raw) {
       try {
         historicalSettings = JSON.parse(raw);
+      } catch {
+        // Malformed — fall back to null (current settings)
+      }
+    }
+  } else {
+    // No settings save at or before T. If settings were saved later, the earliest
+    // later save's oldValue is what was in effect at T (allLogs is newest-first).
+    const earliestLaterSettings = [...allLogs].reverse().find((l) => l.changeType === "settings");
+    if (earliestLaterSettings?.oldValue) {
+      try {
+        historicalSettings = JSON.parse(earliestLaterSettings.oldValue);
       } catch {
         // Malformed — fall back to null (current settings)
       }
