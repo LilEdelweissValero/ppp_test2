@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import ProjectLoadingSkeleton from "@/components/ProjectLoadingSkeleton";
 import {
   DndContext,
   closestCenter,
@@ -285,6 +287,11 @@ export default function ProjectDetailView({ project: initialProject, historicalT
   const { canReturnToDashboard, setProject } = usePortfolioCache();
   const [project, setCurrentProject] = useState(initialProject);
   const isHistorical = !!historicalTimestamp;
+  // Historical mode: hold back the live data until the snapshot answers
+  const [snapshotState, setSnapshotState] = useState<"loading" | "ready" | "error" | "missing">(
+    historicalTimestamp ? "loading" : "ready"
+  );
+  const [snapshotAttempt, setSnapshotAttempt] = useState(0);
   const [editUnlocked, setEditUnlocked] = useState<boolean | undefined>(canEdit);
   const locked = isHistorical || editUnlocked !== true;
   const [showEditProject, setShowEditProject] = useState(false);
@@ -370,6 +377,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
   // Fetch snapshot data when in historical mode
   useEffect(() => {
     if (!historicalTimestamp) {
+      setSnapshotState("ready");
       // Restore live settings (snapshot mode may have overridden them)
       if (initialSettings) {
         setCompSettings(initialSettings);
@@ -383,11 +391,18 @@ export default function ProjectDetailView({ project: initialProject, historicalT
       }
       return;
     }
+    let cancelled = false;
+    setSnapshotState("loading");
     fetch(`/api/snapshot?timestamp=${encodeURIComponent(historicalTimestamp)}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (!data?.frameworks) return;
+        if (cancelled) return;
+        if (!data?.frameworks) {
+          setSnapshotState("error");
+          return;
+        }
         // Find this project in the snapshot
+        let found = false;
         for (const fw of data.frameworks) {
           for (const prog of fw.programs) {
             for (const pr of prog.projects) {
@@ -397,6 +412,7 @@ export default function ProjectDetailView({ project: initialProject, historicalT
                 setSpecialTasks(pr.specialTasks as CachedSpecialTask[]);
                 setSuchTasks(pr.suchTasks as CachedSuchTask[]);
                 setPhases((pr.phases || []) as typeof phases);
+                found = true;
                 break;
               }
             }
@@ -408,9 +424,15 @@ export default function ProjectDetailView({ project: initialProject, historicalT
           // Snapshot had no settings change before T ("use current settings")
           setCompSettings(initialSettings);
         }
+        setSnapshotState(found ? "ready" : "missing");
       })
-      .catch(() => {});
-  }, [historicalTimestamp, project.id, initialSettings]);
+      .catch(() => {
+        if (!cancelled) setSnapshotState("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [historicalTimestamp, project.id, initialSettings, snapshotAttempt]);
 
   function handleTaskMouseEnter(task: Task, e: React.MouseEvent<HTMLTableRowElement>) {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
@@ -695,6 +717,35 @@ export default function ProjectDetailView({ project: initialProject, historicalT
     } catch {
       updateTasks(previousTasks);
     }
+  }
+
+  if (snapshotState === "loading") {
+    return <ProjectLoadingSkeleton label="Loading historical snapshot" />;
+  }
+
+  if (snapshotState === "missing" || snapshotState === "error") {
+    return (
+      <main className="detail-shell">
+        <div className="detail-container">
+          <div role={snapshotState === "error" ? "alert" : "status"} style={{ padding: "48px 32px", textAlign: "center" }}>
+            <p style={{ fontSize: 13, color: "var(--ink-tertiary)", marginBottom: 12 }}>
+              {snapshotState === "missing"
+                ? "This project didn’t exist as of the selected date."
+                : "Couldn’t load the historical snapshot."}
+            </p>
+            {snapshotState === "error" ? (
+              <button type="button" className="detail-back" onClick={() => setSnapshotAttempt((n) => n + 1)}>
+                Retry
+              </button>
+            ) : (
+              <Link href={`/?asOf=${encodeURIComponent(historicalTimestamp ?? "")}`} className="detail-back">
+                <span aria-hidden="true">←</span> Back to Dashboard
+              </Link>
+            )}
+          </div>
+        </div>
+      </main>
+    );
   }
 
   return (

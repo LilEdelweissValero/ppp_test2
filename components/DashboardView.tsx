@@ -1552,7 +1552,9 @@ export default function DashboardView({
   const [portfolio, setPortfolio] = useState(historicalTimestamp ? [] : frameworks);
   const isHistorical = !!historicalTimestamp;
   const editable = canEdit && !isHistorical;
-  const [snapshotLoading, setSnapshotLoading] = useState(false);
+  const [snapshotLoading, setSnapshotLoading] = useState(!!historicalTimestamp);
+  const [snapshotError, setSnapshotError] = useState(false);
+  const [snapshotAttempt, setSnapshotAttempt] = useState(0);
 
   const [selectedQuarter, setSelectedQuarter] = useState(searchParams.get("q") || ALL_TIME);
 
@@ -1627,24 +1629,36 @@ export default function DashboardView({
       }
       return;
     }
+    let cancelled = false;
     setSnapshotLoading(true);
+    setSnapshotError(false);
     setPortfolio([]);
     fetch(`/api/snapshot?timestamp=${encodeURIComponent(historicalTimestamp)}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
+        if (cancelled) return;
         if (data?.frameworks) {
           setPortfolio(data.frameworks);
-        }
-        if (data?.settings) {
-          setCompSettings(data.settings);
-        } else if (initialSettings) {
-          // Snapshot had no settings change before T ("use current settings")
-          setCompSettings(initialSettings);
+          if (data.settings) {
+            setCompSettings(data.settings);
+          } else if (initialSettings) {
+            // Snapshot had no settings change before T ("use current settings")
+            setCompSettings(initialSettings);
+          }
+        } else {
+          setSnapshotError(true);
         }
         setSnapshotLoading(false);
       })
-      .catch(() => setSnapshotLoading(false));
-  }, [historicalTimestamp, frameworks, initialSettings]);
+      .catch(() => {
+        if (cancelled) return;
+        setSnapshotError(true);
+        setSnapshotLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [historicalTimestamp, frameworks, initialSettings, snapshotAttempt]);
 
   useEffect(() => {
     seedPortfolio(frameworks, sourceVersion);
@@ -2201,7 +2215,56 @@ export default function DashboardView({
       </div>
 
       {/* ── Empty state ── */}
-      {filteredFrameworks.length === 0 && (
+      {isHistorical && snapshotLoading && (
+        <div
+          aria-busy="true"
+          aria-label="Loading historical snapshot"
+          role="status"
+          style={{ display: "flex", flexDirection: "column", gap: 12 }}
+        >
+          {[0, 1, 2].map((item) => (
+            <div className="route-loading-panel" key={item}>
+              <div className="route-loading-panel-title" />
+              <div className="route-loading-row" />
+              <div className="route-loading-row" />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {isHistorical && !snapshotLoading && snapshotError && (
+        <div
+          role="alert"
+          style={{
+            padding: "48px 32px",
+            textAlign: "center",
+            background: "var(--surface)",
+            border: "1px solid var(--rule)",
+            borderRadius: 4,
+          }}
+        >
+          <p style={{ fontSize: 13, color: "var(--ink-tertiary)", marginBottom: 12 }}>
+            Couldn&apos;t load the historical snapshot.
+          </p>
+          <button
+            type="button"
+            onClick={() => setSnapshotAttempt((n) => n + 1)}
+            style={{
+              fontSize: 12,
+              padding: "6px 14px",
+              border: "1px solid var(--rule)",
+              borderRadius: 4,
+              background: "var(--surface)",
+              color: "var(--ink-secondary)",
+              cursor: "pointer",
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {filteredFrameworks.length === 0 && !(isHistorical && (snapshotLoading || snapshotError)) && (
         <div
           style={{
             padding: "48px 32px",
@@ -2220,9 +2283,11 @@ export default function DashboardView({
           >
             {search
               ? "No projects match your search."
-              : "No frameworks or projects yet."}
+              : isHistorical
+                ? "No frameworks or projects existed as of this date."
+                : "No frameworks or projects yet."}
           </p>
-          {!search && (
+          {!search && !isHistorical && (
             <p style={{ fontSize: 12, color: "var(--ink-tertiary)" }}>
               Click &quot;Add Project&quot; or use Manage → Import / Export Excel to get started.
             </p>
