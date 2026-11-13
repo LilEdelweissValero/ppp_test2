@@ -1,4 +1,4 @@
-# Product
+# Product demo
 
 <!-- impeccable:product-schema 1 -->
 
