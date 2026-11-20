@@ -8,6 +8,7 @@ interface ModalProps {
   title: string;
   children: React.ReactNode;
   wide?: boolean;
+  onTitleTripleClick?: () => void;
 }
 
 export default function Modal({
@@ -16,6 +17,7 @@ export default function Modal({
   title,
   children,
   wide,
+  onTitleTripleClick,
 }: ModalProps) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -68,7 +70,15 @@ export default function Modal({
         >
           <h2
             id="modal-title"
+            onClick={
+              onTitleTripleClick
+                ? (e) => {
+                    if (e.detail === 3) onTitleTripleClick();
+                  }
+                : undefined
+            }
             style={{
+              userSelect: onTitleTripleClick ? "none" : undefined,
               margin: 0,
               fontSize: 18,
               fontWeight: 600,

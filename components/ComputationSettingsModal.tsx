@@ -22,7 +22,7 @@ interface Props {
   onSaved?: (settings: ComputationSettings) => void;
 }
 
-type Tab = "statuses" | "health" | "completionRates" | "abandonment";
+type Tab = "statuses" | "health" | "completionRates" | "abandonment" | "keepalive";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "statuses", label: "Statuses" },
@@ -30,6 +30,106 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "completionRates", label: "Completion Rates" },
   { key: "abandonment", label: "Abandonment Reasons" },
 ];
+
+// Not in TABS: only shown after the title is triple-clicked (edit access only).
+const KEEPALIVE_TAB: { key: Tab; label: string } = {
+  key: "keepalive",
+  label: "Keep-Alive",
+};
+
+const LAST_PING_KEY = "ppp_last_db_ping";
+
+// ── Keep-Alive Tab ─────────────────────────────────────────────────────────
+
+function KeepAliveTab() {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(
+    null
+  );
+  const [lastPing, setLastPing] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(LAST_PING_KEY);
+    } catch {
+      return null;
+    }
+  });
+
+  async function ping() {
+    setBusy(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/keepalive", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.ok) {
+        setResult({ ok: true, text: `Database responded in ${data.ms} ms.` });
+        setLastPing(data.pingedAt);
+        try {
+          localStorage.setItem(LAST_PING_KEY, data.pingedAt);
+        } catch {
+          // storage unavailable; display only
+        }
+      } else {
+        setResult({ ok: false, text: data.error || "Ping failed." });
+      }
+    } catch {
+      setResult({ ok: false, text: "Could not reach the server." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <p
+        style={{
+          fontSize: 12,
+          color: "var(--ink-secondary)",
+          marginBottom: 16,
+        }}
+      >
+        Sends a harmless read query to the database so the hosting provider
+        sees activity and does not pause it for inactivity.
+      </p>
+      <button
+        onClick={ping}
+        disabled={busy}
+        style={{
+          padding: "8px 20px",
+          fontSize: 12,
+          fontWeight: 600,
+          color: "#FFFFFF",
+          background: "var(--accent)",
+          borderRadius: 3,
+          opacity: busy ? 0.5 : 1,
+          cursor: busy ? "not-allowed" : "pointer",
+        }}
+      >
+        {busy ? "Pinging..." : "Ping database"}
+      </button>
+      {result && (
+        <p
+          style={{
+            fontSize: 12,
+            marginTop: 12,
+            color: result.ok ? "#1A6B3C" : "#B91C1C",
+          }}
+        >
+          {result.text}
+        </p>
+      )}
+      <p
+        style={{
+          fontSize: 11,
+          color: "var(--ink-tertiary)",
+          marginTop: 12,
+        }}
+      >
+        Last successful ping from this browser:{" "}
+        {lastPing ? new Date(lastPing).toLocaleString() : "never"}
+      </p>
+    </div>
+  );
+}
 
 // ── Statuses Tab ───────────────────────────────────────────────────────────
 
@@ -775,6 +875,17 @@ export default function ComputationSettingsModal({ open, onClose, onSaved }: Pro
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [revealed, setRevealed] = useState(false);
+
+  const revealKeepAlive = useCallback(async () => {
+    try {
+      const res = await fetch("/api/auth/status");
+      const data = await res.json();
+      if (data.canEdit) setRevealed(true);
+    } catch {
+      // stay hidden
+    }
+  }, []);
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -796,6 +907,9 @@ export default function ComputationSettingsModal({ open, onClose, onSaved }: Pro
       fetchSettings();
       setError(null);
       setSuccess(null);
+    } else {
+      setRevealed(false);
+      setTab((t) => (t === "keepalive" ? "statuses" : t));
     }
   }, [open, fetchSettings]);
 
@@ -906,7 +1020,7 @@ export default function ComputationSettingsModal({ open, onClose, onSaved }: Pro
 
   if (fetching) {
     return (
-      <Modal open={open} onClose={handleClose} title="Settings" wide>
+      <Modal open={open} onClose={handleClose} title="Settings" wide onTitleTripleClick={revealKeepAlive}>
         <div
           style={{
             padding: 32,
@@ -922,7 +1036,7 @@ export default function ComputationSettingsModal({ open, onClose, onSaved }: Pro
   }
 
   return (
-    <Modal open={open} onClose={handleClose} title="Settings" wide>
+    <Modal open={open} onClose={handleClose} title="Settings" wide onTitleTripleClick={revealKeepAlive}>
       <div>
         {/* Tab bar */}
         <div
@@ -933,7 +1047,7 @@ export default function ComputationSettingsModal({ open, onClose, onSaved }: Pro
             marginBottom: 20,
           }}
         >
-          {TABS.map((t) => (
+          {(revealed ? [...TABS, KEEPALIVE_TAB] : TABS).map((t) => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
@@ -981,6 +1095,7 @@ export default function ComputationSettingsModal({ open, onClose, onSaved }: Pro
           {tab === "completionRates" && (
             <CompletionRatesTab statuses={settings.statuses} />
           )}
+          {tab === "keepalive" && revealed && <KeepAliveTab />}
           {tab === "abandonment" && (
             <AbandonmentReasonsTab
               reasons={settings.abandonmentReasons ?? []}
